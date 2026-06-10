@@ -48,3 +48,28 @@
 - **流水线本身成立**：两阶段在一个真实工程工具输入上端到端跑通，产物完整、工程代码经测试可运行。
 - **skill 原本对「带 REST 后端的框架式 Web 应用」假设过强**；本次最有价值的调整是把它泛化到「离线/宿主桥 + 原生无框架」这一类 BMC/嵌入式场景——而这恰好是 skill 自身示例（SMC、cooling-web-config）所属的领域。
 - 调整均为**向后兼容的补充分支**，未改变原有主路径。
+
+---
+
+## 4. 第二轮反馈与调整（用户复盘后）
+
+| # | 反馈 | 处理 |
+|---|------|------|
+| R1 | `/design-critique`、`/accessibility-review` 是 Claude 自带 skill，应把**思路内嵌**进两 skill，保证换工具/换环境都能跑 | 两 skill 把审查从「调用外部 skill」改为「**内置方法 + 自带清单，工具无关**」：phase1 §1.2.2 加内置设计审查四维度清单；phase2 §2 改为「环境有就叠加调用、没有就用内置清单」。外部 skill 降级为可选实现 |
+| R2 | 第一阶段缺「优化后 Demo」——提示词应产出一个可见的优化后 Demo | 补产物 `optimized-demo/index.html`（单文件可双击，落实 demo-prompt 的 O1–O5 + a11y + 窄屏降级 + `smc-apply` 事件）；phase1 新增 **Step 3.5 用提示词产出优化后 Demo**，并列入标准产出（必出） |
+| R3 | 第二阶段应针对**优化后 Demo**做审查 + uxspec | phase2 输入与 `design-review.md`/`accessibility-audit.md` 全部重新指向优化后 Demo（第二轮：确认 R1 修复 + 残留 R2-x）；design-structure 反推对象改为优化后 Demo |
+| R4 | uxspec 可否用**可视化报告**形式给出 | 新增 `uxspec-report.html`（16:9 幻灯片，8 张：布局/Token/组件/状态矩阵/交互序列/复审/交付）；phase2 新增 **§3.9 uxspec 可视化报告形态**，并列入标准产出（推荐）。md 为精确源、report 为评审窗 |
+
+### 新增/更新产物
+- `optimized-demo/index.html`（新，单文件优化后 Demo，编解码往返经校验）
+- `phase2/uxspec-report.html`（新，8 slide，结构平衡）
+- `phase2/design-review.md` · `accessibility-audit.md`（重写为针对优化后 Demo 的第二轮）
+- `phase2/design-structure.md`（反推对象更新 + 指向可视化报告）
+
+### 流水线形态（更新后）
+```
+需求 →[阶段一]→ 分析 + 可视化报告 + demo-prompt → ★优化后 Demo★
+                                                      │
+       ★优化后 Demo★ →[阶段二]→ 审查(R2) + uxspec(md + 可视化报告) + 工程代码 + 接入交付
+```
+

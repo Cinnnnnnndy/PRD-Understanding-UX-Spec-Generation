@@ -1,6 +1,7 @@
-# SMC 偏移量计算器 · 设计结构文档
-> 生成时间：2026-06-10 | Demo 版本：preview-smc-calculator.html
+# SMC 偏移量计算器 · 设计结构文档（UX Spec）
+> 生成时间：2026-06-10 | 反推对象：**优化后 Demo** `../optimized-demo/index.html`
 > 原则：视觉规格精确(hex/px)；数据/布局不写死实例。
+> 📊 本规格另有**可视化报告形态**：`uxspec-report.html`（16:9 幻灯片，评审沟通用）。本 md 为精确源。
 
 ## 一、页面整体布局
 

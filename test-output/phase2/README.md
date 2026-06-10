@@ -13,9 +13,13 @@ BMC 固件 **32 位 SMC 命令字 ↔ 5 语义字段** 的双向编解码工具�
 - `smc-calculator-report.html` — 16:9 幻灯片可视化报告（含第一轮设计审查）
 - `preview/index.html` — 审查对象（原始 Demo）
 
+### 阶段间过渡 · 优化后 Demo（`../optimized-demo/`）
+- `index.html` — 由阶段一 demo-prompt.md 产出的优化后 Demo（单文件可双击）；**阶段二的输入对象**。
+
 ### 阶段二 · 工程化（本目录）
-- `design-review.md` · `accessibility-audit.md` — 设计 / 可访问性审查（WCAG 2.1 AA）
-- `design-structure.md` — 精确设计规格（视觉/布局/逐组件状态枚举/交互序列）
+- `design-review.md` · `accessibility-audit.md` — 针对**优化后 Demo** 的第二轮设计 / 可访问性审查（WCAG 2.1 AA）
+- `design-structure.md` — uxspec 精确源（视觉/布局/逐组件状态枚举/交互序列）
+- `uxspec-report.html` — **uxspec 可视化报告**（16:9 幻灯片，评审沟通用）
 - `tech-selection.md` — 技术选型（原生 Web Component，无框架）
 - `src/` — 工程级前端代码
 - `test/` — 单元测试（9 用例，`node --test` 通过）
@@ -40,6 +44,8 @@ phase2/
 
 ## 如何打开 Demo / 工程版
 - 原始 Demo：双击 `../phase1/preview/index.html`。
+- **优化后 Demo：双击 `../optimized-demo/index.html`**（单文件，可直接 file:// 打开）。
+- uxspec 可视化报告：双击 `uxspec-report.html`。
 - 工程版：因用 ES Modules，需经 HTTP 打开（不能 file://）：
   ```bash
   cd phase2 && python3 -m http.server 8765   # 浏览器访问 http://localhost:8765

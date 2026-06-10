@@ -98,7 +98,7 @@ description: |
 
 | 类型 | 说明 |
 |------|------|
-| **精调后的 Demo 产物**（必需） | 单文件 HTML 原型 / 一组页面 / 截图 + 代码。由阶段一 demo-prompt.md 驱动生成或精调 |
+| **优化后 Demo 产物**（必需） | 阶段一 Step 3.5 产出的 `optimized-demo/index.html`（或基于 demo-prompt.md 再迭代的版本）。单文件 HTML 原型 / 一组页面 / 截图 + 代码。**本阶段所有审查与 uxspec 都以这个优化后 Demo 为对象，而非原始 Demo** |
 | 阶段一产物（强烈建议带上） | `demo-prompt.md`、`product-doc.md`、`data-structure.md`、`interface-contract.md`、`business-logic.md`、可视化报告 |
 | 目标工程信息（建议先问） | 目标开发栈、目录结构约定、状态管理方案、CSS 方案、测试框架、TypeScript 严格度 |
 
@@ -112,7 +112,8 @@ description: |
 |---|------|------|------|
 | 1 | `design-review.md` | 必出 | /design-critique 设计审查报告（信息架构·一致性·层级·反馈） |
 | 2 | `accessibility-audit.md` | 必出 | /accessibility-review 可访问性审查报告（WCAG 2.1 AA + 工程侧建议） |
-| 3 | `design-structure.md` | 必出 | 精确视觉规格 · 布局算法 · 交互规格 · 状态枚举 · 交互序列 · 待确认清单 |
+| 3 | `design-structure.md` | 必出 | 精确视觉规格 · 布局算法 · 交互规格 · 状态枚举 · 交互序列 · 待确认清单（uxspec 的**精确源**） |
+| 3.5 | `uxspec-report.html` | 推荐 | uxspec 的**可视化报告形态**（16:9 幻灯片，单文件）——把 design-structure 渲染成可评审的 deck |
 | 4 | `tech-selection.md` | 可选（看复杂度） | 技术选型，Demo 与工程各一套 + 迁移路径 |
 | 5 | `src/components/...` | 必出 | 工程级前端代码，符合后端数据结构，可直接接入 |
 | 6 | `src/services/[feature]Api.ts` | 有 HTTP 后端时必出 | API 集成层，Mock 字段映射真实接口；**纯本地功能/宿主桥**则改为事件或 IPC 适配层（如 `CustomEvent`/`postMessage`），不强造空 API 层 |
@@ -148,9 +149,13 @@ description: |
 
 #### 2.1 设计审查（/design-critique）→ `design-review.md`
 
-> **若 `/design-critique` 或 `/accessibility-review` 未安装**：不要跳过这两步，按 2.1 / 2.2 列出的维度与 WCAG 2.1 AA 清单**人工执行**，并在报告里注明「按对应框架人工执行」。审查是必出项，外部 skill 只是其一种实现方式。
+> **设计审查与可访问性审查的方法都内置于本 skill（下方 2.1/2.2 的检查维度表 + WCAG 2.1 AA 清单），工具无关，不依赖外部 skill。**
+> `/design-critique`、`/accessibility-review` 是 Claude 自带的同名 skill：
+> - **环境有** → 可调用它们，并把产品上下文一起传入，结论按本节格式落盘。
+> - **环境没有**（换工具/换环境/裸 API）→ 直接用 2.1/2.2 的内置清单执行同一套审查。
+> 两条路径产出同构。这两份审查是**必出项**，外部 skill 只是其一种实现方式。
 
-带上阶段一的产品上下文模板调用 `/design-critique`：
+带上阶段一的产品上下文，对照下方维度做设计审查（有 `/design-critique` 则一并调用）：
 
 ```
 请基于以下产品背景进行审查：
@@ -278,6 +283,17 @@ description: |
 | 拓扑网络 | ELK.js（layered 模式） | 边距 Xpx，端口对齐方式 |
 | 力导向图 | d3-force | 排斥力 X，中心引力 X |
 | 手动布局（可拖拽后持久化） | 无自动布局 | 初始位置从数据源读取 |
+
+---
+
+#### 3.9 uxspec 的可视化报告形态（推荐）→ `uxspec-report.html`
+
+> `design-structure.md` 是给开发看的**精确源**（hex/px/状态枚举），信息密度高但不便评审汇报。再产出一份**可视化报告**，把同一套规格渲染成 16:9 幻灯片，供设计/产品/工程对齐。
+
+- **形态硬约束与阶段一可视化报告完全一致**：单文件、1280×720 固定画布 + 整体 `scale()` 自适应、一次一张 slide、内部固定 px、组件化而非裸标签（缩放/翻页/SVG 逻辑直接复用阶段一 Step 4 的实现）。
+- **建议 slide 清单**：封面（规格概览数字）→ 整体布局（ASCII 树 + 间距）→ 设计 Token（色板 + 字体表）→ 组件规格（含位布局条/mockup）→ **状态矩阵**（逐组件 × 状态网格）→ 交互序列（流程链 + 数据流）→ 复审结论（R1 问题→R2 状态 + 残留）→ 交付映射（规格/审查/工程落地）。
+- **两者关系**：md 为准、report 为窗。report 里的每个数值都出自 design-structure.md，不另造规格；md 更新后 report 同步。
+- 生成后过阶段一 Step 4 的「交付前自检」（比例不变形、单页不溢出、翻页可用、用组件非裸标签）。
 
 ---
 
