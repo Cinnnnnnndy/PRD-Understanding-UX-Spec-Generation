@@ -1,7 +1,13 @@
 # SMC 偏移量计算器 · 设计结构文档（UX Spec）
-> 生成时间：2026-06-10 | 反推对象：**优化后 Demo** `../optimized-demo/index.html`
-> 原则：视觉规格精确(hex/px)；数据/布局不写死实例。
+> 生成时间：2026-06-10 | 原则：视觉规格精确(hex/px)；数据/布局不写死实例。
 > 📊 本规格另有**可视化报告形态**：`uxspec-report.html`（16:9 幻灯片，评审沟通用）。本 md 为精确源。
+>
+> ⚠️ **版本说明（待重做）**：本文档 + `uxspec-report.html` + `design-review.md` + `accessibility-audit.md`
+> 是基于**早期较薄的优化 Demo** 反推的。优化 Demo 现已升级为 gold-standard
+> `../optimized-demo/index.html`（openUBMC Studio shell + studio-shell.css），新增了
+> **完整 32-bit 位图、HEX↔DEC 双向同步输入、多格式导出(C/JSON)、最近 10 次历史、字段卡按位宽布局、载入示例/重置** 等能力。
+> 这些 phase2 产物需**针对新 Demo 重新反推**（组件清单、状态枚举、交互序列、Token 都要按 Studio 系统更新）。
+> 重做前，以 `../phase1/demo-prompt.md` 与 gold-standard Demo 为准。
 
 ## 一、页面整体布局
 

@@ -73,3 +73,25 @@
        ★优化后 Demo★ →[阶段二]→ 审查(R2) + uxspec(md + 可视化报告) + 工程代码 + 接入交付
 ```
 
+---
+
+## 5. 第三轮反馈与调整（优化 Demo 完成度不足）
+
+**反馈**：优化后 Demo「优化得非常少」，与用户和 Claude design + code 讨论出的 gold-standard 差距大——漏掉了一整类专业能力。用户提供了参考 Demo `SMC_Offset_Calculator.html` 作为目标水准。
+
+**对照 gold-standard，我的分析/提示词遗漏的优化点：**
+完整 32-bit 逐位位图 · HEX↔DEC 双向同步输入 · 字段卡按位宽成比例布局 · 多格式导出(HEX/DEC/HEX+DEC/C字面量/JSON) · 最近10次历史(localStorage+回填+Ctrl+S) · 载入示例/重置 · 每字段dec/hex读数+单独复制 · 样式化 hint 浮层 · 宽松解析。
+
+**根因**：优化模式的分析停在「修审查发现的问题」，没问「专业用户一天用 50 次还缺什么」——产出「正确但单薄」。
+
+**调整：**
+| # | 处理 |
+|---|------|
+| 产物 | 把 gold-standard 落库 `test-input/reference-optimized-demo.html`，并作为新的 `optimized-demo/index.html`；合成 `optimized-demo/studio-shell.css`（openUBMC Studio 设计系统）使其可独立双击（22 个 CSS 变量全覆盖） |
+| demo-prompt | 重写 `phase1/demo-prompt.md` 到**参考级完成度**：§A 改 Studio token + 字段 hue 系统；§C 把 9 大能力写成可验收规格（位图三行网格/双向同步/多格式导出含 C·JSON/历史/字段权重布局…）；§F 覆盖全状态 |
+| 需求分析 | `phase1/product-doc.md` 机会点扩为三类：(a)问题修复 O1–O5、**(b)专业级完成度 O8–O13**、(c)需规格 O6–O7；并记录「分析教训」 |
+| **skill** | phase1 §E 机会点分析新增「**两类穷尽 + 自检三问**」（一天50次还缺什么/产出去哪/数据最该被看见什么）；优化模式新增「**专业级完成度补齐清单**」（全保真可视化/历史复用/多格式导出/双向同步/快速起点/逐元素操作/键盘加速），要求逐项判断要不要、写成可验收规格 |
+| phase2 | design-structure 等加「版本说明」横幅：标记为基于早期薄 Demo 反推，需针对 gold-standard 重做 |
+
+> 核心 skill 教训：**优化模式 ≠ 修问题点，而是做到专业工具完成度。** 这条已固化进 phase1 skill 的机会点分析与优化模式提示词模板。
+

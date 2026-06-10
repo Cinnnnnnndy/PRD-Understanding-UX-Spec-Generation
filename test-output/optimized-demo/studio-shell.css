@@ -1,0 +1,76 @@
+/* ======================================================================
+   openUBMC Studio · Shell 设计系统（合成版）
+   为 reference-optimized-demo 提供独立渲染能力——原讨论产物依赖此外部样式表。
+   暗色工程工具主题；字段配色 hue-* 与 32-bit 位图/字段卡一一对应。
+   ====================================================================== */
+:root{
+  /* 背景层级 */
+  --bg:#0d0f14; --bg-elev-1:#161922; --bg-elev-2:#1c2029; --bg-elev-3:#252a36;
+  /* 边框 */
+  --border:#262b36; --border-strong:#39414f;
+  /* 圆角 */
+  --radius:6px; --radius-lg:10px;
+  /* 强调（靛蓝） */
+  --accent:#4f6ef7; --accent-soft:rgba(79,110,247,0.16);
+  /* 语义色 */
+  --err:#f06570; --ok:#34d399; --warn:#f5b454;
+  /* 文字 */
+  --text:#e6e9f0; --text-dim:#9aa3b2; --text-mute:#6b7384; --placeholder:#566073;
+  /* 字体 */
+  --font-mono:ui-monospace,'SF Mono','JetBrains Mono',Consolas,'Courier New',monospace;
+  --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans CJK SC',sans-serif;
+  /* 字段 hue（与位图/字段卡对应） */
+  --hue-func:#f59e6b; --hue-cmd:#4f6ef7; --hue-ms:#a78bfa; --hue-rw:#34d399; --hue-param:#f5b454;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+/* === Shell / Tab bar === */
+.shell{min-height:100vh;display:flex;flex-direction:column}
+.tabbar{display:flex;align-items:center;gap:18px;height:44px;padding:0 16px;
+  background:var(--bg-elev-1);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;color:var(--text);white-space:nowrap}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.tabs{display:flex;align-items:center;gap:2px;overflow-x:auto}
+.tab{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:6px;font-size:12.5px;
+  color:var(--text-dim);white-space:nowrap;cursor:pointer}
+.tab:hover{background:var(--bg-elev-2);color:var(--text)}
+.tab.active{background:var(--bg-elev-3);color:var(--text)}
+.tab a{color:inherit;text-decoration:none}
+.tab .badge{font-family:var(--font-mono);font-size:10px;color:var(--text-mute);
+  background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:0 4px}
+
+/* === Page / container === */
+.page{flex:1;padding:22px 16px 40px}
+.container{max-width:960px;margin:0 auto}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.page-head h1{margin:0 0 4px;font-size:21px;font-weight:700;letter-spacing:-.2px}
+.page-head .sub{font-size:12.5px;color:var(--text-dim);line-height:1.55;max-width:640px}
+.head-actions{display:flex;gap:8px;flex-shrink:0}
+
+/* === Section header === */
+.section-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.section-h .title{font-size:13px;font-weight:600;color:var(--text);
+  padding-left:9px;border-left:3px solid var(--accent)}
+.section-h .hint{font-size:11px;color:var(--text-mute)}
+
+/* === Buttons === */
+.btn{appearance:none;border:1px solid transparent;border-radius:var(--radius);font-family:var(--font-sans);
+  font-size:12.5px;font-weight:600;padding:0 14px;height:34px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background .12s,border-color .12s,color .12s}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:not(:disabled):hover{background:#6480ff}
+.btn-secondary{background:var(--bg-elev-2);color:var(--text);border-color:var(--border-strong)}
+.btn-secondary:hover{background:var(--bg-elev-3)}
+.btn-ghost{background:transparent;color:var(--text-dim);border-color:var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border-strong);background:var(--bg-elev-2)}
+
+/* === Toast === */
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(12px);
+  background:var(--bg-elev-3);color:var(--text);border:1px solid var(--border-strong);
+  border-radius:8px;padding:9px 16px;font-size:12.5px;font-family:var(--font-mono);
+  box-shadow:0 12px 36px rgba(0,0,0,.5);opacity:0;pointer-events:none;
+  transition:opacity .18s,transform .18s;z-index:100}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
