@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC 偏移量计算器 · 工程版</title>
+<style>
+  body{margin:0;background:#1e1e1e}
+  /* VS Code 主题变量在独立预览时的兜底（嵌入 Webview 时由宿主提供，可删） */
+</style>
+</head>
+<body>
+  <!-- 工程组件以原生自定义元素接入；宿主监听 smc-apply 事件即可拿到结果 -->
+  <smc-calculator id="calc"></smc-calculator>
+  <script type="module">
+    import './src/components/SmcCalculator/smc-calculator.js';
+    // 宿主桥示例：VS Code Webview 中可在此 acquireVsCodeApi().postMessage(e.detail)
+    document.getElementById('calc').addEventListener('smc-apply', (e) => {
+      console.log('[smc-apply]', e.detail); // { offsetHex, offsetDec, fields }
+    });
+  </script>
+</body>
+</html>

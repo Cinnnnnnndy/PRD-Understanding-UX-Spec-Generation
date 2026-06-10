@@ -327,6 +327,13 @@ sensor_reading: "<=/Scanner_Lm75_Inlet.Value"
 逐一列出所有接口（请求方式、路径、参数、返回字段，TypeScript 接口格式）。
 若已有接口文档以其为准，只做整理补充；若无，根据代码与业务拟草案，明确标注「草案，待后端确认」。
 
+> **先判断后端形态——不是所有功能都有 HTTP 接口。** 三类常见形态，按实际选用，别硬套 REST 模板：
+> 1. **HTTP/REST 后端** → 用下面的请求方式/路径/分页模板。
+> 2. **无网络的本地功能**（离线计算器、编解码器、纯前端工具）→ 没有「接口」，改写**纯函数计算契约**（输入/输出/校验的函数签名，TypeScript 形式），跳过路径与分页。
+> 3. **宿主桥**（VS Code Webview / Electron / CLI 工具）→ 接口是**消息协议**而非 HTTP：列出 `postMessage` / IPC / stdin-stdout 的消息类型与 payload（标「草案，待宿主确认」）。
+>
+> 真实案例：SMC 偏移量计算器是「离线纯函数 + Webview 消息桥」，整张 REST 模板（请求方式 / 路径 / 分页 cursor/offset）都不适用——把它写成纯函数契约 + `applyOffset` 消息桥才正确。
+
 **接口字段 → UI 状态映射**：
 ```
 GET /api/feature?page=1&status=active
@@ -531,6 +538,8 @@ A=10  B=11  C=12  D=13  E=14  F=15
 
 把预览页面作为对象，调用 `/design-critique` 做系统性设计评审，并带上分析得到的产品上下文模板：
 
+> **若 `/design-critique` 未安装**（环境里没有这个 skill）：不要跳过审查，按本节列出的四维度框架（信息架构 / 视觉一致性 / 反馈与状态 / 层级清晰度）**人工执行**同一套审查，并在 critique slide 注明「本轮按 /design-critique 框架人工执行」。审查是必做项，外部 skill 只是其一种实现。
+
 ```
 请基于以下产品背景进行审查：
 - 产品类型：[工程工具 / 消费者应用 / 管理后台]
@@ -714,6 +723,8 @@ A=10  B=11  C=12  D=13  E=14  F=15
 ## §B 当前 UI 问题诊断（逐视图逐组件，可量化）
 
 > 每条问题必须写明：位置 + 可量化的表现 + 用户影响。「布局不好」不是问题，「右侧 40% 空白导致工程师每次切视图都要水平移动视线」才是。
+>
+> ⚠️ **下表的具体数值（660px、🔍、字号等）只是格式示范，不是结论。** 每个量化值都必须从**当前这份真实 artifact** 重新测量/读取，不能照抄模板里的示例数字。例：示例写「max-width 660px」，但你手上的文件可能是 650px；示例写「emoji 标题🔍」，实际可能是🧮 或根本没有。照抄会让诊断与真实文件对不上。
 
 ### [视图名称]
 
@@ -1015,13 +1026,17 @@ document.getElementById('deck').addEventListener('click', e=>{
 <span class="chip chip-yellow">🟡 需后端配合</span>
 <span class="chip chip-red">🔴 需产品决策</span>
 
-<!-- 位字段图（编码整数概念）：每段一个 cell -->
+<!-- 位字段图（编码整数概念）：每段一个 cell，cell 宽度按"位宽"成比例（style="flex:位数"） -->
+<!-- ⚠️ 段宽必须按真实位宽，不能等分、更不能按十六进制字符分段——很多命令字字段不落在 nibble(4位) 边界上 -->
 <div class="bit-row">
-  <div class="bit-cell bit-fn">0x30<div class="bit-lbl">功能码</div></div>
-  <div class="bit-cell bit-cmd">0x44<div class="bit-lbl">命令码</div></div>
-  <div class="bit-cell bit-ms">0x01<div class="bit-lbl">毫秒</div></div>
-  <div class="bit-cell bit-rw">0x00<div class="bit-lbl">读写</div></div>
+  <div class="bit-cell bit-fn"  style="flex:6"><span>功能码</span><div class="bit-lbl">6-bit · 31–26</div></div>
+  <div class="bit-cell bit-cmd" style="flex:16"><span>命令码</span><div class="bit-lbl">16-bit · 25–10</div></div>
+  <div class="bit-cell bit-ms"  style="flex:1"><span>MS</span><div class="bit-lbl">9</div></div>
+  <div class="bit-cell bit-rw"  style="flex:1"><span>RW</span><div class="bit-lbl">8</div></div>
+  <div class="bit-cell bit-pm"  style="flex:8"><span>参数</span><div class="bit-lbl">8-bit · 7–0</div></div>
 </div>
+<!-- 真实案例 SMC：功能码(6)与命令码(16)都跨越 nibble，肉眼数十六进制无法分段——这正是位布局可视化的价值；
+     等宽 bit-row 会把 16-bit 命令码画得和 1-bit MS 一样宽，传达错误的字段权重。 -->
 
 <!-- 管道链（表达式概念） -->
 <div class="pipe-chain">
@@ -1151,6 +1166,8 @@ function drawConnections(){
 **十六进制不是障碍，是结构信号。** 看到 `0x30440100` 不要跳过——它告诉你这个值被分成了 4 段，每段 8 位、各有含义。设计师的工作是把这些段翻译成用户能填写和理解的字段。
 
 **位字段的来源永远是外部文档，不是命令码本身。** 用户不是「拿到命令码来解析字段」，而是「先有规格文档知道各段含义，再按规格填写命令码」。UI 的目标是让规格文档里的字段定义变成用户的操作界面。
+
+**合法零值不是空值。** 数值/编码类工具里，`0x00000000`、`0`、全默认字段往往是一个**合法**结果，不是「未输入」。如果空态、零态、错误态共用同一个结果区且同色（如都显示红），用户会把合法零值误判成错误。分析时把「空 / 零 / 错」当三个独立状态，提醒下游 Demo 三态分色——这是数值工具最常见的状态设计陷阱。
 
 **调试模式和用例模式的根本差异是使用意图，不是功能差异。** 调试是「我要试试这条命令」，用例是「我要定义一套可重复操作」。两者的 UI 结构应反映意图差异，而非共用一个表单加 toggle。
 

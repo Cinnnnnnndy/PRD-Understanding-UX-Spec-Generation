@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC 偏移量计算器 · 需求分析报告</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#e0e0e5;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans CJK SC',sans-serif}
+:root{--bg:#f5f5f7;--bg2:#fff;--border:#d2d2d7;--text:#1d1d1f;--text2:#4a4a52;--text3:#86868b;
+  --blue:#0071e3;--green:#1a7f42;--yellow:#b06000;--red:#d70015}
+.deck-wrapper{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.deck{position:absolute;width:1280px;height:720px;transform-origin:top left;background:var(--bg);
+  overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.18)}
+.deck-header{position:absolute;top:0;left:0;right:0;height:40px;z-index:200;display:flex;
+  align-items:center;gap:10px;padding:0 20px;background:rgba(255,255,255,.94);border-bottom:1px solid var(--border)}
+.hdr-brand{font-size:12px;font-weight:700;color:var(--text)}
+.hdr-brand span{color:var(--blue)}
+.hdr-sub{font-size:10.5px;color:var(--text3)}
+.hdr-spacer{flex:1}
+.nav-btn{width:24px;height:24px;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;
+  font-size:13px;color:var(--text2);display:flex;align-items:center;justify-content:center}
+.nav-btn:hover{background:#f0f0f2}
+#counter{font-size:10.5px;color:var(--text3);min-width:42px;text-align:center;font-variant-numeric:tabular-nums}
+.slide{display:none;position:absolute;top:40px;left:0;right:0;bottom:0;padding:24px 48px 26px;
+  overflow:hidden;flex-direction:column;color:var(--text)}
+.slide.active{display:flex}
+.tag{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--blue);margin-bottom:7px}
+h1{font-size:38px;font-weight:800;line-height:1.1;letter-spacing:-.5px}
+h2{font-size:22px;font-weight:700;margin-bottom:14px;letter-spacing:-.3px}
+h3{font-size:13px;font-weight:700;margin-bottom:7px;color:var(--text)}
+h4{font-size:12px;font-weight:700;color:var(--text)}
+p{font-size:12px;line-height:1.6;color:var(--text2)}
+.cols{display:flex;gap:16px;flex:1;min-height:0}
+.col{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.col2{flex:2;display:flex;flex-direction:column;gap:8px;min-width:0}
+.col-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 15px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.card h4{margin-bottom:4px}
+.card.mt6{margin-top:6px}
+.mt6{margin-top:6px}.mt10{margin-top:10px}
+ul.list{list-style:none;display:flex;flex-direction:column;gap:5px}
+ul.list li{display:flex;gap:7px;align-items:flex-start;font-size:12px;color:var(--text2);line-height:1.5}
+ul.list li::before{content:'›';color:var(--blue);flex-shrink:0;font-weight:700}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:10.5px;font-weight:500;border:1px solid;white-space:nowrap}
+.chip-green{color:var(--green);border-color:rgba(26,127,66,.35);background:rgba(26,127,66,.08)}
+.chip-yellow{color:var(--yellow);border-color:rgba(176,96,0,.35);background:rgba(176,96,0,.08)}
+.chip-red{color:var(--red);border-color:rgba(215,0,21,.35);background:rgba(215,0,21,.08)}
+.chip-blue{color:var(--blue);border-color:rgba(0,113,227,.35);background:rgba(0,113,227,.08)}
+table{border-collapse:collapse;width:100%}
+th{background:#ebebed;color:var(--text3);font-size:9.5px;font-weight:700;text-transform:uppercase;
+  padding:5px 9px;text-align:left;border-bottom:1px solid var(--border)}
+td{padding:5px 9px;border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;vertical-align:top}
+td code,p code,.mono{font-family:ui-monospace,'SF Mono',Consolas,monospace}
+td code{background:#ececf0;padding:1px 5px;border-radius:4px;font-size:10.5px;color:#1d1d1f}
+/* number blocks */
+.nums{display:flex;gap:14px;margin-top:26px}
+.num{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 20px;flex:1;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.num .v{font-size:30px;font-weight:800;color:var(--blue);font-family:ui-monospace,Consolas,monospace;line-height:1}
+.num .l{font-size:11px;color:var(--text2);margin-top:6px}
+/* proportional bit bar */
+.bit-bar{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;height:62px;margin:6px 0 4px}
+.bit-seg{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;
+  font-family:ui-monospace,Consolas,monospace;border-right:1px solid rgba(255,255,255,.5);padding:4px 2px;text-align:center}
+.bit-seg:last-child{border-right:none}
+.bit-seg .bn{font-size:11px;font-weight:700}.bit-seg .bb{font-size:9px;opacity:.92;margin-top:2px}.bit-seg .br{font-size:8px;opacity:.8;margin-top:1px}
+.seg-fn{background:#0071e3}.seg-cmd{background:#5e5ce6}.seg-ms{background:#1a7f42}.seg-rw{background:#b06000}.seg-pm{background:#86868b}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+.legend span{font-size:10px;color:var(--text2);display:flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.pre{background:#1e1e22;color:#e6e6ea;border-radius:8px;padding:10px 13px;font-family:ui-monospace,Consolas,monospace;
+  font-size:10.5px;line-height:1.55;white-space:pre;overflow:hidden}
+/* scenario */
+.scn{background:#fff;border:1px solid var(--border);border-radius:10px;padding:11px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.scn .sn{font-size:10px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.scn h4{margin:3px 0 4px}
+/* opp rows */
+.opp{display:flex;align-items:flex-start;gap:10px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:9px 12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.opp .oid{font-family:ui-monospace,Consolas,monospace;font-weight:700;color:var(--text3);font-size:11px;flex-shrink:0;width:22px}
+.opp .ob{flex:1;min-width:0}
+.opp h4{font-size:11.5px;margin-bottom:2px}
+.opp p{font-size:10.5px;line-height:1.45}
+/* patent */
+.patent{background:rgba(0,113,227,.05);border:1px solid rgba(0,113,227,.25);border-radius:10px;padding:11px 14px}
+.patent h4{color:var(--blue);margin-bottom:5px}
+/* design-system swatch */
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.15);vertical-align:-1px;margin-right:5px}
+/* flow cards */
+.flow-card{border-radius:8px;padding:8px 11px;position:relative;border:1px solid;margin-bottom:7px}
+.flow-card h4{font-size:11px;margin-bottom:2px}
+.flow-card p{font-size:9.5px;line-height:1.4}
+.fc-pain{background:rgba(215,0,21,.05);border-color:rgba(215,0,21,.22)}
+.fc-insight{background:rgba(0,113,227,.05);border-color:rgba(0,113,227,.22)}
+.fc-strategy{background:rgba(26,127,66,.05);border-color:rgba(26,127,66,.22)}
+.fc-id{position:absolute;top:6px;right:9px;font-size:8.5px;font-weight:700;opacity:.3;font-family:ui-monospace,Consolas,monospace}
+.hook{font-size:15px;color:var(--text2);margin-top:14px;line-height:1.5;max-width:760px}
+.bars-note{font-size:10px;color:var(--text3);margin-top:2px}
+</style>
+</head>
+<body>
+<div class="deck-wrapper">
+  <div class="deck" id="deck">
+    <div class="deck-header">
+      <div class="hdr-brand">SMC <span>偏移量计算器</span></div>
+      <div class="hdr-sub">需求分析 · 可视化报告（阶段一）</div>
+      <div class="hdr-spacer"></div>
+      <button class="nav-btn" onclick="go(-1)">‹</button>
+      <span id="counter">1 / 11</span>
+      <button class="nav-btn" onclick="go(1)">›</button>
+    </div>
+
+    <!-- 1 COVER -->
+    <section class="slide active" id="cover">
+      <div style="margin:auto 0">
+        <div class="tag">REQUIREMENT ANALYSIS · 阶段一</div>
+        <h1>SMC 偏移量计算器</h1>
+        <p class="hook">把 BMC 固件里一个 32 位「命令字」整数，与功能码 / 命令码 / 读取方式 / 读写方向 / 参数这 5 个语义字段，做<strong>双向、实时、零错</strong>的编解码——让工程师不再手算移位掩码。</p>
+        <div class="nums">
+          <div class="num"><div class="v">32</div><div class="l">位命令字 (uint32)</div></div>
+          <div class="num"><div class="v">5</div><div class="l">语义位字段</div></div>
+          <div class="num"><div class="v">2向</div><div class="l">编码 ↔ 解码</div></div>
+          <div class="num"><div class="v">0</div><div class="l">外部依赖 / 构建</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 CONCEPT -->
+    <section class="slide" id="concept">
+      <div class="tag">CONCEPT · 核心概念</div>
+      <h2>一个整数里藏着 5 段信息</h2>
+      <div class="cols">
+        <div class="col2">
+          <p>硬件通信一次发固定 4 字节(32 位)。工程师把 5 个字段打包进这 32 位——像一个压缩包，外面是一个数，解开有 5 样东西。按 MSB→LSB 的位区间着色（块宽按位数成比例）：</p>
+          <div class="bit-bar">
+            <div class="bit-seg seg-fn" style="flex:6"><span class="bn">功能码</span><span class="bb">6-bit</span><span class="br">31–26</span></div>
+            <div class="bit-seg seg-cmd" style="flex:16"><span class="bn">命令码</span><span class="bb">16-bit</span><span class="br">25–10</span></div>
+            <div class="bit-seg seg-ms" style="flex:1"><span class="bn">MS</span><span class="br">9</span></div>
+            <div class="bit-seg seg-rw" style="flex:1"><span class="bn">RW</span><span class="br">8</span></div>
+            <div class="bit-seg seg-pm" style="flex:8"><span class="bn">参数</span><span class="bb">8-bit</span><span class="br">7–0</span></div>
+          </div>
+          <p class="bars-note">⚠ 关键：功能码(6) 与命令码(16) <strong>不落在半字节(4位)边界</strong>上，所以肉眼数十六进制字符无法分段——这正是本工具存在的理由：替用户做位移与掩码。</p>
+          <div class="pre">encodeOffset = (fn&lt;&lt;26)|(cmd&lt;&lt;10)|(ms&lt;&lt;9)|(rw&lt;&lt;8)|param
+
+例：fn=0x0C cmd=0x1180 ms=0 rw=0 param=0x00
+   → 0x30460000  (十进制 809893888)</div>
+        </div>
+        <div class="col">
+          <h3>对设计意味着什么</h3>
+          <ul class="list">
+            <li>用户不该手填整数：UI 拆成 5 个独立字段，后台合并并实时预览</li>
+            <li>字段语义（散热部件 / 单读 / 读）应<strong>常驻可见</strong>，不藏 tooltip</li>
+            <li>位布局可视化要按<strong>真实位区间</strong>着色，绝不按十六进制字符等分</li>
+            <li>反向：粘一个整数应能一键拆回 5 字段</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 SCENARIO -->
+    <section class="slide" id="scenario">
+      <div class="tag">SCENARIOS · 使用场景</div>
+      <h2>工程师在什么时候打开它</h2>
+      <div class="cols">
+        <div class="col">
+          <div class="scn"><div class="sn">场景 1 · 照规格填命令字</div>
+            <h4>从协议文档到一串 hex</h4>
+            <p>工程师拿到「散热部件、命令 0x0102、读操作」。打开计算器：功能码选散热(0x06)、命令码填 0102、RW 选读，结果区实时给出完整命令字，复制进配置——省去手算移位。</p></div>
+          <div class="scn mt6"><div class="sn">场景 2 · 反查日志里的偏移量</div>
+            <h4>809893888 到底是什么操作</h4>
+            <p>排障时日志打印 <code>offset=809893888</code>，看不出含义。粘进十进制框点「解析」，字段区拆出 function=0x0C / command=0x1180… 立即定位是哪个部件域的哪条命令。</p></div>
+        </div>
+        <div class="col">
+          <div class="scn"><div class="sn">场景 3 · 批量核对配置</div>
+            <h4>揪出填错部件的条目</h4>
+            <p>评审一批寄存器配置，逐个粘进去解码，核对功能码是否落在预期部件域，发现某条本应是「供电(0x09)」却填成了「存储(0x05)」。</p></div>
+          <div class="card mt6"><h4>共同点</h4>
+            <p>三个场景都是「整数 ↔ 语义」的来回翻译，且都阵发性高频——写/审一批配置时连用，平时不开。工具的价值在<strong>快、准、结果可带走</strong>。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 USERS -->
+    <section class="slide" id="users">
+      <div class="tag">USERS · 目标用户</div>
+      <h2>谁在用，在什么环境用</h2>
+      <div class="cols">
+        <div class="col2">
+          <table>
+            <thead><tr><th>维度</th><th>内容</th></tr></thead>
+            <tbody>
+              <tr><td>角色</td><td>BMC/固件工程师、硬件调试、测试工程师；具备十六进制与位运算基础</td></tr>
+              <tr><td>使用频率</td><td>中频、阵发——写/审一批配置时高频连用，平时不开</td></tr>
+              <tr><td>使用环境</td><td>VS Code 内（常为较<strong>窄</strong>的侧边/底部面板），暗色主题</td></tr>
+              <tr><td>核心诉求</td><td>快速零错地在「整数 ↔ 语义字段」互转，并能把结果拿走</td></tr>
+              <tr><td>典型触发点</td><td>照协议文档写命令字；或在日志/寄存器里遇到看不懂的 offset</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col">
+          <div class="card"><h4>设计含义</h4>
+            <p>用户是专业人士但<strong>长时间</strong>使用：可读性要求更高而非更低（字号别太小）。宿主多为窄面板，布局须窄宽皆成立，不能假设宽屏两栏。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 PAIN -->
+    <section class="slide" id="pain">
+      <div class="tag">PAIN POINTS · 痛点分析</div>
+      <h2>没有这个工具时，成本在哪</h2>
+      <div class="cols">
+        <div class="col">
+          <div class="card"><h4>P1 · 手算位运算易错</h4>
+            <p>字段边界不对齐 nibble，肉眼看十六进制无法分段，手动移位掩码每次几十秒且常错一位。</p>
+            <p style="margin-top:4px;color:var(--red)"><strong>痛点核心：</strong>字段边界不对齐 nibble，"看一眼就懂"不可能。</p></div>
+          <div class="card mt6"><h4>P2 · 语义藏在 tooltip</h4>
+            <p>MS=1 是「单读」、RW=1 是「读」、0x06=「散热部件」——只在 hover tooltip 出现，须记忆或反复悬停。</p>
+            <p style="margin-top:4px;color:var(--red)"><strong>痛点核心：</strong>核心语义不可见，工具只帮算不帮懂。</p></div>
+        </div>
+        <div class="col">
+          <div class="card"><h4>P3 · 结果拿不走</h4>
+            <p>算出 0x30460000 后无复制按钮，手动选中 8 位十六进制串易漏字符。</p>
+            <p style="margin-top:4px;color:var(--red)"><strong>痛点核心：</strong>主产出缺少一键带走的出口。</p></div>
+          <div class="card mt6"><h4>P4 · 空/零/错三态同形</h4>
+            <p>默认 0x00000000（合法零值）与清空字段后的 0x--------（错误）共用结果区，区分弱。</p>
+            <p style="margin-top:4px;color:var(--red)"><strong>痛点核心：</strong>合法零值与缺失/错误状态混淆。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 OPP -->
+    <section class="slide" id="opp">
+      <div class="tag">OPPORTUNITIES · 设计机会点</div>
+      <h2>可以怎么改进（分级）</h2>
+      <div class="cols">
+        <div class="col">
+          <div class="opp"><span class="oid">O1</span><div class="ob"><h4>功能码语义常驻可见 <span class="chip chip-green">🟢 前端</span></h4><p>改带标签下拉，选「散热部件管理」而非记 0x06</p></div></div>
+          <div class="opp mt6"><span class="oid">O2</span><div class="ob"><h4>MS/RW 语义化控件 <span class="chip chip-green">🟢 前端</span></h4><p>1-bit 改带标签二选一（多读/单读、写/读）</p></div></div>
+          <div class="opp mt6"><span class="oid">O3</span><div class="ob"><h4>结果一键复制 <span class="chip chip-green">🟢 前端</span></h4><p>hex/dec 各加复制按钮 + 成功反馈</p></div></div>
+          <div class="opp mt6"><span class="oid">O4</span><div class="ob"><h4>位布局可视化 <span class="chip chip-green">🟢 前端</span></h4><p>按真实位区间着色 + 与输入框双向高亮</p></div></div>
+        </div>
+        <div class="col">
+          <div class="opp"><span class="oid">O5</span><div class="ob"><h4>空/零/错三态区分 <span class="chip chip-green">🟢 前端</span></h4><p>零值中性蓝、错误红、未输入占位灰</p></div></div>
+          <div class="opp mt6"><span class="oid">O6</span><div class="ob"><h4>功能码语义校验 <span class="chip chip-yellow">🟡 需规格</span></h4><p>区分已定义/保留(0x20)/OEM(0x37-3F)/未定义空洞</p></div></div>
+          <div class="opp mt6"><span class="oid">O7</span><div class="ob"><h4>功能码×命令码联动 <span class="chip chip-red">🔴 需决策</span></h4><p>若规格有合法命令表，按功能码联动命令码可选范围</p></div></div>
+          <div class="card mt6"><h4>优先级</h4><p>O1–O5 是 🟢 纯前端、收益高、可立即做；O6 待规格；O7 需产品决策。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 COMP -->
+    <section class="slide" id="comp">
+      <div class="tag">COMPETITORS · 竞品 + 专利潜力</div>
+      <h2>别人做到哪，差距在哪</h2>
+      <div class="cols">
+        <div class="col2">
+          <table>
+            <thead><tr><th>竞品 / 行业方案</th><th>具备能力</th><th>与本功能的差距</th></tr></thead>
+            <tbody>
+              <tr><td>通用程序员计算器</td><td>进制转换、按位查看/翻转</td><td>不懂 SMC 语义，无业务标签</td></tr>
+              <tr><td>寄存器位字段查看器 (SVD viewer)</td><td>按描述文件拆位字段、带名字</td><td>需 SVD 文件；面向寄存器调试非 SMC；不内置部件域枚举</td></tr>
+              <tr><td>手写 Python / 脚本</td><td>完全可定制</td><td>无 UI、不可分享、每次重写、易错</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col">
+          <div class="patent"><h4>专利潜力 · 评级「中」</h4>
+            <p><strong>差异化组合：</strong>位字段命令字 × 双向实时编解码 × 语义枚举常驻可见 × 非半字节字段的位布局可视化联动。</p>
+            <p style="margin-top:5px">单项均有先例，<strong>组合</strong>未见明确公开先例；叠加 O7 规格联动可上探「中高」。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 DESIGN SYSTEM -->
+    <section class="slide" id="design-system">
+      <div class="tag">DESIGN SYSTEM · 设计系统基线</div>
+      <h2>从现有代码提取的视觉语言（不可发明新 token）</h2>
+      <div class="cols">
+        <div class="col2">
+          <h3>色彩系统（VS Code 暗色）</h3>
+          <table>
+            <thead><tr><th>用途</th><th>hex</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>页面/面板背景</td><td><code><span class="sw" style="background:#1e1e1e"></span>#1e1e1e</code></td><td>section 靠边框区分</td></tr>
+              <tr><td>主强调色</td><td><code><span class="sw" style="background:#4fc1ff"></span>#4fc1ff</code></td><td>标题/链接/结果/有效态</td></tr>
+              <tr><td>输入框背景 / 边框</td><td><code><span class="sw" style="background:#3c3c3c"></span>#3c3c3c</code> / <code>#6b6b6b</code></td><td>focus → #007fd4</td></tr>
+              <tr><td>主按钮 / hover</td><td><code><span class="sw" style="background:#0e639c"></span>#0e639c</code> / <code>#1177bb</code></td><td>文字 #fff</td></tr>
+              <tr><td>主 / 次文字</td><td><code>#cccccc</code> / <code>#9d9d9d</code></td><td></td></tr>
+              <tr><td>错误 / 警告</td><td><code><span class="sw" style="background:#f48771"></span>#f48771</code> / <code><span class="sw" style="background:#cca700"></span>#cca700</code></td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col">
+          <h3>组件规格</h3>
+          <div class="card"><h4>输入框</h4><p>背景 #3c3c3c，边框 #6b6b6b，focus border #007fd4，圆角 4px；hex 带 0x 前缀分隔</p></div>
+          <div class="card mt6"><h4>按钮层级</h4><p>主 #0e639c → 次 #3a3d41 → 文字按钮，颜色不得自创</p></div>
+          <div class="card mt6"><h4>Section Header（建议统一）</h4><p>左侧 3px #4fc1ff 竖条 + 13px 半粗体，替换 🧮/⚡/◆ 混用</p></div>
+          <div class="card mt6"><h4>字体</h4><p>正文 system sans-serif；数值/代码 monospace(Consolas)</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9 CRITIQUE -->
+    <section class="slide" id="critique">
+      <div class="tag">DESIGN CRITIQUE · 第一轮设计审查</div>
+      <h2>计算器主面板 · 审查结论</h2>
+      <div class="cols">
+        <div class="col2">
+          <h3>Usability</h3>
+          <table>
+            <thead><tr><th>Finding</th><th>Severity</th><th>Recommendation</th></tr></thead>
+            <tbody>
+              <tr><td>枚举语义仅存于 title hover tooltip，键盘/触摸不可达</td><td><span class="chip chip-red">🔴 严重</span></td><td>功能码下拉带标签；MS/RW 二选一带标签，语义常驻</td></tr>
+              <tr><td>结果无复制按钮，手动选 8 位 hex 易错</td><td><span class="chip chip-yellow">🟡 中等</span></td><td>hex/dec 各加复制 + 成功反馈</td></tr>
+              <tr><td>「应用」副作用：把结果写回十进制框</td><td><span class="chip chip-yellow">🟡 中等</span></td><td>明确文案/拆分行为</td></tr>
+            </tbody>
+          </table>
+          <h3 class="mt10">Consistency</h3>
+          <table>
+            <thead><tr><th>Element</th><th>Issue</th><th>Recommendation</th></tr></thead>
+            <tbody><tr><td>标题/区块</td><td>🧮 / ⚡ / ◆ 三套装饰符混用</td><td>统一 3px 竖条 header</td></tr></tbody>
+          </table>
+        </div>
+        <div class="col">
+          <h3>Visual Hierarchy</h3>
+          <ul class="list">
+            <li><strong>最大缺口：</strong>无「32 位如何分段」的可视化锚点</li>
+            <li><strong>权重：</strong>命令码(16-bit) 与 MS/RW(1-bit) 位宽差异未在视觉上体现</li>
+            <li><strong>方向：</strong>加按真实位区间着色的位布局条</li>
+          </ul>
+          <h3 class="mt10">Accessibility</h3>
+          <ul class="list">
+            <li>错误/警告 11px、bits 10px 偏小 → ≥12px</li>
+            <li>非法字段仅红色，无图标 → 补 ⚠ 图标（不只靠色）</li>
+            <li>❓ tooltip 无 aria、仅 hover → 语义改常驻</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 SYNTHESIS -->
+    <section class="slide" id="synthesis">
+      <div class="tag">SYNTHESIS · 设计机会汇总</div>
+      <h2>从痛点到设计策略</h2>
+      <div class="cols" style="position:relative">
+        <div class="col"><div class="col-title">用户痛点</div>
+          <div class="flow-card fc-pain" id="p1"><span class="fc-id">P1</span><h4>手算位运算易错</h4><p>字段不对齐 nibble，移位掩码慢且错</p></div>
+          <div class="flow-card fc-pain" id="p2"><span class="fc-id">P2</span><h4>语义藏 tooltip</h4><p>MS/RW/功能码含义须记忆或悬停</p></div>
+          <div class="flow-card fc-pain" id="p3"><span class="fc-id">P3</span><h4>结果拿不走</h4><p>无复制，手选长 hex 易漏</p></div>
+          <div class="flow-card fc-pain" id="p4"><span class="fc-id">P4</span><h4>三态同形</h4><p>零值/缺失/错误共用结果区</p></div>
+        </div>
+        <div class="col"><div class="col-title">洞察汇聚</div>
+          <div class="flow-card fc-insight" id="i1"><span class="fc-id">I1</span><h4>翻译比填写更高频</h4><p>工具的真正价值是"帮懂"，不只是"帮算"——可见的语义胜过隐藏的 tooltip</p></div>
+          <div class="flow-card fc-insight" id="i2"><span class="fc-id">I2</span><h4>结构需要被看见</h4><p>32 位的分段与状态都应"显形"，让对错一眼可辨</p></div>
+        </div>
+        <div class="col"><div class="col-title">设计策略</div>
+          <div class="flow-card fc-strategy" id="s1"><span class="fc-id">S1</span><h4>语义常驻控件</h4><p>功能码下拉 + MS/RW 二选一带标签 🟢</p></div>
+          <div class="flow-card fc-strategy" id="s2"><span class="fc-id">S2</span><h4>位布局 + 三态显形</h4><p>按真实位区间着色的位条 + 零/缺/错三态分色 🟢</p></div>
+          <div class="flow-card fc-strategy" id="s3"><span class="fc-id">S3</span><h4>结果可带走</h4><p>一键复制 hex/dec + 反馈 🟢</p></div>
+        </div>
+        <svg id="opp-svg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></svg>
+      </div>
+    </section>
+
+    <!-- 11 TERMS -->
+    <section class="slide" id="terms">
+      <div class="tag">GLOSSARY · 术语表</div>
+      <h2>术语对照</h2>
+      <div class="cols">
+        <div class="col2">
+          <table>
+            <thead><tr><th>术语</th><th>含义</th></tr></thead>
+            <tbody>
+              <tr><td>SMC 命令字 / offset</td><td>一个 32 位整数，BMC 对部件的一次操作的编码</td></tr>
+              <tr><td>功能码 (Function, 6-bit)</td><td>命令面向的部件域：0x06=散热、0x09=供电…0x20=保留、0x37-3F=OEM</td></tr>
+              <tr><td>命令码 (Command, 16-bit)</td><td>部件域内的具体命令编号 0x0000–0xFFFF</td></tr>
+              <tr><td>MS (读取方式, 1-bit)</td><td>0=多读，1=单读</td></tr>
+              <tr><td>RW (读写方向, 1-bit)</td><td>0=写，1=读</td></tr>
+              <tr><td>参数 (Parameter, 8-bit)</td><td>设备编号或其他参数 0x00–0xFF</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col">
+          <table>
+            <thead><tr><th>术语</th><th>含义</th></tr></thead>
+            <tbody>
+              <tr><td>nibble</td><td>4 个二进制位 = 1 个十六进制字符</td></tr>
+              <tr><td>编码 / 解码</td><td>字段→整数 / 整数→字段</td></tr>
+              <tr><td>魔法值</td><td>0xFFFFFFFF=32位上限；超过取低 32 位</td></tr>
+              <tr><td>Webview</td><td>VS Code 内嵌网页面板，本工具的运行宿主</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+function resizeDeck(){
+  const deck=document.getElementById('deck');
+  const ww=window.innerWidth, wh=window.innerHeight;
+  const scale=Math.min(ww/1280, wh/720);
+  deck.style.transform=`scale(${scale})`;
+  deck.style.left=((ww-1280*scale)/2)+'px';
+  deck.style.top =((wh- 720*scale)/2)+'px';
+}
+window.addEventListener('resize', resizeDeck); resizeDeck();
+
+const slides=document.querySelectorAll('.slide');
+let current=0;
+function goTo(n){
+  slides[current].classList.remove('active');
+  current=Math.max(0,Math.min(slides.length-1,n));
+  slides[current].classList.add('active');
+  document.getElementById('counter').textContent=`${current+1} / ${slides.length}`;
+  if(slides[current].id==='synthesis') setTimeout(drawConnections,80);
+}
+const go=d=>goTo(current+d);
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'){go(1);e.preventDefault();}
+  if(e.key==='ArrowLeft' ||e.key==='ArrowUp'){go(-1);e.preventDefault();}
+});
+document.getElementById('deck').addEventListener('click',e=>{
+  if(e.target.closest('.deck-header')) return;
+  const x=e.clientX, w=window.innerWidth;
+  if(x<w*.25) go(-1); else if(x>w*.75) go(1);
+});
+
+function drawConnections(){
+  const deck=document.getElementById('deck'), svg=document.getElementById('opp-svg');
+  if(!svg) return;
+  const m=deck.style.transform.match(/scale\(([^)]+)\)/);
+  const scale=m?parseFloat(m[1]):1;
+  const box=svg.getBoundingClientRect();
+  const ctr=(el,side)=>{const r=el.getBoundingClientRect();
+    return {x:((side==='r'?r.right:r.left)-box.left)/scale, y:(r.top+r.height/2-box.top)/scale};};
+  const links=[['p1','i2'],['p2','i1'],['p3','i1'],['p4','i2'],['i1','s1'],['i1','s3'],['i2','s2']];
+  const colors={i1:'#0071e3',i2:'#0071e3',s1:'#1a7f42',s2:'#1a7f42',s3:'#1a7f42'};
+  let d='';
+  links.forEach(([a,b])=>{
+    const A=ctr(document.getElementById(a),'r'), B=ctr(document.getElementById(b),'l');
+    const mx=(A.x+B.x)/2;
+    d+=`<path d="M${A.x},${A.y} C${mx},${A.y} ${mx},${B.y} ${B.x},${B.y}" fill="none" stroke="${colors[b]||'#86868b'}" stroke-width="1.4" stroke-dasharray="4 3" opacity="0.55"/>`;
+    d+=`<circle cx="${A.x}" cy="${A.y}" r="2.5" fill="${colors[b]||'#86868b'}"/><circle cx="${B.x}" cy="${B.y}" r="2.5" fill="${colors[b]||'#86868b'}"/>`;
+  });
+  svg.innerHTML=d;
+}
+</script>
+</body>
+</html>

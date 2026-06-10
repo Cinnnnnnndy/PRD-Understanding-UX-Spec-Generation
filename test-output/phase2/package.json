@@ -1,0 +1,10 @@
+{
+  "name": "smc-offset-calculator",
+  "version": "1.0.0-engineering",
+  "private": true,
+  "type": "module",
+  "description": "SMC 偏移量计算器 · 工程级前端（原生 ESM，无框架，BMC 轻量约束）",
+  "scripts": {
+    "test": "node --test"
+  }
+}

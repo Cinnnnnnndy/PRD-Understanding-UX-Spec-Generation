@@ -115,7 +115,7 @@ description: |
 | 3 | `design-structure.md` | 必出 | 精确视觉规格 · 布局算法 · 交互规格 · 状态枚举 · 交互序列 · 待确认清单 |
 | 4 | `tech-selection.md` | 可选（看复杂度） | 技术选型，Demo 与工程各一套 + 迁移路径 |
 | 5 | `src/components/...` | 必出 | 工程级前端代码，符合后端数据结构，可直接接入 |
-| 6 | `src/services/[feature]Api.ts` | 必出 | API 集成层，Mock 字段映射真实接口 |
+| 6 | `src/services/[feature]Api.ts` | 有 HTTP 后端时必出 | API 集成层，Mock 字段映射真实接口；**纯本地功能/宿主桥**则改为事件或 IPC 适配层（如 `CustomEvent`/`postMessage`），不强造空 API 层 |
 | 7 | `src/utils/[feature]Logic.ts` | 视情况 | 业务规则纯函数，与 UI 解耦 |
 | 8 | `INTEGRATION.md` | 必出 | 接入说明：接口定义 · 业务逻辑 · 前后端边界 · 联调待确认 |
 | 9 | `README.md` | 必出 | 项目总览（覆盖两阶段） |
@@ -147,6 +147,8 @@ description: |
 ### Step 2 — 设计审查 + 可访问性审查
 
 #### 2.1 设计审查（/design-critique）→ `design-review.md`
+
+> **若 `/design-critique` 或 `/accessibility-review` 未安装**：不要跳过这两步，按 2.1 / 2.2 列出的维度与 WCAG 2.1 AA 清单**人工执行**，并在报告里注明「按对应框架人工执行」。审查是必出项，外部 skill 只是其一种实现方式。
 
 带上阶段一的产品上下文模板调用 `/design-critique`：
 
@@ -311,7 +313,14 @@ description: |
 
 #### 5.1 组件拆分与工程结构规划
 
-根据 Demo 和目标仓库约定规划组件树，**写代码前先把结构告诉用户确认**（这一步返工成本最高）：
+根据 Demo 和目标仓库约定规划组件树，**写代码前先把结构告诉用户确认**（这一步返工成本最高）。
+
+> **先按目标栈选结构，别默认 React/Vue。** 下面的 `.tsx`/`.vue` 树是「有框架」时的形态；若 Step 1/4 确认目标是**原生 HTML+CSS+JS（BMC/Webview 轻量约束）**，改用框架中立的等价结构：
+> - 组件 → **原生 Web Component（Custom Element + Shadow DOM）**，样式写在 shadow root 内（天然 scoped，不需要 CSS Modules）。
+> - 纯逻辑 → ES Module 纯函数（`utils/*.js`），用 JSDoc `@typedef` 替代 TS 类型；测试用 `node:test` 零依赖。
+> - 目录仍是 `components/ utils/ constants/`，只是文件是 `.js` 而非 `.tsx/.vue`。
+
+
 
 ```
 src/
@@ -362,6 +371,8 @@ function formatTemperature(val){ return val >= 32768 ? '—' : val + ' ℃'; }
 #### 5.4 API 集成层 → `src/services/[feature]Api.ts`
 
 把 Demo 的 Mock 替换为真实 API 调用骨架，**保留 Mock 作为开发降级**：
+
+> 仅当功能有 HTTP 后端时才建本层。**纯本地功能**（离线计算/编解码）无需 API 层，把「结果输出」做成对宿主的事件/IPC（如 `dispatchEvent('feature-apply', {detail})` → Webview `postMessage`），并在 INTEGRATION.md 写清这个边界即可。
 
 ```typescript
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
@@ -451,6 +462,8 @@ describe('[ComponentName]', () => {
 ### Step 7 — README + 新增/修改日志（CHANGELOG）
 
 **README.md** — 项目总览，覆盖两阶段：背景、产物清单、目录结构、如何打开 Demo、如何接入工程、文档索引（指向 design-structure / INTEGRATION / 审查报告 / 阶段一可视化报告）。
+
+> 「如何打开」要区分两类产物：**单文件 Demo** 可 `file://` 双击；**用 ES Modules 的工程版**不能双击（浏览器对 `file://` 的模块 CORS 限制），必须经 HTTP 打开，README 要给出 `python3 -m http.server` 之类的命令，别让接收方对着空白页排查。
 
 **CHANGELOG.md** — 新增/修改日志，区分 Demo 版与工程版：
 

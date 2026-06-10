@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMC 偏移量计算器</title>
+    <style>
+        /* VS Code theme variable polyfills for standalone preview */
+        :root {
+            --vscode-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --vscode-foreground: #cccccc;
+            --vscode-editor-background: #1e1e1e;
+            --vscode-textLink-foreground: #4fc1ff;
+            --vscode-textBlockQuote-background: #2a2d2e;
+            --vscode-input-background: #3c3c3c;
+            --vscode-input-border: #6b6b6b;
+            --vscode-input-foreground: #cccccc;
+            --vscode-input-placeholderForeground: #8b8b8b;
+            --vscode-focusBorder: #007fd4;
+            --vscode-descriptionForeground: #9d9d9d;
+            --vscode-errorForeground: #f48771;
+            --vscode-editorWarningForeground: #cca700;
+            --vscode-widget-border: #454545;
+            --vscode-button-background: #0e639c;
+            --vscode-button-foreground: #ffffff;
+            --vscode-button-hoverBackground: #1177bb;
+            --vscode-button-secondaryBackground: #3a3d41;
+            --vscode-button-secondaryForeground: #cccccc;
+            --vscode-button-secondaryHoverBackground: #45494e;
+            --vscode-editor-inselectionBackground: #264f78;
+            --vscode-editor-font-family: "Consolas", "Courier New", monospace;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: var(--vscode-font-family);
+            padding: 16px;
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+            margin: 0;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+        }
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--vscode-textLink-foreground);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .info-box {
+            padding: 12px;
+            background: var(--vscode-textBlockQuote-background);
+            border-left: 4px solid var(--vscode-textLink-foreground);
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        .info-box code {
+            font-family: var(--vscode-editor-font-family);
+            background: var(--vscode-editor-background);
+            padding: 2px 6px;
+            border-radius: 2px;
+        }
+
+        /* Section styling */
+        .section {
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-widget-border);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--vscode-textLink-foreground);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .section-title::before {
+            content: '◆';
+            font-size: 12px;
+        }
+        .section-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Offset input section */
+        .offset-input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .offset-input {
+            flex: 1;
+            padding: 8px 12px;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 14px;
+            background: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            color: var(--vscode-input-foreground);
+            border-radius: 4px;
+        }
+        .offset-input:focus {
+            outline: 1px solid var(--vscode-focusBorder);
+            outline-offset: -1px;
+        }
+
+        /* Fields grid */
+        .fields-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .field-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .field-item.wide {
+            grid-column: span 2;
+        }
+        .field-label {
+            font-size: 12px;
+            color: var(--vscode-foreground);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .field-bits {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            background: var(--vscode-textBlockQuote-background);
+            padding: 1px 4px;
+            border-radius: 2px;
+        }
+        .help-icon {
+            margin-left: 2px;
+            cursor: help;
+            opacity: 0.6;
+            font-size: 11px;
+            transition: opacity 0.2s;
+        }
+        .help-icon:hover {
+            opacity: 1;
+        }
+
+        /* Hex input with prefix */
+        .hex-input-wrapper {
+            display: flex;
+            align-items: center;
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            background: var(--vscode-input-background);
+            transition: border-color 0.2s;
+        }
+        .hex-input-wrapper:focus-within {
+            border-color: var(--vscode-focusBorder);
+        }
+        .hex-prefix {
+            padding: 6px 8px 6px 12px;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 13px;
+            color: var(--vscode-descriptionForeground);
+            background: var(--vscode-input-background);
+            border-right: 1px solid var(--vscode-input-border);
+            user-select: none;
+        }
+        .hex-input {
+            flex: 1;
+            padding: 6px 12px;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 13px;
+            background: transparent;
+            border: none;
+            color: var(--vscode-input-foreground);
+            outline: none;
+            text-transform: uppercase;
+        }
+        .hex-input.invalid {
+            color: var(--vscode-errorForeground);
+        }
+        .hex-input::placeholder {
+            color: var(--vscode-input-placeholderForeground);
+            text-transform: none;
+        }
+
+        /* Real-time result section */
+        .result-section {
+            background: linear-gradient(135deg, var(--vscode-textBlockQuote-background) 0%, var(--vscode-editor-inselectionBackground) 100%);
+            border: 2px solid var(--vscode-textLink-foreground);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        .result-section .section-title::before {
+            content: '⚡';
+        }
+        .result-display {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+        .result-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .result-label {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .result-value {
+            font-size: 24px;
+            font-weight: 700;
+            font-family: var(--vscode-editor-font-family);
+            color: var(--vscode-textLink-foreground);
+        }
+        .result-value.secondary {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--vscode-foreground);
+        }
+
+        /* Buttons */
+        .button-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            font-size: 13px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-primary {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+        }
+        .btn-primary:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+        .btn-secondary {
+            background: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+        }
+        .btn-secondary:hover {
+            background: var(--vscode-button-secondaryHoverBackground);
+        }
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* Error / warning messages */
+        .error-message {
+            color: var(--vscode-errorForeground);
+            font-size: 11px;
+            min-height: 14px;
+        }
+        .warning-message {
+            color: var(--vscode-editorWarningForeground);
+            font-size: 11px;
+            min-height: 14px;
+            margin-top: 4px;
+        }
+
+        /* Arrow indicator */
+        .arrow-indicator {
+            text-align: center;
+            color: var(--vscode-descriptionForeground);
+            font-size: 18px;
+            margin: -8px 0;
+        }
+
+        /* Apply result toast */
+        #applyResult {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: none;
+        }
+        #applyResult.success {
+            background: #1e3a1e;
+            border-left: 3px solid #4caf50;
+            color: #81c784;
+        }
+        #applyResult.error {
+            background: #3a1e1e;
+            border-left: 3px solid var(--vscode-errorForeground);
+            color: var(--vscode-errorForeground);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">🧮 SMC 偏移量计算器</div>
+
+        <div class="info-box">
+            <strong>SMC 命令字格式:</strong><br>
+            功能码(6位) | 命令码(16位) | 读取方式(1位) | 读写方向(1位) | 参数(8位)
+        </div>
+
+        <!-- Real-time Result Section -->
+        <div class="section result-section">
+            <div class="section-title">实时计算结果</div>
+            <div class="result-display">
+                <div class="result-row">
+                    <span class="result-label">16进制</span>
+                    <span class="result-value" id="realTimeHex">0x00000000</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">10进制</span>
+                    <span class="result-value secondary" id="realTimeDec">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Decimal Offset Input Section -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">10进制偏移量</div>
+            </div>
+            <div class="section-content">
+                <div class="offset-input-group">
+                    <input
+                        type="text"
+                        id="offsetDecimal"
+                        class="offset-input"
+                        placeholder="如: 809893888"
+                    >
+                    <button type="button" id="parseBtn" class="btn btn-secondary btn-small">
+                        ↓ 解析到组成字段
+                    </button>
+                </div>
+                <div class="error-message" id="offsetDecimal-error"></div>
+                <div class="warning-message" id="offsetDecimal-warning" style="display: none;"></div>
+            </div>
+        </div>
+
+        <div class="arrow-indicator">⇅</div>
+
+        <!-- Component Fields Section (Hex) -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">组成字段 (16进制)</div>
+            </div>
+            <div class="fields-grid">
+                <div class="field-item">
+                    <label class="field-label" for="function">
+                        功能码(Function)
+                        <span class="field-bits">6-bit</span>
+                        <span class="help-icon" title="功能码 (Function)&#10;0x00 = 公共功能&#10;0x01 = 扩展组件管理功能&#10;0x02 = 机箱部件管理功能&#10;0x03 = 计算部件管理功能&#10;0x04 = 内存部件管理功能&#10;0x05 = 存储部件管理功能&#10;0x06 = 散热部件管理功能&#10;0x07 = IO扩展部件管理功能&#10;0x08 = 加速扩展部件管理功能&#10;0x09 = 供电部件管理功能&#10;0x20 (32) = Reserved&#10;0x37-0x3F (55-63) = OEM功能">❓</span>
+                    </label>
+                    <div class="hex-input-wrapper">
+                        <span class="hex-prefix">0x</span>
+                        <input type="text" id="function" class="hex-input" maxlength="2" placeholder="00" value="00">
+                    </div>
+                    <div class="error-message" id="function-error"></div>
+                </div>
+
+                <div class="field-item">
+                    <label class="field-label" for="ms">
+                        读取方式(MS)
+                        <span class="field-bits">1-bit</span>
+                        <span class="help-icon" title="MS位 (读取方式)&#10;0x0 = 多读&#10;0x1 = 单读">❓</span>
+                    </label>
+                    <div class="hex-input-wrapper">
+                        <span class="hex-prefix">0x</span>
+                        <input type="text" id="ms" class="hex-input" maxlength="1" placeholder="0" value="0">
+                    </div>
+                    <div class="error-message" id="ms-error"></div>
+                </div>
+
+                <div class="field-item wide">
+                    <label class="field-label" for="command">
+                        命令码(Command)
+                        <span class="field-bits">16-bit</span>
+                        <span class="help-icon" title="命令码 (Command)&#10;具体命令编号&#10;范围: 0x0000-0xFFFF (0-65535)">❓</span>
+                    </label>
+                    <div class="hex-input-wrapper">
+                        <span class="hex-prefix">0x</span>
+                        <input type="text" id="command" class="hex-input" maxlength="4" placeholder="0000" value="0000">
+                    </div>
+                    <div class="error-message" id="command-error"></div>
+                </div>
+
+                <div class="field-item">
+                    <label class="field-label" for="rw">
+                        读写方向(RW)
+                        <span class="field-bits">1-bit</span>
+                        <span class="help-icon" title="RW位 (读写方向)&#10;0x0 = 写操作&#10;0x1 = 读操作">❓</span>
+                    </label>
+                    <div class="hex-input-wrapper">
+                        <span class="hex-prefix">0x</span>
+                        <input type="text" id="rw" class="hex-input" maxlength="1" placeholder="0" value="0">
+                    </div>
+                    <div class="error-message" id="rw-error"></div>
+                </div>
+
+                <div class="field-item">
+                    <label class="field-label" for="parameter">
+                        参数(Parameter)
+                        <span class="field-bits">8-bit</span>
+                        <span class="help-icon" title="参数 (Parameter)&#10;设备编号或其他参数&#10;范围: 0x00-0xFF (0-255)">❓</span>
+                    </label>
+                    <div class="hex-input-wrapper">
+                        <span class="hex-prefix">0x</span>
+                        <input type="text" id="parameter" class="hex-input" maxlength="2" placeholder="00" value="00">
+                    </div>
+                    <div class="error-message" id="parameter-error"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="button-row">
+            <button type="button" id="applyBtn" class="btn btn-primary">
+                ✓ 应用
+            </button>
+            <button type="button" id="cancelBtn" class="btn btn-secondary">
+                ✕ 取消
+            </button>
+        </div>
+
+        <div id="applyResult"></div>
+    </div>
+
+    <script>
+        // ── Field configuration ──────────────────────────────────────────────────
+        const fieldConfig = {
+            function:  { maxLen: 2, maxValue: 0x3F },
+            command:   { maxLen: 4, maxValue: 0xFFFF },
+            ms:        { maxLen: 1, maxValue: 0x1 },
+            rw:        { maxLen: 1, maxValue: 0x1 },
+            parameter: { maxLen: 2, maxValue: 0xFF }
+        };
+
+        const MAX_U32 = 0xFFFFFFFF;
+
+        let updateTimer = null;
+        const DEBOUNCE_DELAY = 300;
+
+        // ── Helpers ──────────────────────────────────────────────────────────────
+        function parseHexInput(value) {
+            const trimmed = value.trim();
+            if (!trimmed) return NaN;
+            if (/^[0-9A-Fa-f]+$/.test(trimmed)) return parseInt(trimmed, 16);
+            return NaN;
+        }
+
+        function formatHex(value, digits) {
+            return (value >>> 0).toString(16).toUpperCase().padStart(digits, '0');
+        }
+
+        function isValidField(field, value) {
+            if (isNaN(value)) return false;
+            const cfg = fieldConfig[field];
+            return Number.isInteger(value) && value >= 0 && value <= cfg.maxValue;
+        }
+
+        function encodeOffset(fn, cmd, ms, rw, param) {
+            return ((fn << 26) | (cmd << 10) | (ms << 9) | (rw << 8) | param) >>> 0;
+        }
+
+        function decodeOffset(offset32) {
+            return {
+                function:  (offset32 >>> 26) & 0x3F,
+                command:   (offset32 >>> 10) & 0xFFFF,
+                ms:        (offset32 >>> 9)  & 0x1,
+                rw:        (offset32 >>> 8)  & 0x1,
+                parameter:  offset32         & 0xFF
+            };
+        }
+
+        // ── Real-time result update ───────────────────────────────────────────────
+        function updateRealTimeResult() {
+            const fn    = parseHexInput(document.getElementById('function').value);
+            const cmd   = parseHexInput(document.getElementById('command').value);
+            const ms    = parseHexInput(document.getElementById('ms').value);
+            const rw    = parseHexInput(document.getElementById('rw').value);
+            const param = parseHexInput(document.getElementById('parameter').value);
+
+            const valid = isValidField('function', fn)  &&
+                          isValidField('command',  cmd)  &&
+                          isValidField('ms',  ms)        &&
+                          isValidField('rw',  rw)        &&
+                          isValidField('parameter', param);
+
+            const hexEl = document.getElementById('realTimeHex');
+            const decEl = document.getElementById('realTimeDec');
+
+            if (valid) {
+                const offset = encodeOffset(fn, cmd, ms, rw, param);
+                hexEl.textContent = '0x' + formatHex(offset, 8);
+                decEl.textContent = offset;
+                hexEl.style.color = 'var(--vscode-textLink-foreground)';
+            } else {
+                hexEl.textContent = '0x--------';
+                decEl.textContent = '-';
+                hexEl.style.color = 'var(--vscode-errorForeground)';
+            }
+        }
+
+        function debounceUpdate() {
+            clearTimeout(updateTimer);
+            updateTimer = setTimeout(updateRealTimeResult, DEBOUNCE_DELAY);
+        }
+
+        // ── Hex field input handlers ──────────────────────────────────────────────
+        Object.keys(fieldConfig).forEach(field => {
+            const input = document.getElementById(field);
+            const cfg   = fieldConfig[field];
+
+            input.addEventListener('input', () => {
+                let v = input.value.toUpperCase().replace(/[^0-9A-F]/g, '');
+                if (v.length > cfg.maxLen) v = v.slice(0, cfg.maxLen);
+                input.value = v;
+                debounceUpdate();
+            });
+
+            input.addEventListener('blur', () => {
+                const val = parseHexInput(input.value);
+                if (!isValidField(field, val)) {
+                    input.classList.add('invalid');
+                    document.getElementById(field + '-error').textContent = '超出范围';
+                } else {
+                    input.classList.remove('invalid');
+                    document.getElementById(field + '-error').textContent = '';
+                }
+            });
+
+            input.addEventListener('keydown', e => {
+                if (e.key === 'Enter') document.getElementById('applyBtn').click();
+            });
+        });
+
+        // ── Parse decimal offset → fill fields ───────────────────────────────────
+        function parseDecimalOffset() {
+            const raw     = document.getElementById('offsetDecimal').value.trim();
+            const errEl   = document.getElementById('offsetDecimal-error');
+            const warnEl  = document.getElementById('offsetDecimal-warning');
+
+            errEl.textContent = '';
+            warnEl.style.display = 'none';
+
+            if (!raw) {
+                errEl.textContent = '请输入10进制偏移量';
+                return;
+            }
+
+            let parsed;
+            if (raw.startsWith('0x') || raw.startsWith('0X')) {
+                parsed = parseInt(raw, 16);
+            } else {
+                parsed = parseInt(raw, 10);
+            }
+
+            if (isNaN(parsed) || parsed < 0) {
+                errEl.textContent = '无效的10进制偏移量';
+                return;
+            }
+
+            // Overflow warning
+            if (parsed > MAX_U32) {
+                const truncated = parsed >>> 0;
+                const bits = Math.floor(Math.log2(parsed)) + 1;
+                warnEl.textContent = `⚠️ 输入值 ${parsed} 超过 32 位范围 (${bits} 位)。将使用低 32 位 (${truncated}) 进行计算`;
+                warnEl.style.display = 'block';
+            }
+
+            const d = decodeOffset(parsed >>> 0);
+
+            document.getElementById('function').value  = formatHex(d.function,  2);
+            document.getElementById('command').value   = formatHex(d.command,   4);
+            document.getElementById('ms').value        = formatHex(d.ms,        1);
+            document.getElementById('rw').value        = formatHex(d.rw,        1);
+            document.getElementById('parameter').value = formatHex(d.parameter, 2);
+
+            // Clear field errors
+            Object.keys(fieldConfig).forEach(f => {
+                document.getElementById(f).classList.remove('invalid');
+                document.getElementById(f + '-error').textContent = '';
+            });
+
+            updateRealTimeResult();
+        }
+
+        document.getElementById('parseBtn').addEventListener('click', parseDecimalOffset);
+        document.getElementById('offsetDecimal').addEventListener('keydown', e => {
+            if (e.key === 'Enter') parseDecimalOffset();
+        });
+
+        // ── Apply button ──────────────────────────────────────────────────────────
+        document.getElementById('applyBtn').addEventListener('click', () => {
+            const fn    = parseHexInput(document.getElementById('function').value);
+            const cmd   = parseHexInput(document.getElementById('command').value);
+            const ms    = parseHexInput(document.getElementById('ms').value);
+            const rw    = parseHexInput(document.getElementById('rw').value);
+            const param = parseHexInput(document.getElementById('parameter').value);
+
+            const resultEl = document.getElementById('applyResult');
+
+            if (!isValidField('function', fn)  ||
+                !isValidField('command',  cmd)  ||
+                !isValidField('ms',  ms)        ||
+                !isValidField('rw',  rw)        ||
+                !isValidField('parameter', param)) {
+                resultEl.className = 'error';
+                resultEl.textContent = '检测到无效字段值，请检查输入';
+                resultEl.style.display = 'block';
+                return;
+            }
+
+            const offset = encodeOffset(fn, cmd, ms, rw, param);
+            const hexStr = '0x' + formatHex(offset, 8);
+
+            resultEl.className = 'success';
+            resultEl.textContent = `✓ 偏移量已计算: ${hexStr} (${offset})`;
+            resultEl.style.display = 'block';
+
+            // Also sync decimal input field
+            document.getElementById('offsetDecimal').value = offset;
+        });
+
+        // ── Cancel button ─────────────────────────────────────────────────────────
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            // Reset all fields
+            document.getElementById('function').value  = '00';
+            document.getElementById('command').value   = '0000';
+            document.getElementById('ms').value        = '0';
+            document.getElementById('rw').value        = '0';
+            document.getElementById('parameter').value = '00';
+            document.getElementById('offsetDecimal').value = '';
+            document.getElementById('offsetDecimal-error').textContent = '';
+            document.getElementById('offsetDecimal-warning').style.display = 'none';
+            Object.keys(fieldConfig).forEach(f => {
+                document.getElementById(f).classList.remove('invalid');
+                document.getElementById(f + '-error').textContent = '';
+            });
+            document.getElementById('applyResult').style.display = 'none';
+            updateRealTimeResult();
+        });
+
+        // ── Initial render ────────────────────────────────────────────────────────
+        updateRealTimeResult();
+    </script>
+</body>
+</html>
