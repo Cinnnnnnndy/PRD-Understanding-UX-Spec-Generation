@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SMC 偏移量计算器 · 优化版（skill 盲测生成 iter-1）</title>
+<style>
+/* 由 iter-1 盲测提示词生成；自包含、可双击。VS Code 暗色 + 字段 hue 系统。 */
+:root{
+  --bg:#1e1e1e;--elev1:#232733;--elev2:#2a2f3c;--bd:#3a3f4b;--bd2:#4a5160;
+  --accent:#4fc1ff;--accent-soft:rgba(79,193,255,.16);--err:#f48771;--ok:#4caf50;--warn:#cca700;
+  --txt:#dfe3ea;--dim:#9aa3b2;--mute:#6b7384;--ph:#5a6273;--radius:6px;--radius-lg:10px;
+  --mono:ui-monospace,'SF Mono',Consolas,'Courier New',monospace;
+  --hue-func:#f59e6b;--hue-cmd:#5e8bff;--hue-ms:#a78bfa;--hue-rw:#34d399;--hue-param:#f5b454;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans CJK SC',sans-serif}
+.mono{font-family:var(--mono)}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 40px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+.head h1{margin:0 0 4px;font-size:20px}
+.head .sub{font-size:12.5px;color:var(--dim);max-width:560px}
+.head .acts{display:flex;gap:8px;flex-shrink:0}
+.btn{appearance:none;border:1px solid var(--bd2);border-radius:var(--radius);background:var(--elev2);color:var(--txt);
+  font-size:12.5px;font-weight:600;padding:0 13px;height:32px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--elev1);border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:#06243a;border-color:var(--accent)}
+.btn.primary:hover{background:#74cdff}
+.btn.ghost{background:transparent}
+.sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.sh .t{font-size:13px;font-weight:600;padding-left:9px;border-left:3px solid var(--accent)}
+.sh .h{font-size:11px;color:var(--mute)}
+.card{background:var(--elev1);border:1px solid var(--bd);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:14px}
+/* offset bar */
+.obar .row{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:stretch}
+@media(max-width:760px){.obar .row{grid-template-columns:1fr}}
+.owrap{background:var(--bg);border:1px solid var(--bd2);border-radius:var(--radius);padding:8px 12px;display:flex;flex-direction:column;gap:4px;transition:.12s}
+.owrap.focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.owrap.invalid{border-color:var(--err);box-shadow:0 0 0 3px rgba(244,135,113,.14)}
+.owrap .tag{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:.07em}
+.owrap .sync{color:var(--mute)}
+.owrap.synced .sync{color:var(--accent)}
+.owrap input{background:transparent;border:0;color:var(--txt);font-family:var(--mono);font-size:19px;font-weight:600;padding:0;outline:none;width:100%}
+.owrap input::placeholder{color:var(--ph)}
+.oact{display:flex;align-items:stretch}
+.split{position:relative;display:flex}
+.split .cp{border-radius:var(--radius) 0 0 var(--radius)}
+.split .fm{border-left:1px solid rgba(0,0,0,.25);border-radius:0 var(--radius) var(--radius) 0;padding:0 9px}
+.menu{position:absolute;top:calc(100% + 4px);right:0;background:var(--elev2);border:1px solid var(--bd2);border-radius:var(--radius);padding:4px;box-shadow:0 12px 34px rgba(0,0,0,.5);min-width:248px;z-index:10;display:none}
+.menu.open{display:block}
+.mi{padding:7px 10px;border-radius:4px;font-size:12px;display:flex;justify-content:space-between;gap:10px;cursor:pointer}
+.mi:hover{background:var(--elev1)}
+.mi .pv{font-family:var(--mono);font-size:11px;color:var(--dim);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mi.active::after{content:"✓";color:var(--accent);margin-left:6px}
+.oerr{margin-top:8px;min-height:14px;font-size:11.5px;color:var(--err);font-family:var(--mono)}
+/* bit grid */
+.bg{display:grid;grid-template-columns:repeat(32,minmax(18px,1fr));min-width:660px}
+.band{padding:4px 0;text-align:center;font-size:10px;font-weight:700;color:#06120c;border-radius:4px 4px 0 0;margin-right:2px;white-space:nowrap;overflow:hidden}
+.band .si{font-family:var(--mono);font-size:9px;opacity:.7;margin-left:5px}
+.cell{height:28px;border:1px solid var(--bd);border-right:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--dim);transition:.15s}
+.cell.bound{border-right:1px solid var(--bd2)}
+.cell:last-child{border-right:1px solid var(--bd)}
+.cell.on{color:#fff;font-weight:700}
+.pos{text-align:center;font-family:var(--mono);font-size:9px;color:var(--dim);padding-top:5px}
+.pos.bound{color:var(--txt);font-weight:700}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:11px;color:var(--mute);font-family:var(--mono)}
+.legend .c{display:inline-flex;align-items:center;gap:6px}
+.legend .sw{width:10px;height:10px;border-radius:2px}
+.bmcard{overflow-x:auto}
+/* field cards */
+.frow{display:grid;gap:12px;margin-bottom:12px}.frow:last-child{margin-bottom:0}
+.frow.r1{grid-template-columns:6fr 16fr}.frow.r2{grid-template-columns:1fr 1fr 2fr}
+@media(max-width:760px){.frow.r1,.frow.r2{grid-template-columns:1fr}}
+.fc{background:var(--elev2);border:1px solid var(--bd);border-radius:var(--radius);padding:11px 12px;position:relative}
+.fc:focus-within{background:#2f3543}
+.fhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;gap:8px}
+.flabel{font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.sw{width:8px;height:8px;border-radius:2px;display:inline-block}
+.fmeta{font-size:10.5px;color:var(--dim);font-family:var(--mono);white-space:nowrap}
+.fin-wrap{display:flex;gap:6px}
+.fin{flex:1;background:var(--bg);border:1px solid var(--bd2);border-radius:var(--radius);color:var(--txt);font-family:var(--mono);font-size:14px;font-weight:600;padding:7px 10px;outline:none;min-width:0}
+.fin:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.fin.invalid{border-color:var(--err);box-shadow:0 0 0 3px rgba(244,135,113,.14)}
+.fin::placeholder{color:var(--ph)}
+.fcopy{width:30px;height:32px;border-radius:var(--radius);background:transparent;border:1px solid var(--bd);color:var(--dim);cursor:pointer}
+.fcopy:hover{color:var(--txt);border-color:var(--accent)}
+.fcopy:disabled{opacity:.4;cursor:not-allowed}
+.fcopy.copied{color:var(--ok);border-color:var(--ok)}
+.ffoot{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-family:var(--mono);font-size:10.5px;color:var(--dim);min-height:14px}
+.ffoot .pair span .k{color:var(--mute);margin-right:2px}.ffoot .pair span.muted .v{color:var(--ph)}
+.ffoot .sem{color:var(--mute);font-style:italic}.ffoot .sem.err{color:var(--err);font-style:normal}
+.ffoot .sem.warn{color:var(--warn);font-style:normal}
+/* hint pop */
+.hint{position:relative;cursor:help;border-bottom:1px dotted var(--dim)}
+.hint:hover .pop,.hint:focus-within .pop{opacity:1;transform:none;pointer-events:auto}
+.pop{position:absolute;top:calc(100% + 8px);left:0;background:#0d0f15;border:1px solid var(--bd2);border-radius:6px;padding:10px 12px;min-width:230px;z-index:12;box-shadow:0 12px 30px rgba(0,0,0,.5);opacity:0;transform:translateY(-4px);pointer-events:none;transition:.15s;font-weight:400}
+.pop .ph{font-size:11px;color:var(--dim);font-family:var(--mono);margin-bottom:6px}
+.pop ul{list-style:none;margin:0;padding:0;font-family:var(--mono);font-size:11.5px;line-height:1.7}
+.pop li .k{color:var(--hue-func);display:inline-block;min-width:42px}.pop li .d{color:var(--mute);margin-left:6px}
+/* history */
+.hlist{list-style:none;padding:0;margin:8px 0 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+.hitem{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;padding:6px 10px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--radius);cursor:pointer}
+.hitem:hover{border-color:var(--accent);background:var(--elev2)}
+.hitem .idx{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:right}
+.hitem .v{font-family:var(--mono);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hitem .ts{font-size:10px;color:var(--dim);font-family:var(--mono)}
+.hempty{padding:16px;text-align:center;color:var(--dim);font-size:12px;grid-column:1/-1}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:var(--elev2);border:1px solid var(--bd2);border-radius:8px;padding:9px 15px;font-size:12.5px;font-family:var(--mono);box-shadow:0 12px 34px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.18s;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div><h1>SMC 偏移量计算器</h1>
+      <div class="sub">32-bit 命令字 ↔ 功能码·命令码·MS·RW·参数 双向同步。任一输入框或字段编辑后整体即时联动。</div></div>
+    <div class="acts"><button class="btn ghost" id="reset">重置</button><button class="btn" id="sample">载入示例</button></div>
+  </div>
+
+  <!-- offset bar -->
+  <div class="card obar">
+    <div class="sh"><span class="t">偏移量 · 32-bit</span><span class="h">输入 dec 或 0x hex，两边 + 下方字段自动联动</span></div>
+    <div class="row">
+      <div class="owrap" id="hexw"><div class="tag"><span>HEX · 0x…</span><span class="sync">●</span></div>
+        <input id="hex" placeholder="0x00000000" autocomplete="off" spellcheck="false" aria-label="十六进制偏移量"/></div>
+      <div class="owrap" id="decw"><div class="tag"><span>DEC · 0–4 294 967 295</span><span class="sync">●</span></div>
+        <input id="dec" placeholder="0" autocomplete="off" spellcheck="false" inputmode="numeric" aria-label="十进制偏移量"/></div>
+      <div class="oact"><div class="split">
+        <button class="btn primary cp" id="copyAll" disabled>复制偏移量</button>
+        <button class="btn primary fm" id="fmBtn" disabled aria-label="选择复制格式">▾</button>
+        <div class="menu" id="menu">
+          <div class="mi active" data-f="hex"><span>仅 HEX</span><span class="pv" id="pv-hex">0x00000000</span></div>
+          <div class="mi" data-f="dec"><span>仅 DEC</span><span class="pv" id="pv-dec">0</span></div>
+          <div class="mi" data-f="both"><span>HEX + DEC</span><span class="pv" id="pv-both">0x00000000 (0)</span></div>
+          <div class="mi" data-f="c"><span>C 字面量</span><span class="pv" id="pv-c">0x00000000u</span></div>
+          <div class="mi" data-f="json"><span>JSON 字段</span><span class="pv" id="pv-json">{…}</span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="oerr" id="oerr" role="status" aria-live="polite"></div>
+  </div>
+
+  <!-- bit grid -->
+  <div class="card bmcard">
+    <div class="sh"><span class="t">32-bit 位图</span><span class="h">MSB → LSB · 每格 1 bit · 颜色对应字段</span></div>
+    <div class="bg" id="grid"></div>
+    <div class="legend">
+      <span class="c"><span class="sw" style="background:var(--hue-func)"></span>Function·[31:26]·6b</span>
+      <span class="c"><span class="sw" style="background:var(--hue-cmd)"></span>Command·[25:10]·16b</span>
+      <span class="c"><span class="sw" style="background:var(--hue-ms)"></span>MS·[9]·1b</span>
+      <span class="c"><span class="sw" style="background:var(--hue-rw)"></span>RW·[8]·1b</span>
+      <span class="c"><span class="sw" style="background:var(--hue-param)"></span>Param·[7:0]·8b</span>
+    </div>
+  </div>
+
+  <!-- field cards -->
+  <div class="card">
+    <div class="sh"><span class="t">字段拆解 · 双向编辑</span><span class="h">0x 开头按十六进制，否则十进制</span></div>
+    <div class="frow r1" id="rowFuncCmd"></div>
+    <div class="frow r2" id="rowMsRwParam"></div>
+  </div>
+
+  <!-- history -->
+  <div class="card">
+    <div class="sh"><span class="t">最近 10 次计算</span>
+      <span style="display:flex;gap:8px;align-items:center"><span class="h">Ctrl+S 收藏 · 点击回填</span>
+      <button class="btn ghost" id="clearH" style="height:24px;padding:0 9px;font-size:11px">清空</button></span></div>
+    <ul class="hlist" id="hlist"><li class="hempty">尚无历史记录 · 复制即自动收藏</li></ul>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const FIELDS={
+  func: {hi:31,lo:26,w:6, hex:2, hue:'func',  label:'Function · 功能码', meta:'[31:26] · 6b · 0–0x3F'},
+  cmd:  {hi:25,lo:10,w:16,hex:4, hue:'cmd',   label:'Command · 命令码', meta:'[25:10] · 16b · 0–0xFFFF'},
+  ms:   {hi:9, lo:9, w:1, hex:1, hue:'ms',    label:'MS · 读取方式',   meta:'[9] · 1b'},
+  rw:   {hi:8, lo:8, w:1, hex:1, hue:'rw',    label:'RW · 读写方向',   meta:'[8] · 1b'},
+  param:{hi:7, lo:0, w:8, hex:2, hue:'param', label:'Param · 参数',    meta:'[7:0] · 8b · 0–0xFF'},
+};
+const ORDER=['func','cmd','ms','rw','param'];
+// 权威功能码语义（来自 data-structure.md，非 gold-standard 占位）
+const FUNC={0x00:'公共功能',0x01:'扩展组件管理',0x02:'机箱部件管理',0x03:'计算部件管理',0x04:'内存部件管理',0x05:'存储部件管理',0x06:'散热部件管理',0x07:'IO 扩展部件管理',0x08:'加速扩展部件管理',0x09:'供电部件管理',0x20:'Reserved（保留）'};
+const MS={0:'多读',1:'单读'},RW={0:'写操作',1:'读操作'};
+const HINTS={
+  func:{h:'功能码速查 · 6-bit',items:[['0x01','扩展组件'],['0x03','计算部件'],['0x05','存储部件'],['0x06','散热部件'],['0x09','供电部件'],['0x20','Reserved']]},
+  ms:{h:'读取方式 · 1-bit',items:[['0','多读 Multi'],['1','单读 Single']]},
+  rw:{h:'读写方向 · 1-bit',items:[['0','写 Write'],['1','读 Read']]},
+};
+const KEY='ubmc.smc.history.iter1';
+const state={fields:{func:null,cmd:null,ms:null,rw:null,param:null},history:[],fmt:'hex'};
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+const pad=(s,n)=>s.length>=n?s:'0'.repeat(n-s.length)+s;
+
+function compose(){let w=0;for(const k of ORDER){const v=state.fields[k];if(v!=null)w=(w|((v<<FIELDS[k].lo)>>>0))>>>0;}return w>>>0;}
+function decompose(w){const o={};for(const k of ORDER){o[k]=(w>>>FIELDS[k].lo)&((1<<FIELDS[k].w)-1);}return o;}
+function anySet(){return ORDER.some(k=>state.fields[k]!=null);}
+function fmtHex(w){return '0x'+pad((w>>>0).toString(16).toUpperCase(),8);}
+function describeFunc(v){if(v in FUNC)return{kind:v===0x20?'warn':'',label:FUNC[v]};if(v>=0x37&&v<=0x3f)return{kind:'warn',label:'OEM 0x'+v.toString(16).toUpperCase()};if(v>=0&&v<=0x3f)return{kind:'warn',label:'未定义功能码'};return{kind:'err',label:'超范围'};}
+
+function parseLoose(raw,bits){
+  const s=String(raw||'').trim();if(!s)return{ok:true,value:null};
+  let n;
+  if(/^0x/i.test(s)){if(!/^0x[0-9a-f]+$/i.test(s))return{ok:false,err:'不合法的十六进制'};n=parseInt(s.slice(2),16);}
+  else if(/^[0-9a-f]+$/i.test(s)&&/[a-f]/i.test(s))n=parseInt(s,16);
+  else if(/^[0-9]+$/.test(s))n=parseInt(s,10);
+  else return{ok:false,err:'只接受 dec 或 0x hex'};
+  if(!Number.isFinite(n)||n<0)return{ok:false,err:'非法数字'};
+  const max=bits===32?0xFFFFFFFF:((1<<bits)-1);
+  if(n>max)return{ok:false,err:`超出 ${bits}-bit 范围`};
+  return{ok:true,value:n>>>0};
+}
+
+/* bit grid */
+function buildGrid(){
+  const g=$('#grid');const h=[];
+  h.push(`<div class="band" style="grid-column:1/7;background:var(--hue-func)">Function<span class="si">[31:26]</span></div>`);
+  h.push(`<div class="band" style="grid-column:7/23;background:var(--hue-cmd);color:#fff">Command<span class="si">[25:10]</span></div>`);
+  h.push(`<div class="band" style="grid-column:23/24;background:var(--hue-ms);color:#fff;font-size:9px">MS</div>`);
+  h.push(`<div class="band" style="grid-column:24/25;background:var(--hue-rw);font-size:9px">RW</div>`);
+  h.push(`<div class="band" style="grid-column:25/33;background:var(--hue-param)">Param<span class="si">[7:0]</span></div>`);
+  for(let c=0;c<32;c++){const b=31-c;const bound=[5,21,22,23].includes(c)?'bound':'';h.push(`<div class="cell ${bound}" data-bit="${b}" data-hue="${hueOf(b)}">0</div>`);}
+  for(let c=0;c<32;c++){const b=31-c;const bound=[31,26,25,10,9,8,7,0].includes(b)?'bound':'';h.push(`<div class="pos ${bound}">${b}</div>`);}
+  g.innerHTML=h.join('');
+}
+function hueOf(b){if(b>=26)return'func';if(b>=10)return'cmd';if(b===9)return'ms';if(b===8)return'rw';return'param';}
+const HUEVAR={func:'--hue-func',cmd:'--hue-cmd',ms:'--hue-ms',rw:'--hue-rw',param:'--hue-param'};
+function paintGrid(){
+  const w=compose(),set=anySet();
+  $$('#grid .cell').forEach(c=>{
+    const b=+c.dataset.bit,on=((w>>>b)&1)===1;
+    c.textContent=set?(on?'1':'0'):'0';
+    if(set&&on){const v=getComputedStyle(document.documentElement).getPropertyValue(HUEVAR[c.dataset.hue]).trim();
+      c.classList.add('on');c.style.background=hexA(v,.26);c.style.borderColor=hexA(v,.6);}
+    else{c.classList.remove('on');c.style.background='';c.style.borderColor='';}
+  });
+}
+function hexA(hex,a){const m=hex.replace('#','');const r=parseInt(m.slice(0,2),16),g=parseInt(m.slice(2,4),16),b=parseInt(m.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
+
+/* field cards */
+function buildFields(){
+  const r1=$('#rowFuncCmd'),r2=$('#rowMsRwParam');
+  r1.innerHTML=fieldCard('func')+fieldCard('cmd');
+  r2.innerHTML=fieldCard('ms')+fieldCard('rw')+fieldCard('param');
+  ORDER.forEach(wireField);
+  $$('[data-copy]').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.dataset.copy,v=state.fields[k];if(v==null)return;
+    const t='0x'+pad(v.toString(16).toUpperCase(),FIELDS[k].hex);
+    navigator.clipboard?.writeText(t);b.classList.add('copied');setTimeout(()=>b.classList.remove('copied'),800);toast('已复制 '+t);
+  }));
+}
+function fieldCard(k){
+  const f=FIELDS[k];const hv=`var(${HUEVAR[k]})`;
+  const labelInner=HINTS[k]?`<span class="hint" tabindex="0">${f.label}<span class="pop"><div class="ph">${HINTS[k].h}</div><ul>${HINTS[k].items.map(([a,b])=>`<li><span class="k">${a}</span><span class="d">${b}</span></li>`).join('')}</ul></span></span>`:f.label;
+  return `<div class="fc" data-field="${k}" style="border-top:2px solid ${hv}">
+    <div class="fhead"><span class="flabel"><span class="sw" style="background:${hv}"></span>${labelInner}</span><span class="fmeta">${f.meta}</span></div>
+    <div class="fin-wrap"><input class="fin mono" data-in="${k}" placeholder="0x.. / dec" autocomplete="off" spellcheck="false" aria-label="${f.label}"/>
+      <button class="fcopy" data-copy="${k}" title="复制此字段" disabled>⧉</button></div>
+    <div class="ffoot" data-foot="${k}"><span class="pair">${f.w===1?'<span class="muted"><span class="k">DEC</span><span class="v">—</span></span>':'<span class="muted"><span class="k">DEC</span><span class="v">—</span></span> <span class="muted"><span class="k">HEX</span><span class="v">—</span></span>'}</span><span class="sem"></span></div>
+  </div>`;
+}
+function wireField(k){
+  const inp=$(`[data-in="${k}"]`);
+  inp.addEventListener('input',()=>{
+    const r=parseLoose(inp.value,FIELDS[k].w);const sem=$(`[data-foot="${k}"] .sem`);
+    if(!r.ok){inp.classList.add('invalid');sem.textContent='· '+r.err;sem.className='sem err';return;}
+    inp.classList.remove('invalid');state.fields[k]=r.value;
+    renderFoot(k);renderTop('field');paintGrid();updatePreviews();updateCopy();
+  });
+  inp.addEventListener('blur',()=>{const v=state.fields[k];if(v!=null)inp.value='0x'+pad(v.toString(16).toUpperCase(),FIELDS[k].hex);});
+}
+function renderFoot(k){
+  const v=state.fields[k],foot=$(`[data-foot="${k}"]`),pair=foot.querySelector('.pair'),sem=foot.querySelector('.sem');
+  const f=FIELDS[k];
+  if(v==null){pair.innerHTML=f.w===1?'<span class="muted"><span class="k">DEC</span><span class="v">—</span></span>':'<span class="muted"><span class="k">DEC</span><span class="v">—</span></span> <span class="muted"><span class="k">HEX</span><span class="v">—</span></span>';sem.textContent='';sem.className='sem';}
+  else{
+    pair.innerHTML=f.w===1?`<span><span class="k">DEC</span><span class="v">${v}</span></span>`:`<span><span class="k">DEC</span><span class="v">${v}</span></span> <span><span class="k">HEX</span><span class="v">0x${pad(v.toString(16).toUpperCase(),f.hex)}</span></span>`;
+    if(k==='func'){const d=describeFunc(v);sem.textContent='· '+d.label;sem.className='sem '+(d.kind||'');}
+    else if(k==='ms'){sem.textContent='· '+(MS[v]||'');sem.className='sem';}
+    else if(k==='rw'){sem.textContent='· '+(RW[v]||'');sem.className='sem';}
+    else{sem.textContent='';sem.className='sem';}
+  }
+  const cp=$(`[data-copy="${k}"]`);if(cp)cp.disabled=v==null;
+}
+function renderFields(){ORDER.forEach(k=>{const inp=$(`[data-in="${k}"]`);const v=state.fields[k];inp.value=v==null?'':'0x'+pad(v.toString(16).toUpperCase(),FIELDS[k].hex);inp.classList.remove('invalid');renderFoot(k);});}
+
+/* top offset */
+const hexw=$('#hexw'),decw=$('#decw');
+$('#hex').addEventListener('focus',()=>hexw.classList.add('focus'));$('#hex').addEventListener('blur',()=>hexw.classList.remove('focus'));
+$('#dec').addEventListener('focus',()=>decw.classList.add('focus'));$('#dec').addEventListener('blur',()=>decw.classList.remove('focus'));
+function renderTop(src){
+  const w=compose(),set=anySet();
+  if(src!=='hex'){$('#hex').value=set?fmtHex(w):'';}
+  if(src!=='dec'){$('#dec').value=set?String(w):'';}
+  hexw.classList.toggle('synced',set);decw.classList.toggle('synced',set);
+  hexw.classList.remove('invalid');decw.classList.remove('invalid');
+}
+function onTop(src){
+  const raw=src==='hex'?$('#hex').value:$('#dec').value;$('#oerr').textContent='';
+  hexw.classList.remove('invalid');decw.classList.remove('invalid');
+  if(raw.trim()===''){ORDER.forEach(k=>state.fields[k]=null);renderFields();renderTop(src);paintGrid();updatePreviews();updateCopy();return;}
+  const r=parseLoose(raw,32);
+  if(!r.ok){(src==='hex'?hexw:decw).classList.add('invalid');$('#oerr').textContent=r.err;return;}
+  const parts=decompose(r.value);ORDER.forEach(k=>state.fields[k]=parts[k]);
+  renderFields();renderTop(src);paintGrid();updatePreviews();updateCopy();
+}
+$('#hex').addEventListener('input',()=>onTop('hex'));$('#dec').addEventListener('input',()=>onTop('dec'));
+
+/* export formats */
+function formatted(f){
+  const w=compose(),hex=fmtHex(w),dec=String(w);
+  if(f==='dec')return dec;if(f==='both')return `${hex} (${dec})`;if(f==='c')return hex+'u';
+  if(f==='json'){const p=decompose(w);return JSON.stringify({offset:hex,func:'0x'+pad(p.func.toString(16).toUpperCase(),2),cmd:'0x'+pad(p.cmd.toString(16).toUpperCase(),4),ms:p.ms,rw:p.rw,param:'0x'+pad(p.param.toString(16).toUpperCase(),2)});}
+  return hex;
+}
+function updatePreviews(){
+  $('#pv-hex').textContent=formatted('hex');$('#pv-dec').textContent=formatted('dec');
+  $('#pv-both').textContent=formatted('both');$('#pv-c').textContent=formatted('c');
+  const j=formatted('json');$('#pv-json').textContent=j.length>22?j.slice(0,20)+'…':j;
+}
+function updateCopy(){const s=anySet();$('#copyAll').disabled=!s;$('#fmBtn').disabled=!s;}
+$('#copyAll').addEventListener('click',()=>{if(!anySet())return;const t=formatted(state.fmt);navigator.clipboard?.writeText(t);toast('已复制 '+(t.length>36?t.slice(0,34)+'…':t));saveHistory();});
+$('#fmBtn').addEventListener('click',e=>{e.stopPropagation();$('#menu').classList.toggle('open');});
+document.addEventListener('click',e=>{if(!e.target.closest('.split'))$('#menu').classList.remove('open');});
+$$('.mi').forEach(el=>el.addEventListener('click',()=>{state.fmt=el.dataset.f;$$('.mi').forEach(x=>x.classList.remove('active'));el.classList.add('active');$('#menu').classList.remove('open');$('#copyAll').click();}));
+
+/* reset / sample */
+$('#reset').addEventListener('click',()=>{ORDER.forEach(k=>state.fields[k]=null);renderFields();renderTop();paintGrid();updatePreviews();updateCopy();$('#oerr').textContent='';});
+$('#sample').addEventListener('click',()=>{$('#hex').value='0x18040600';onTop('hex');toast('已载入示例');}); // func=0x06 散热 cmd=0x0106 rw=0 ...
+
+/* history */
+function saveHistory(){
+  if(!anySet())return;const snap={word:compose(),parts:{...state.fields},ts:Date.now()};
+  if(state.history[0]&&state.history[0].word===snap.word)return;
+  state.history.unshift(snap);if(state.history.length>10)state.history.length=10;
+  try{localStorage.setItem(KEY,JSON.stringify(state.history));}catch(e){}renderHistory();
+}
+function renderHistory(){
+  const l=$('#hlist');
+  if(!state.history.length){l.innerHTML='<li class="hempty">尚无历史记录 · 复制即自动收藏</li>';return;}
+  l.innerHTML=state.history.map((it,i)=>{const t=new Date(it.ts);const ts=pad(String(t.getHours()),2)+':'+pad(String(t.getMinutes()),2);
+    return `<li class="hitem" data-h="${i}"><span class="idx">${pad(String(i+1),2)}</span><span class="v">${fmtHex(it.word)}</span><span class="ts">${ts}</span></li>`;}).join('');
+  $$('.hitem').forEach(el=>el.addEventListener('click',()=>{const it=state.history[+el.dataset.h];if(!it)return;ORDER.forEach(k=>state.fields[k]=it.parts[k]);renderFields();renderTop();paintGrid();updatePreviews();updateCopy();toast('已回填 '+fmtHex(it.word));}));
+}
+$('#clearH').addEventListener('click',()=>{state.history=[];try{localStorage.removeItem(KEY);}catch(e){}renderHistory();});
+function restoreHistory(){try{const s=localStorage.getItem(KEY);if(s)state.history=JSON.parse(s)||[];}catch(e){}}
+
+/* toast + keyboard */
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1600);}
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveHistory();toast('已保存当前结果');}});
+
+/* init */
+buildGrid();buildFields();paintGrid();renderFields();renderTop();updatePreviews();updateCopy();restoreHistory();renderHistory();
+</script>
+</body>
+</html>
