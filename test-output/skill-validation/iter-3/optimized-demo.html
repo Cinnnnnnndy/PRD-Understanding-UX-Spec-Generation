@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SMC 偏移量计算器 · PTO</title>
+<!-- 设计系统槽位 = pto-design-system：消费其 token 与 class，本文件零硬编码颜色 -->
+<link rel="stylesheet" href="../../../design-systems/pto-design-system/css/style.css"/>
+<style>
+/* ── module-local 布局/结构（视觉值全部来自 PTO token）── */
+body.smc-page{display:block;height:auto;min-height:100vh;overflow:auto;font-size:var(--font-size-body-md)}
+.smc-wrap{max-width:980px;margin:0 auto;padding:var(--space-4) var(--space-4) var(--space-6)}
+.smc-head-sub{font:var(--text-body-sm);color:var(--foreground-secondary);max-width:560px}
+.smc-stack{display:flex;flex-direction:column;gap:var(--space-4)}
+.smc-mono{font-family:var(--font-mono)}
+
+/* offset 双输入 */
+.smc-offset-row{display:grid;grid-template-columns:1fr 1fr auto;gap:var(--space-3);align-items:stretch}
+@media(max-width:760px){.smc-offset-row{grid-template-columns:1fr}}
+.smc-owrap{background:var(--input-bg);border:1px solid var(--input-border);border-radius:var(--input-radius);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;gap:var(--space-1)}
+.smc-owrap:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)}
+.smc-owrap.invalid{border-color:var(--danger);box-shadow:0 0 0 3px var(--tone-critical-bg)}
+.smc-otag{display:flex;justify-content:space-between;font:var(--text-label);letter-spacing:var(--letter-spacing-label);color:var(--foreground-muted);font-family:var(--font-mono);text-transform:uppercase}
+.smc-osync{color:var(--foreground-muted)}
+.smc-owrap.synced .smc-osync{color:var(--primary)}
+.smc-owrap input{background:transparent;border:0;color:var(--foreground);font-family:var(--font-mono);font-size:19px;font-weight:var(--font-weight-semibold);outline:none;width:100%}
+.smc-owrap input::placeholder{color:var(--foreground-disabled)}
+.smc-split{position:relative;display:flex;align-items:stretch}
+.smc-split .btn{height:auto}
+.smc-split .smc-fmt{padding:0 var(--space-2);border-left:1px solid var(--border-default)}
+.smc-oerr{min-height:16px;font:var(--text-body-sm);color:var(--danger);font-family:var(--font-mono);margin-top:var(--space-2)}
+
+/* 32-bit 位图（module-local grid 结构；色值=token） */
+.smc-bitwrap{overflow-x:auto}
+.smc-grid{display:grid;grid-template-columns:repeat(32,minmax(18px,1fr));min-width:660px}
+.smc-band{padding:var(--space-1) 0;text-align:center;font:var(--text-label);font-weight:var(--font-weight-bold);color:var(--primary-foreground);border-radius:var(--radius-sm) var(--radius-sm) 0 0;margin-right:2px;white-space:nowrap;overflow:hidden}
+.smc-band:last-of-type{margin-right:0}
+.smc-band .si{font-family:var(--font-mono);opacity:.75;margin-left:var(--space-1)}
+.smc-cell{height:28px;border:1px solid var(--border-subtle);border-right:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:var(--font-size-body-sm);font-weight:var(--font-weight-semibold);color:var(--foreground-muted);transition:background .15s,color .15s}
+.smc-cell.bound{border-right:1px solid var(--border-strong)}
+.smc-cell:last-child{border-right:1px solid var(--border-subtle)}
+.smc-cell.on{color:var(--foreground);background:color-mix(in srgb,var(--cell-hue) 22%,transparent);border-color:color-mix(in srgb,var(--cell-hue) 50%,transparent)}
+.smc-pos{text-align:center;font-family:var(--font-mono);font-size:var(--font-size-label-xs);color:var(--foreground-muted);padding-top:var(--space-1)}
+.smc-pos.bound{color:var(--foreground);font-weight:var(--font-weight-bold)}
+.smc-legend{display:flex;flex-wrap:wrap;gap:var(--space-3);margin-top:var(--space-3);font:var(--text-label);color:var(--foreground-secondary);font-family:var(--font-mono)}
+.smc-legend span{display:inline-flex;align-items:center;gap:var(--space-1)}
+.smc-sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+/* 字段卡：中性 surface + 小 swatch（PTO 色彩原则） */
+.smc-frow{display:grid;gap:var(--space-3)}
+.smc-frow + .smc-frow{margin-top:var(--space-3)}
+.smc-frow.r1{grid-template-columns:6fr 16fr}
+.smc-frow.r2{grid-template-columns:1fr 1fr 2fr}
+@media(max-width:760px){.smc-frow.r1,.smc-frow.r2{grid-template-columns:1fr}}
+.smc-fc{background:var(--surface-2);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--space-3)}
+.smc-fc:focus-within{background:var(--surface-3)}
+.smc-fhead{display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-2)}
+.smc-flabel{font:var(--text-body-sm);font-weight:var(--font-weight-semibold);color:var(--foreground);display:inline-flex;align-items:center;gap:var(--space-1)}
+.smc-fmeta{font:var(--text-label);color:var(--foreground-muted);font-family:var(--font-mono);white-space:nowrap}
+.smc-fin-wrap{display:flex;gap:var(--space-1)}
+.smc-fin{flex:1;min-width:0;background:var(--input-bg);border:1px solid var(--input-border);border-radius:var(--input-radius);color:var(--foreground);font-family:var(--font-mono);font-size:var(--font-size-body-md);font-weight:var(--font-weight-semibold);padding:var(--space-2) var(--space-3);outline:none}
+.smc-fin:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)}
+.smc-fin.invalid{border-color:var(--danger);box-shadow:0 0 0 3px var(--tone-critical-bg)}
+.smc-fin::placeholder{color:var(--foreground-disabled)}
+.smc-ffoot{display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);margin-top:var(--space-2);min-height:22px}
+.smc-pair{display:inline-flex;gap:var(--space-2)}
+.smc-sem{font:var(--text-body-sm);color:var(--foreground-muted);font-style:italic}
+.smc-sem.warn{color:var(--warning);font-style:normal}
+.smc-sem.err{color:var(--danger);font-style:normal}
+
+/* hint 浮层（panel-shell 语言） */
+.smc-hint{position:relative;cursor:help;border-bottom:1px dotted var(--foreground-muted)}
+.smc-hint:hover .smc-pop,.smc-hint:focus-within .smc-pop{opacity:1;transform:none;pointer-events:auto}
+.smc-pop{position:absolute;top:calc(100% + var(--space-2));left:0;background:var(--background-elevated);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:var(--space-3);min-width:230px;z-index:12;box-shadow:var(--shadow-lg);opacity:0;transform:translateY(-4px);pointer-events:none;transition:opacity .15s,transform .15s;font-weight:var(--font-weight-medium)}
+.smc-pop .ph{font:var(--text-label);color:var(--foreground-muted);font-family:var(--font-mono);margin-bottom:var(--space-2)}
+.smc-pop ul{list-style:none;margin:0;padding:0;font:var(--text-mono);line-height:1.7;color:var(--foreground)}
+.smc-pop li .k{color:var(--warning);display:inline-block;min-width:42px}
+.smc-pop li .d{color:var(--foreground-secondary);margin-left:var(--space-1)}
+
+/* 历史（recent-chip + module-local 网格） */
+.smc-hlist{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.smc-hempty{font:var(--text-body-sm);color:var(--foreground-muted);padding:var(--space-3) 0}
+.smc-hts{color:var(--foreground-muted);margin-left:var(--space-1)}
+
+/* toast：系统未覆盖 → token 组装（见产出说明） */
+.smc-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:var(--background-elevated);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-4);font:var(--text-mono);color:var(--foreground);box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:.18s;z-index:50}
+.smc-toast.show{opacity:1;transform:translateX(-50%)}
+.btn.copied{color:var(--success);border-color:var(--success)}
+</style>
+</head>
+<body class="smc-page">
+<div class="smc-wrap smc-stack">
+
+  <!-- 透明页头（PTO chrome 基线：无填充底、无装饰带） -->
+  <header class="layout-header" style="padding:0">
+    <div class="layout-header-left">
+      <span class="layout-header-brand"><span class="layout-header-dot"></span>SMC 偏移量计算器</span>
+      <span class="smc-head-sub">32-bit 命令字 ↔ 功能码·命令码·MS·RW·参数 双向同步；任一处编辑全局联动</span>
+    </div>
+    <div class="layout-header-right">
+      <button class="btn btn-ghost" id="reset" type="button">重置</button>
+      <button class="btn" id="sample" type="button">载入示例</button>
+    </div>
+  </header>
+
+  <!-- 偏移量 · 双输入 + 多格式复制 -->
+  <section class="panel-shell">
+    <div class="panel-shell-header">
+      <span class="panel-shell-title">偏移量 · 32-bit</span>
+      <span class="smc-head-sub">输入 dec 或 0x hex，两边与下方字段即时联动</span>
+    </div>
+    <div class="panel-shell-body">
+      <div class="smc-offset-row">
+        <div class="smc-owrap" id="hexw">
+          <span class="smc-otag"><span>HEX · 0x…</span><span class="smc-osync">●</span></span>
+          <input id="hex" placeholder="0x00000000" autocomplete="off" spellcheck="false" aria-label="十六进制偏移量"/>
+        </div>
+        <div class="smc-owrap" id="decw">
+          <span class="smc-otag"><span>DEC · 0–4294967295</span><span class="smc-osync">●</span></span>
+          <input id="dec" placeholder="0" autocomplete="off" spellcheck="false" inputmode="numeric" aria-label="十进制偏移量"/>
+        </div>
+        <div class="smc-split graph-picker">
+          <button class="btn btn-solid" id="copyAll" type="button" disabled>复制偏移量</button>
+          <button class="btn btn-solid smc-fmt" id="fmBtn" type="button" disabled aria-label="选择复制格式">▾</button>
+          <div class="graph-menu" id="menu">
+            <button class="graph-menu-item" data-f="hex">仅 HEX<span class="smc-mono" id="pv-hex" style="color:var(--foreground-muted)">0x00000000</span></button>
+            <button class="graph-menu-item" data-f="dec">仅 DEC<span class="smc-mono" id="pv-dec" style="color:var(--foreground-muted)">0</span></button>
+            <button class="graph-menu-item" data-f="both">HEX + DEC<span class="smc-mono" id="pv-both" style="color:var(--foreground-muted)">…</span></button>
+            <button class="graph-menu-item" data-f="c">C 字面量<span class="smc-mono" id="pv-c" style="color:var(--foreground-muted)">…u</span></button>
+            <button class="graph-menu-item" data-f="json">JSON 字段<span class="smc-mono" id="pv-json" style="color:var(--foreground-muted)">{…}</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="smc-oerr" id="oerr" role="status" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- 32-bit 位图 -->
+  <section class="panel-shell">
+    <div class="panel-shell-header">
+      <span class="panel-shell-title">32-bit 位图</span>
+      <span class="smc-head-sub">MSB → LSB · 每格 1 bit · 颜色对应字段</span>
+    </div>
+    <div class="panel-shell-body smc-bitwrap">
+      <div class="smc-grid" id="grid" aria-hidden="true"></div>
+      <div class="smc-legend" id="legend"></div>
+    </div>
+  </section>
+
+  <!-- 字段拆解 -->
+  <section class="panel-shell">
+    <div class="panel-shell-header">
+      <span class="panel-shell-title">字段拆解 · 双向编辑</span>
+      <span class="smc-head-sub">0x 开头按十六进制，否则十进制</span>
+    </div>
+    <div class="panel-shell-body">
+      <div class="smc-frow r1" id="rowA"></div>
+      <div class="smc-frow r2" id="rowB"></div>
+    </div>
+  </section>
+
+  <!-- 历史 -->
+  <section class="panel-shell panel-shell-quiet">
+    <div class="panel-shell-header">
+      <span class="panel-shell-title">最近 10 次计算</span>
+      <span style="display:inline-flex;gap:var(--space-2);align-items:center">
+        <span class="smc-head-sub">Ctrl+S 收藏 · 点击回填</span>
+        <button class="btn btn-ghost btn-sm" id="clearH" type="button">清空</button>
+      </span>
+    </div>
+    <div class="panel-shell-body">
+      <ul class="smc-hlist" id="hlist"><li class="smc-hempty">尚无历史记录 · 复制即自动收藏</li></ul>
+    </div>
+  </section>
+
+</div>
+<div class="smc-toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* 单一数据源 + 编解码（逻辑沿用 iter-1 已验证实现） */
+const FIELDS={
+  func: {lo:26,w:6, hex:2, hue:'--warning', label:'Function · 功能码', meta:'[31:26] · 6b · 0–0x3F'},
+  cmd:  {lo:10,w:16,hex:4, hue:'--primary', label:'Command · 命令码', meta:'[25:10] · 16b · 0–0xFFFF'},
+  ms:   {lo:9, w:1, hex:1, hue:'--accent',  label:'MS · 读取方式',   meta:'[9] · 1b'},
+  rw:   {lo:8, w:1, hex:1, hue:'--success', label:'RW · 读写方向',   meta:'[8] · 1b'},
+  param:{lo:0, w:8, hex:2, hue:'--danger',  label:'Param · 参数',    meta:'[7:0] · 8b · 0–0xFF'},
+};
+const ORDER=['func','cmd','ms','rw','param'];
+const BAND=[['func',1,7,'Function','[31:26]'],['cmd',7,23,'Command','[25:10]'],['ms',23,24,'MS',''],['rw',24,25,'RW',''],['param',25,33,'Param','[7:0]']];
+const FUNC={0x00:'公共功能',0x01:'扩展组件管理',0x02:'机箱部件管理',0x03:'计算部件管理',0x04:'内存部件管理',0x05:'存储部件管理',0x06:'散热部件管理',0x07:'IO 扩展部件管理',0x08:'加速扩展部件管理',0x09:'供电部件管理',0x20:'Reserved（保留）'};
+const SEG={ms:[['0','多读'],['1','单读']],rw:[['0','写入'],['1','读取']]};
+const KEY='pto.smc.history.v1';
+const state={fields:{func:null,cmd:null,ms:null,rw:null,param:null},history:[],fmt:'hex'};
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+const pad=(s,n)=>s.length>=n?s:'0'.repeat(n-s.length)+s;
+const compose=()=>{let w=0;for(const k of ORDER){const v=state.fields[k];if(v!=null)w=(w|((v<<FIELDS[k].lo)>>>0))>>>0;}return w>>>0;};
+const decompose=w=>{const o={};for(const k of ORDER)o[k]=((w>>>0)>>>FIELDS[k].lo)&((1<<FIELDS[k].w)-1);return o;};
+const anySet=()=>ORDER.some(k=>state.fields[k]!=null);
+const fmtHex=w=>'0x'+pad((w>>>0).toString(16).toUpperCase(),8);
+function describeFunc(v){if(v in FUNC)return{kind:v===0x20?'warn':'',label:FUNC[v]};if(v>=0x37&&v<=0x3f)return{kind:'warn',label:'OEM 0x'+v.toString(16).toUpperCase()};if(v>=0&&v<=0x3f)return{kind:'warn',label:'未定义功能码'};return{kind:'err',label:'超范围'};}
+function parseLoose(raw,bits){const s=String(raw||'').trim();if(!s)return{ok:true,value:null};let n;
+  if(/^0x/i.test(s)){if(!/^0x[0-9a-f]+$/i.test(s))return{ok:false,err:'不合法的十六进制'};n=parseInt(s.slice(2),16);}
+  else if(/^[0-9a-f]+$/i.test(s)&&/[a-f]/i.test(s))n=parseInt(s,16);
+  else if(/^[0-9]+$/.test(s))n=parseInt(s,10);
+  else return{ok:false,err:'只接受 dec 或 0x hex'};
+  if(!Number.isFinite(n)||n<0)return{ok:false,err:'非法数字'};
+  const max=bits===32?0xFFFFFFFF:((1<<bits)-1);
+  if(n>max)return{ok:false,err:`超出 ${bits}-bit 范围`};
+  return{ok:true,value:n>>>0};}
+
+/* 位图 */
+function buildGrid(){
+  const h=[];
+  for(const[k,a,b,name,si]of BAND)h.push(`<div class="smc-band" style="grid-column:${a}/${b};background:var(${FIELDS[k].hue})">${name}${si?`<span class="si">${si}</span>`:''}</div>`);
+  for(let c=0;c<32;c++){const b=31-c;h.push(`<div class="smc-cell${[5,21,22,23].includes(c)?' bound':''}" data-bit="${b}" style="--cell-hue:var(${FIELDS[hueOf(b)].hue})">0</div>`);}
+  for(let c=0;c<32;c++){const b=31-c;h.push(`<div class="smc-pos${[31,26,25,10,9,8,7,0].includes(b)?' bound':''}">${b}</div>`);}
+  $('#grid').innerHTML=h.join('');
+  $('#legend').innerHTML=ORDER.map(k=>`<span><span class="smc-sw" style="background:var(${FIELDS[k].hue})"></span>${FIELDS[k].label.split(' ·')[0]} · ${FIELDS[k].meta.split(' · ').slice(0,2).join(' · ')}</span>`).join('');
+}
+const hueOf=b=>b>=26?'func':b>=10?'cmd':b===9?'ms':b===8?'rw':'param';
+function paintGrid(){const w=compose(),set=anySet();
+  $$('#grid .smc-cell').forEach(c=>{const b=+c.dataset.bit,on=((w>>>b)&1)===1;
+    c.textContent=set?(on?'1':'0'):'0';c.classList.toggle('on',set&&on);});}
+
+/* 字段卡 */
+function fieldCard(k){const f=FIELDS[k];
+  const hints={func:{h:'功能码速查 · 6-bit',items:[['0x01','扩展组件'],['0x03','计算部件'],['0x05','存储部件'],['0x06','散热部件'],['0x09','供电部件'],['0x20','Reserved']]}}[k];
+  const label=hints?`<span class="smc-hint" tabindex="0">${f.label}<span class="smc-pop"><span class="ph">${hints.h}</span><ul>${hints.items.map(([a,b])=>`<li><span class="k">${a}</span><span class="d">${b}</span></li>`).join('')}</ul></span></span>`:f.label;
+  const input=SEG[k]
+    ?`<div class="segmented-control" role="group" aria-label="${f.label}" data-seg="${k}">${SEG[k].map(([v,t],i)=>`<button class="btn btn-sm${i===0?' is-selected':''}" type="button" data-v="${v}" aria-pressed="${i===0}">${t}</button>`).join('')}</div>`
+    :`<div class="smc-fin-wrap"><input class="smc-fin" data-in="${k}" placeholder="0x.. / dec" autocomplete="off" spellcheck="false" aria-label="${f.label}"/><button class="btn btn-ghost btn-icon" data-copy="${k}" title="复制此字段" type="button" disabled>⧉</button></div>`;
+  return `<div class="smc-fc" data-field="${k}">
+    <div class="smc-fhead"><span class="smc-flabel"><span class="smc-sw" style="background:var(${f.hue})"></span>${label}</span><span class="smc-fmeta">${f.meta}</span></div>
+    ${input}
+    <div class="smc-ffoot"><span class="smc-pair" data-pair="${k}"></span><span class="smc-sem" data-sem="${k}"></span></div>
+  </div>`;}
+function buildFields(){
+  $('#rowA').innerHTML=fieldCard('func')+fieldCard('cmd');
+  $('#rowB').innerHTML=fieldCard('ms')+fieldCard('rw')+fieldCard('param');
+  ['func','cmd','param'].forEach(k=>{
+    const inp=$(`[data-in="${k}"]`);
+    inp.addEventListener('input',()=>{const r=parseLoose(inp.value,FIELDS[k].w);const sem=$(`[data-sem="${k}"]`);
+      if(!r.ok){inp.classList.add('invalid');sem.textContent='⚠ '+r.err;sem.className='smc-sem err';return;}
+      inp.classList.remove('invalid');state.fields[k]=r.value;refresh('field:'+k);});
+    inp.addEventListener('blur',()=>{const v=state.fields[k];if(v!=null)inp.value='0x'+pad(v.toString(16).toUpperCase(),FIELDS[k].hex);});});
+  ['ms','rw'].forEach(k=>{$(`[data-seg="${k}"]`).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+    state.fields[k]=+b.dataset.v;
+    $(`[data-seg="${k}"]`).querySelectorAll('button').forEach(x=>{x.classList.toggle('is-selected',x===b);x.setAttribute('aria-pressed',String(x===b));});
+    refresh();});});
+  $$('[data-copy]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.copy,v=state.fields[k];if(v==null)return;
+    const t='0x'+pad(v.toString(16).toUpperCase(),FIELDS[k].hex);navigator.clipboard?.writeText(t);
+    b.classList.add('copied');setTimeout(()=>b.classList.remove('copied'),800);toast('已复制 '+t);}));
+}
+function renderFeet(){ORDER.forEach(k=>{const v=state.fields[k],pair=$(`[data-pair="${k}"]`),sem=$(`[data-sem="${k}"]`);
+  if(v==null){pair.innerHTML=`<span class="stat-chip">DEC —</span>${FIELDS[k].w>1?'<span class="stat-chip">HEX —</span>':''}`;if(!sem.classList.contains('err')){sem.textContent='';sem.className='smc-sem';}}
+  else{pair.innerHTML=`<span class="stat-chip">DEC ${v}</span>${FIELDS[k].w>1?`<span class="stat-chip">HEX 0x${pad(v.toString(16).toUpperCase(),FIELDS[k].hex)}</span>`:''}`;
+    if(k==='func'){const d=describeFunc(v);sem.textContent='· '+d.label;sem.className='smc-sem '+(d.kind||'');}
+    else{sem.textContent='';sem.className='smc-sem';}}
+  const cp=$(`[data-copy="${k}"]`);if(cp)cp.disabled=v==null;});}
+function renderInputs(skip){['func','cmd','param'].forEach(k=>{if(skip==='field:'+k)return;const inp=$(`[data-in="${k}"]`);const v=state.fields[k];
+  inp.value=v==null?'':'0x'+pad(v.toString(16).toUpperCase(),FIELDS[k].hex);inp.classList.remove('invalid');});
+  ['ms','rw'].forEach(k=>{const v=state.fields[k]??0;$(`[data-seg="${k}"]`).querySelectorAll('button').forEach(b=>{const on=+b.dataset.v===v&&state.fields[k]!=null||state.fields[k]==null&&b.dataset.v==='0';
+    b.classList.toggle('is-selected',on);b.setAttribute('aria-pressed',String(on));});});}
+
+/* 顶部双输入 */
+function renderTop(src){const w=compose(),set=anySet();
+  if(src!=='hex')$('#hex').value=set?fmtHex(w):'';
+  if(src!=='dec')$('#dec').value=set?String(w):'';
+  $('#hexw').classList.toggle('synced',set);$('#decw').classList.toggle('synced',set);
+  $('#hexw').classList.remove('invalid');$('#decw').classList.remove('invalid');}
+function onTop(src){const raw=src==='hex'?$('#hex').value:$('#dec').value;$('#oerr').textContent='';
+  $('#hexw').classList.remove('invalid');$('#decw').classList.remove('invalid');
+  if(raw.trim()===''){ORDER.forEach(k=>state.fields[k]=null);refresh(src);return;}
+  const r=parseLoose(raw,32);
+  if(!r.ok){$(src==='hex'?'#hexw':'#decw').classList.add('invalid');$('#oerr').textContent='⚠ '+r.err;return;}
+  const p=decompose(r.value);ORDER.forEach(k=>state.fields[k]=p[k]);refresh(src);}
+$('#hex').addEventListener('input',()=>onTop('hex'));
+$('#dec').addEventListener('input',()=>onTop('dec'));
+
+/* 多格式导出 */
+function formatted(f){const w=compose(),hex=fmtHex(w),dec=String(w);
+  if(f==='dec')return dec;if(f==='both')return`${hex} (${dec})`;if(f==='c')return hex+'u';
+  if(f==='json'){const p=decompose(w);return JSON.stringify({offset:hex,func:'0x'+pad(p.func.toString(16).toUpperCase(),2),cmd:'0x'+pad(p.cmd.toString(16).toUpperCase(),4),ms:p.ms,rw:p.rw,param:'0x'+pad(p.param.toString(16).toUpperCase(),2)});}
+  return hex;}
+function renderPreviews(){$('#pv-hex').textContent=formatted('hex');$('#pv-dec').textContent=formatted('dec');
+  $('#pv-both').textContent=formatted('both');$('#pv-c').textContent=formatted('c');
+  const j=formatted('json');$('#pv-json').textContent=j.length>22?j.slice(0,20)+'…':j;
+  const s=anySet();$('#copyAll').disabled=!s;$('#fmBtn').disabled=!s;}
+$('#copyAll').addEventListener('click',()=>{if(!anySet())return;const t=formatted(state.fmt);
+  navigator.clipboard?.writeText(t);toast('已复制 '+(t.length>36?t.slice(0,34)+'…':t));saveHistory();});
+$('#fmBtn').addEventListener('click',e=>{e.stopPropagation();$('#menu').classList.toggle('open');});
+document.addEventListener('click',e=>{if(!e.target.closest('.smc-split'))$('#menu').classList.remove('open');});
+$$('.graph-menu-item').forEach(el=>el.addEventListener('click',()=>{state.fmt=el.dataset.f;$('#menu').classList.remove('open');$('#copyAll').click();}));
+
+/* 示例 / 重置 */
+$('#reset').addEventListener('click',()=>{ORDER.forEach(k=>state.fields[k]=null);$('#oerr').textContent='';refresh();});
+$('#sample').addEventListener('click',()=>{$('#hex').value='0x18040600';onTop('hex');toast('已载入示例');});
+
+/* 历史 */
+function saveHistory(){if(!anySet())return;const snap={word:compose(),parts:{...state.fields},ts:Date.now()};
+  if(state.history[0]&&state.history[0].word===snap.word)return;
+  state.history.unshift(snap);if(state.history.length>10)state.history.length=10;
+  try{localStorage.setItem(KEY,JSON.stringify(state.history));}catch(e){}renderHistory();}
+function renderHistory(){const l=$('#hlist');
+  if(!state.history.length){l.innerHTML='<li class="smc-hempty">尚无历史记录 · 复制即自动收藏</li>';return;}
+  l.innerHTML=state.history.map((it,i)=>{const t=new Date(it.ts);
+    return`<li><button class="recent-chip" data-h="${i}" type="button">${pad(String(i+1),2)} · ${fmtHex(it.word)}<span class="smc-hts">${pad(String(t.getHours()),2)}:${pad(String(t.getMinutes()),2)}</span></button></li>`;}).join('');
+  $$('.recent-chip').forEach(el=>el.addEventListener('click',()=>{const it=state.history[+el.dataset.h];if(!it)return;
+    ORDER.forEach(k=>state.fields[k]=it.parts[k]);refresh();toast('已回填 '+fmtHex(it.word));}));}
+$('#clearH').addEventListener('click',()=>{state.history=[];try{localStorage.removeItem(KEY);}catch(e){}renderHistory();});
+
+/* toast + 快捷键 */
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1600);}
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveHistory();toast('已保存当前结果');}});
+
+function refresh(src){renderInputs(src);renderFeet();renderTop(src);paintGrid();renderPreviews();}
+buildGrid();buildFields();try{const s=localStorage.getItem(KEY);if(s)state.history=JSON.parse(s)||[];}catch(e){}
+renderHistory();refresh();
+</script>
+</body>
+</html>
