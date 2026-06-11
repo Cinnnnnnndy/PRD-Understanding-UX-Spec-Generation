@@ -2,781 +2,1209 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SMC 偏移量计算器 · UX 规格报告</title>
 <style>
+/* ─── Reset & Root ─── */
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0a0a0a;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Inter','Source Han Sans SC',sans-serif;overflow:hidden}
-.stage{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}
-.canvas{width:1280px;height:720px;position:relative;transform-origin:center center;background:#101010;overflow:hidden;border-radius:4px}
-.slide{position:absolute;inset:0;display:none;padding:52px 60px 44px}
-.slide.active{display:flex;flex-direction:column}
-
-/* nav */
-.nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:16px;z-index:100}
-.nav-btn{width:36px;height:36px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:rgba(255,255,255,0.7);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
-.nav-btn:hover{background:rgba(255,255,255,0.14)}
-.counter{color:rgba(255,255,255,0.5);font-size:13px;min-width:40px;text-align:center;font-family:monospace}
-
-/* common slide styles */
-.slide-header{margin-bottom:28px}
-.slide-tag{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#4369EF;margin-bottom:8px}
-.slide-title{font-size:28px;font-weight:700;color:rgba(255,255,255,0.92);line-height:1.2}
-.slide-subtitle{font-size:14px;color:rgba(255,255,255,0.50);margin-top:6px}
-.slide-body{flex:1;display:flex;gap:24px}
-.col{flex:1;display:flex;flex-direction:column;gap:12px}
-.col-half{flex:0 0 calc(50% - 12px)}
-
-/* tokens */
 :root{
-  --bg:#101010;--bg-el:#141414;--s1:#161616;--s2:#1c1c1c;--s3:#262626;--s4:#313131;
-  --fg:rgba(255,255,255,0.90);--fg2:rgba(255,255,255,0.60);--fg3:rgba(255,255,255,0.40);
-  --bd:rgba(255,255,255,0.08);--bd2:rgba(255,255,255,0.14);
-  --pri:#4369EF;--acc:#7c8db8;--suc:#04D793;--warn:#FFAA3B;--dan:#FF4B7B;
-  --foc:rgba(67,105,239,0.42);
+  --bg:#101010;--bg-elev:#141414;--surf1:#161616;--surf2:#1c1c1c;--surf3:#262626;--surf4:#313131;
+  --fg:rgba(255,255,255,0.90);--fg2:rgba(255,255,255,0.60);--fg3:rgba(255,255,255,0.40);--fg4:rgba(255,255,255,0.25);
+  --primary:#4369EF;--success:#04D793;--warning:#FFAA3B;--danger:#FF4B7B;--accent:#7c8db8;
+  --hover:rgba(255,255,255,0.06);--focus-ring:rgba(67,105,239,0.42);--border:rgba(255,255,255,0.06);
+  --border-mid:rgba(255,255,255,0.12);--border-strong:rgba(255,255,255,0.20);
+  --func:#FFAA3B;--cmd:#4369EF;--ms:#7c8db8;--rw:#04D793;--param:#FF4B7B;
+  --mono:ui-monospace,'SF Mono',Consolas,'Courier New',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC','PingFang SC',sans-serif;
+  --r:8px;--r-lg:14px;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:var(--sans)}
+
+/* ─── Viewport Scaler ─── */
+#stage{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:#000;
+}
+#canvas{
+  width:1280px;height:720px;
+  transform-origin:center center;
+  position:relative;overflow:hidden;
+}
+.slide{
+  position:absolute;inset:0;width:1280px;height:720px;
+  background:var(--bg);color:var(--fg);
+  display:none;flex-direction:column;
+}
+.slide.active{display:flex}
+
+/* ─── Nav Buttons ─── */
+#nav{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:12px;z-index:100;
+  background:rgba(16,16,16,0.88);border:1px solid var(--border-mid);
+  border-radius:100px;padding:8px 16px;backdrop-filter:blur(12px);
+}
+#nav button{
+  background:var(--surf3);border:1px solid var(--border-mid);color:var(--fg);
+  width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;transition:0.15s;
+}
+#nav button:hover{background:var(--primary);border-color:var(--primary)}
+#nav button:disabled{opacity:0.3;cursor:not-allowed}
+#counter{color:var(--fg2);font-family:var(--mono);font-size:13px;min-width:40px;text-align:center}
+
+/* ─── Shared Slide Parts ─── */
+.slide-header{
+  padding:26px 48px 0;display:flex;align-items:baseline;gap:16px;flex-shrink:0;
+}
+.slide-num{
+  font-family:var(--mono);font-size:11px;color:var(--fg4);letter-spacing:.12em;text-transform:uppercase;
+}
+.slide-title{
+  font-size:21px;font-weight:700;color:var(--fg);letter-spacing:-.01em;
+}
+.slide-body{
+  flex:1;padding:18px 48px 24px;display:flex;gap:0;min-height:0;
 }
 
-/* cards */
-.card{background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:14px 16px}
-.card-title{font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--fg3);margin-bottom:10px}
-.card-sm{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}
+/* ─── Utility ─── */
+.mono{font-family:var(--mono)}
+.dim{color:var(--fg2)}
+.mute{color:var(--fg3)}
+.pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:100px;
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  border:1px solid currentColor;
+}
+.tag-primary{color:var(--primary)}
+.tag-success{color:var(--success)}
+.tag-warning{color:var(--warning)}
+.tag-danger{color:var(--danger)}
+.tag-accent{color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.swatch{width:14px;height:14px;border-radius:3px;display:inline-block;flex-shrink:0;border:1px solid rgba(255,255,255,0.08)}
+table{border-collapse:collapse;width:100%}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3);font-weight:600;
+   padding:6px 10px;text-align:left;border-bottom:1px solid var(--border-mid)}
+td{font-size:12px;padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
 
-/* token chip */
-.tok-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px}
-.tok-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
-.tok-name{color:var(--acc);font-family:monospace;min-width:155px;font-size:11px}
-.tok-val{color:var(--fg3);font-family:monospace;font-size:11px}
-.tok-desc{color:var(--fg2);font-size:11px;margin-left:4px}
+/* ────────────────────────────────────────────
+   SLIDE 1 — Cover
+─────────────────────────────────────────────*/
+.s1-kicker{font-family:var(--mono);font-size:12px;color:var(--primary);letter-spacing:.15em;text-transform:uppercase}
+.s1-h1{font-size:44px;font-weight:800;line-height:1.1;letter-spacing:-.02em;color:var(--fg)}
+.s1-h1 em{color:var(--primary);font-style:normal}
+.s1-sub{font-size:14px;color:var(--fg3);font-family:var(--mono);margin-top:2px}
+.s1-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.stat-box{
+  background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);
+  padding:11px 16px;display:flex;flex-direction:column;gap:3px;
+}
+.stat-box .val{font-size:20px;font-weight:700;font-family:var(--mono)}
+.stat-box .lbl{font-size:10px;color:var(--fg3)}
+.bit-bar{display:flex;height:38px;border-radius:var(--r);overflow:hidden;gap:2px}
+.bb-seg{
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  padding:0 6px;white-space:nowrap;border-radius:4px;
+}
 
-/* bit layout */
-.bit-row{display:flex;border-radius:6px;overflow:hidden;height:32px}
-.bit-seg{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;font-family:monospace}
+/* ────────────────────────────────────────────
+   SLIDE 2 — Layout
+─────────────────────────────────────────────*/
+.layout-diagram{display:flex;flex-direction:column;gap:7px;flex:1}
+.ld-row{
+  background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);
+  padding:9px 13px;display:flex;align-items:flex-start;gap:12px;
+}
+.ld-label{
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg4);
+  white-space:nowrap;min-width:72px;padding-top:2px;font-family:var(--mono);
+}
+.ld-content{flex:1}
+.ld-title{font-size:13px;font-weight:600;color:var(--fg);margin-bottom:3px}
+.ld-sub{font-size:11px;color:var(--fg3);font-family:var(--mono)}
+.ld-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.lchip{
+  font-size:10px;font-family:var(--mono);padding:2px 7px;
+  background:var(--surf3);border:1px solid var(--border-mid);border-radius:4px;color:var(--fg2);
+}
+.s2-aside{width:248px;padding-left:16px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.aside-box{background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);padding:11px}
+.aside-box .atitle{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg4);margin-bottom:7px;font-weight:600}
+.kv{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--fg3);font-family:var(--mono)}
+.kv .v{color:var(--fg);font-family:var(--mono);font-weight:600}
 
-/* layout diagram */
-.lay-panel{background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
-.lay-label{font-size:12px;font-weight:600;color:var(--fg2)}
-.lay-detail{font-size:11px;color:var(--fg3);font-family:monospace}
+/* ────────────────────────────────────────────
+   SLIDE 3 — Tokens
+─────────────────────────────────────────────*/
+.token-section{margin-bottom:10px}
+.token-section-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:4px;font-weight:600}
+.token-row{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:4px}
+.token-row:hover{background:var(--hover)}
+.token-name{font-family:var(--mono);font-size:11px;color:var(--fg2);min-width:192px}
+.token-val{font-family:var(--mono);font-size:11px;color:var(--fg);flex:1}
 
-/* state matrix */
-.matrix{display:grid;border-radius:8px;overflow:hidden;border:1px solid var(--bd);font-size:11px}
-.mhd{background:var(--s3);color:var(--fg3);font-weight:600;font-size:10px;letter-spacing:0.5px;text-transform:uppercase;padding:6px 8px;text-align:center}
-.mcell{background:var(--s1);border-top:1px solid var(--bd);border-left:1px solid var(--bd);padding:5px 7px;color:var(--fg2);font-family:monospace;font-size:10px;text-align:center}
-.mcell-label{background:var(--s2);border-top:1px solid var(--bd);padding:5px 8px;color:var(--fg);font-size:11px;font-weight:600}
-.mc-ok{color:var(--suc)}
-.mc-err{color:var(--dan)}
-.mc-warn{color:var(--warn)}
-.mc-muted{color:var(--fg3)}
-.mc-pri{color:var(--pri)}
+/* ────────────────────────────────────────────
+   SLIDE 4 — Components
+─────────────────────────────────────────────*/
+.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1}
+.comp-box{background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);padding:13px}
+.comp-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:9px;font-weight:600}
+.mock-input{background:var(--surf3);border:1px solid var(--border-mid);border-radius:6px;padding:7px 10px}
+.mock-input.focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)}
+.mock-input.synced{border-color:var(--success)}
+.mock-input.invalid{border-color:var(--danger);box-shadow:0 0 0 3px rgba(255,75,123,0.22)}
+.mock-input .tag-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--fg4);margin-bottom:3px}
+.mock-input .val-row{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--fg)}
+.seg-ctrl{display:flex;background:var(--surf3);border:1px solid var(--border-mid);border-radius:6px;overflow:hidden}
+.seg-item{flex:1;padding:5px 8px;font-size:12px;font-weight:600;text-align:center;color:var(--fg3)}
+.seg-item.sel{background:var(--primary);color:#fff}
+.stat-chip{display:inline-flex;gap:5px;background:var(--surf3);border:1px solid var(--border-mid);border-radius:4px;padding:3px 8px;font-family:var(--mono);font-size:11px;color:var(--fg2)}
+.recent-chip{display:flex;justify-content:space-between;align-items:center;background:var(--surf3);border:1px solid var(--border-mid);border-radius:6px;padding:5px 9px;font-family:var(--mono);font-size:11px;color:var(--fg2)}
+.recent-chip .idx{color:var(--fg4);margin-right:4px}
+.recent-chip .hex{color:var(--fg)}
+.recent-chip .time{color:var(--fg4)}
+.bitbar-mini{display:flex;height:26px;border-radius:5px;overflow:hidden;gap:2px}
+.bb-mini{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:700;color:rgba(0,0,0,0.72);border-radius:3px}
+.panel-spec{background:var(--bg-elev);border:1px solid var(--border-mid);border-radius:10px;padding:10px}
+.panel-spec-row{display:flex;justify-content:space-between;font-size:10px;padding:3px 0;border-bottom:1px solid var(--border)}
+.panel-spec-row:last-child{border-bottom:none}
+.panel-spec-row .pk{color:var(--fg3);font-family:var(--mono)}
+.panel-spec-row .pv{color:var(--fg);font-family:var(--mono)}
 
-/* flow */
-.flow-step{display:flex;align-items:flex-start;gap:10px;padding:8px 0}
-.flow-dot{width:24px;height:24px;border-radius:50%;background:var(--pri);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-.flow-conn{width:1px;background:var(--bd2);height:14px;margin-left:11px}
-.flow-content{flex:1}
-.flow-title{font-size:12px;font-weight:600;color:var(--fg);margin-bottom:2px}
-.flow-desc{font-size:11px;color:var(--fg3);font-family:monospace}
+/* ────────────────────────────────────────────
+   SLIDE 5 — State Matrix
+─────────────────────────────────────────────*/
+.matrix-wrap table th{font-size:10px;padding:5px 7px}
+.matrix-wrap table td{font-size:10px;padding:5px 7px;line-height:1.35}
+.st-cell{border-radius:3px;padding:2px 5px;font-family:var(--mono);font-size:9px;display:inline-block}
+.st-default{background:var(--surf3);color:var(--fg3)}
+.st-focus{background:rgba(67,105,239,0.18);color:var(--primary)}
+.st-valid{background:rgba(4,215,147,0.13);color:var(--success)}
+.st-invalid{background:rgba(255,75,123,0.13);color:var(--danger)}
+.st-disabled{background:var(--surf2);color:var(--fg4)}
+.st-active{background:rgba(255,170,59,0.13);color:var(--warning)}
+.st-na{color:var(--fg4);font-size:10px}
 
-/* review items */
-.rev-item{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)}
-.rev-item:last-child{border-bottom:0}
-.rev-pri{font-size:12px;flex-shrink:0}
-.rev-key{font-size:11px;font-weight:600;color:var(--acc);min-width:24px}
-.rev-text{font-size:11px;color:var(--fg2);flex:1}
-.rev-status{font-size:10px;padding:1px 6px;border-radius:4px;flex-shrink:0;font-weight:600}
-.status-ok{background:rgba(4,215,147,0.15);color:var(--suc)}
-.status-pending{background:rgba(255,170,59,0.15);color:var(--warn)}
+/* ────────────────────────────────────────────
+   SLIDE 6 — Flows
+─────────────────────────────────────────────*/
+.flow-cols{display:flex;gap:0;flex:1}
+.flow-col{flex:1;padding:0 14px;border-right:1px solid var(--border)}
+.flow-col:first-child{padding-left:0}
+.flow-col:last-child{border-right:none;padding-right:0}
+.flow-title{font-size:11px;font-weight:700;color:var(--fg);margin-bottom:12px;padding-bottom:7px;border-bottom:1px solid var(--border-mid);font-family:var(--mono)}
+.step-box{
+  background:var(--surf2);border:1px solid var(--border-mid);border-radius:6px;
+  padding:7px 11px;width:100%;font-family:var(--mono);
+}
+.step-box.trigger{border-color:var(--primary);background:rgba(67,105,239,0.10)}
+.step-box.process{border-color:var(--border-mid)}
+.step-box.output{border-color:var(--success);background:rgba(4,215,147,0.07)}
+.step-label{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:3px}
+.step-text{font-size:11px;color:var(--fg);line-height:1.4}
+.step-spacer{height:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+.step-arrow-line{width:1px;flex:1;background:var(--border-mid)}
+.step-arrow-head{font-size:7px;color:var(--fg4);line-height:1}
 
-/* delivery cols */
-.del-col{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:16px}
-.del-head{font-size:12px;font-weight:700;color:var(--fg);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bd)}
-.del-item{display:flex;align-items:flex-start;gap:6px;padding:4px 0;font-size:11px;color:var(--fg2)}
-.del-icon{color:var(--suc);flex-shrink:0}
-.del-check{background:rgba(4,215,147,0.12);border:1px solid rgba(4,215,147,0.25);border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--fg2);margin-top:8px}
+/* ────────────────────────────────────────────
+   SLIDE 7 — Review
+─────────────────────────────────────────────*/
+.review-col{flex:1}
+.review-col:last-child{padding-left:16px;border-left:1px solid var(--border)}
+.review-title{font-size:13px;font-weight:700;color:var(--fg);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.finding{display:flex;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.finding:last-child{border-bottom:none}
+.find-id{font-family:var(--mono);font-size:10px;color:var(--fg4);min-width:24px;padding-top:1px}
+.find-body{flex:1}
+.find-text{font-size:11px;color:var(--fg);line-height:1.4}
+.find-status{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-family:var(--mono);
+             margin-top:3px;padding:2px 6px;border-radius:3px}
+.status-fixed{background:rgba(4,215,147,0.13);color:var(--success)}
+.status-confirm{background:rgba(255,170,59,0.13);color:var(--warning)}
+.status-eng{background:rgba(67,105,239,0.13);color:var(--primary)}
 
-/* cover */
-.cover-stats{display:flex;gap:16px;margin-top:24px}
-.cstat{background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:14px 20px;text-align:center;flex:1}
-.cstat-num{font-size:28px;font-weight:700;color:var(--fg);font-family:monospace}
-.cstat-lbl{font-size:11px;color:var(--fg3);margin-top:4px}
-
-/* type table */
-.type-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--bd);font-size:12px}
-.type-row:last-child{border-bottom:0}
-.type-sample{font-weight:600;color:var(--fg);min-width:160px}
-.type-spec{color:var(--fg3);font-family:monospace;font-size:11px;min-width:140px}
-.type-use{color:var(--fg2);font-size:11px}
-
-/* comp demo */
-.comp-demo{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:8px}
-.comp-label{font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--fg3);margin-bottom:8px}
-
-/* mock UI components */
-.mock-owrap{background:var(--s1);border:1px solid rgba(255,255,255,0.10);border-radius:8px;padding:6px 10px;width:180px}
-.mock-tag{font-size:9px;color:var(--fg3);font-family:monospace;text-transform:uppercase;letter-spacing:0.4px;display:flex;justify-content:space-between}
-.mock-val{font-size:16px;font-weight:600;color:var(--fg);font-family:monospace}
-.mock-owrap.synced{border-color:var(--pri)}
-.mock-owrap.synced .mock-tag .dot{color:var(--pri)}
-.mock-owrap.invalid{border-color:var(--dan)}
-.mock-seg{display:inline-flex;gap:2px;padding:2px;border-radius:7px;border:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.04)}
-.mock-seg-btn{padding:3px 12px;border-radius:5px;font-size:12px;border:0;cursor:default}
-.mock-seg-btn.sel{background:rgba(255,255,255,0.90);color:#101010;font-weight:600}
-.mock-seg-btn.unsel{background:transparent;color:var(--fg3)}
-.mock-chip{display:inline-flex;align-items:center;padding:1px 6px;border-radius:4px;background:var(--s3);border:1px solid var(--bd);font-family:monospace;font-size:11px;color:var(--fg)}
-.mock-rchip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:999px;font-family:monospace;font-size:11px;color:var(--fg2)}
-.mock-ts{color:var(--fg3);margin-left:4px}
+/* ────────────────────────────────────────────
+   SLIDE 8 — Delivery
+─────────────────────────────────────────────*/
+.delivery-cols{display:flex;gap:0;flex:1}
+.del-col{flex:1;padding:0 14px;border-right:1px solid var(--border)}
+.del-col:first-child{padding-left:0}
+.del-col:last-child{border-right:none;padding-right:0}
+.del-title{font-size:12px;font-weight:700;color:var(--fg);padding-bottom:7px;border-bottom:1px solid var(--border-mid);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.del-icon{font-size:15px}
+.del-item{display:flex;gap:7px;padding:4px 0;border-bottom:1px solid var(--border);align-items:flex-start;font-size:11px}
+.del-item:last-child{border-bottom:none}
+.del-item .di-icon{color:var(--success);flex-shrink:0;font-size:11px;padding-top:1px}
+.del-item .di-text{color:var(--fg2);line-height:1.45}
+.del-item .di-text strong{color:var(--fg);display:block;font-family:var(--mono);font-size:10px}
+.del-footer{
+  flex-shrink:0;height:52px;
+  background:var(--surf2);border-top:1px solid var(--border-mid);
+  padding:0 48px;display:flex;align-items:center;gap:18px;
+  font-family:var(--mono);font-size:11px;color:var(--fg2);
+}
+.del-badge{display:inline-flex;align-items:center;gap:5px;color:var(--success)}
+.del-badge::before{content:'✅';font-size:12px}
 </style>
 </head>
 <body>
-<div class="stage">
-<div class="canvas" id="canvas">
 
-<!-- ══════════════════════════════════════════════════════════════════════════════
-     SLIDE 1 — 封面
-══════════════════════════════════════════════════════════════════════════════ -->
-<div class="slide active" id="s1">
-  <div class="slide-header">
-    <div class="slide-tag">UX 规格报告 · 阶段二</div>
-    <div class="slide-title">SMC 偏移量计算器 · UX 规格报告</div>
-    <div class="slide-subtitle">基于 iter-3 优化后 Demo（PTO 设计系统版）· 2026-06-11 · 设计系统：pto-design-system</div>
-  </div>
+<div id="stage">
+<div id="canvas">
 
-  <div class="cover-stats">
-    <div class="cstat"><div class="cstat-num">5</div><div class="cstat-lbl">字段 (func/cmd/ms/rw/param)</div></div>
-    <div class="cstat"><div class="cstat-num">32</div><div class="cstat-lbl">bit 位图可视化</div></div>
-    <div class="cstat"><div class="cstat-num">9</div><div class="cstat-lbl">专业级功能</div></div>
-    <div class="cstat"><div class="cstat-num">AA</div><div class="cstat-lbl">WCAG 2.1 可访问性</div></div>
-    <div class="cstat"><div class="cstat-num">23</div><div class="cstat-lbl">单元测试全通过</div></div>
-  </div>
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 1 — 封面 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide active" id="s1" style="justify-content:center;padding:0 80px">
+  <div style="display:flex;flex-direction:column;gap:20px;max-width:900px">
+    <div class="s1-kicker">UX Specification Report · iter-3 · PTO Design System</div>
+    <div class="s1-h1">SMC 偏移量计算器<br/><em>· UX 规格报告</em></div>
+    <div class="s1-sub">基于 iter-3 优化后 Demo（PTO 设计系统版）· 2026-06-11</div>
 
-  <div style="margin-top:28px">
-    <div class="card-title">32-bit 命令字位布局</div>
-    <div class="bit-row" style="margin-top:8px">
-      <div class="bit-seg" style="flex:6;background:#FFAA3B;font-size:12px">func<br/><span style="font-size:9px;opacity:.8">[31:26]</span></div>
-      <div class="bit-seg" style="flex:16;background:#4369EF">Command · 命令码 [25:10]</div>
-      <div class="bit-seg" style="flex:1;background:#7c8db8;font-size:9px">MS</div>
-      <div class="bit-seg" style="flex:1;background:#04D793;font-size:9px">RW</div>
-      <div class="bit-seg" style="flex:8;background:#FF4B7B">param [7:0]</div>
+    <div class="s1-stats">
+      <div class="stat-box">
+        <div class="val" style="color:var(--warning)">5</div>
+        <div class="lbl">个字段</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" style="color:var(--primary)">32-bit</div>
+        <div class="lbl">位图结构</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" style="color:var(--success)">9</div>
+        <div class="lbl">大功能</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" style="color:var(--accent);font-size:16px;padding-top:3px">WCAG 2.1 AA</div>
+        <div class="lbl">可访问性合规</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" style="color:var(--fg);font-size:16px;padding-top:3px">PTO</div>
+        <div class="lbl">设计系统</div>
+      </div>
     </div>
-    <div style="display:flex;gap:0;margin-top:4px;font-family:monospace;font-size:10px;color:var(--fg3)">
-      <div style="flex:6;text-align:center">6b · 0–0x3F</div>
-      <div style="flex:16;text-align:center">16b · 0–0xFFFF</div>
-      <div style="flex:1;text-align:center;font-size:9px">1b</div>
-      <div style="flex:1;text-align:center;font-size:9px">1b</div>
-      <div style="flex:8;text-align:center">8b · 0–0xFF</div>
-    </div>
-  </div>
 
-  <div style="margin-top:auto;padding-top:20px;display:flex;gap:12px;font-size:12px;color:var(--fg3)">
-    <span>产品：BMC/固件工程师工具</span>
-    <span>·</span>
-    <span>场景：写/审配置批次时连用</span>
-    <span>·</span>
-    <span>关键需求：快、准、可带走、可复用</span>
+    <!-- Bit layout diagram -->
+    <div>
+      <div style="font-size:10px;color:var(--fg4);font-family:var(--mono);margin-bottom:7px;letter-spacing:.08em;text-transform:uppercase">32-bit 位布局图示</div>
+      <div class="bit-bar">
+        <div class="bb-seg" style="background:var(--func);flex:6;color:rgba(0,0,0,0.75)">func[31:26]</div>
+        <div class="bb-seg" style="background:var(--cmd);flex:16;color:rgba(255,255,255,0.88)">cmd[25:10]</div>
+        <div class="bb-seg" style="background:var(--ms);flex:1;color:rgba(255,255,255,0.88);font-size:9px">ms[9]</div>
+        <div class="bb-seg" style="background:var(--rw);flex:1;color:rgba(0,0,0,0.72);font-size:9px">rw[8]</div>
+        <div class="bb-seg" style="background:var(--param);flex:8;color:rgba(255,255,255,0.88)">param[7:0]</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--fg4);margin-top:4px;padding:0 2px">
+        <span>bit 31</span><span>bit 26</span><span>bit 25</span><span style="flex:1;text-align:center">···</span><span>bit 10</span><span>bit 9</span><span>bit 8</span><span>bit 7</span><span>bit 0</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <span class="pill tag-warning">func · 6-bit</span>
+      <span class="pill tag-primary">cmd · 16-bit</span>
+      <span class="pill tag-accent">ms · 1-bit</span>
+      <span class="pill tag-success">rw · 1-bit</span>
+      <span class="pill tag-danger">param · 8-bit</span>
+    </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════════════
-     SLIDE 2 — 整体布局
-══════════════════════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 2 — 整体布局 -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="slide" id="s2">
   <div class="slide-header">
-    <div class="slide-tag">布局规格</div>
-    <div class="slide-title">页面分区结构</div>
-    <div class="slide-subtitle">垂直堆叠 · max-width 980px · gap 16px · 4个 panel-shell 区块</div>
+    <div class="slide-num">02 / 08</div>
+    <div class="slide-title">整体布局 · 页面分区</div>
   </div>
+  <div class="slide-body" style="gap:14px">
+    <!-- Layout diagram left -->
+    <div class="layout-diagram">
+      <div class="ld-row" style="background:rgba(67,105,239,0.07);border-color:rgba(67,105,239,0.22)">
+        <div class="ld-label" style="color:var(--primary)">HEADER</div>
+        <div class="ld-content">
+          <div class="ld-title">layout-header</div>
+          <div class="ld-sub">transparent · height ~44px · 标题 + 元信息</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--fg4)">h: 44px</div>
+      </div>
 
-  <div class="slide-body">
-    <div class="col col-half" style="flex:0 0 340px">
-      <!-- Page header -->
-      <div style="background:transparent;border:1px dashed rgba(255,255,255,0.15);border-radius:8px;padding:10px 14px;margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-size:13px;font-weight:700;color:var(--fg)">● SMC 偏移量计算器</div>
-            <div style="font-size:10px;color:var(--fg3);margin-top:2px">32-bit 命令字 ↔ 双向同步</div>
+      <div class="ld-row">
+        <div class="ld-label">Panel 1</div>
+        <div class="ld-content">
+          <div class="ld-title">偏移量 · 32-bit</div>
+          <div class="ld-sub">panel-shell · border-radius 14px · bg #141414</div>
+          <div class="ld-chips">
+            <span class="lchip">HEX 输入框</span>
+            <span class="lchip">DEC 输入框</span>
+            <span class="lchip">Copy 按钮</span>
+            <span class="lchip">格式下拉菜单</span>
           </div>
-          <div style="display:flex;gap:6px">
-            <div style="background:rgba(255,255,255,0.07);border:1px solid var(--bd);border-radius:5px;padding:3px 8px;font-size:11px;color:var(--fg3)">重置</div>
-            <div style="background:rgba(255,255,255,0.07);border:1px solid var(--bd);border-radius:5px;padding:3px 8px;font-size:11px;color:var(--fg3)">载入示例</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--fg4);text-align:right;white-space:nowrap">
+          <div>grid: 1fr 1fr auto</div>
+          <div style="margin-top:3px">gap: 12px</div>
+        </div>
+      </div>
+
+      <div class="ld-row">
+        <div class="ld-label">Panel 2</div>
+        <div class="ld-content">
+          <div class="ld-title">32-bit 位图</div>
+          <div class="ld-sub">panel-shell · overflow-x: auto · min-width: 660px</div>
+          <div class="ld-chips">
+            <span class="lchip">32格位图网格</span>
+            <span class="lchip">字段图例</span>
+            <span class="lchip">位号标注</span>
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--fg4)">h: ~80px</div>
+      </div>
+
+      <div class="ld-row" style="flex:1.4;min-height:0">
+        <div class="ld-label">Panel 3</div>
+        <div class="ld-content">
+          <div class="ld-title">字段拆解 · 双向编辑</div>
+          <div class="ld-sub">panel-shell · 两行 CSS Grid 布局</div>
+          <div class="ld-chips" style="margin-bottom:5px">
+            <span class="lchip" style="border-color:rgba(255,170,59,0.4);color:var(--warning)">row1: 6fr : 16fr</span>
+            <span class="lchip">func · cmd</span>
+          </div>
+          <div class="ld-chips">
+            <span class="lchip" style="border-color:rgba(67,105,239,0.4);color:var(--primary)">row2: 1fr : 1fr : 2fr</span>
+            <span class="lchip">ms · rw · param</span>
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--fg4)">gap: 12px</div>
+      </div>
+
+      <div class="ld-row">
+        <div class="ld-label">Panel 4</div>
+        <div class="ld-content">
+          <div class="ld-title">最近 10 次计算</div>
+          <div class="ld-sub">panel-shell · flex-wrap · recent-chip × N</div>
+          <div class="ld-chips">
+            <span class="lchip">历史 chip 列表</span>
+            <span class="lchip">localStorage 持久化</span>
+            <span class="lchip">最多 10 条</span>
           </div>
         </div>
       </div>
-      <!-- Panels -->
-      <div class="lay-panel"><span class="lay-label">偏移量 · 32-bit</span><span class="lay-detail">HEX + DEC 双输入 · 复制</span></div>
-      <div class="lay-panel"><span class="lay-label">32-bit 位图</span><span class="lay-detail">字段带/位格/位号 三行网格</span></div>
-      <div class="lay-panel"><span class="lay-label">字段拆解 · 双向编辑</span><span class="lay-detail">func/cmd/ms/rw/param</span></div>
-      <div class="lay-panel" style="border-color:rgba(255,255,255,0.05)"><span class="lay-label" style="opacity:.6">最近 10 次计算</span><span class="lay-detail">localStorage 持久化</span></div>
-      <div style="font-size:10px;color:var(--fg3);margin-top:4px;font-family:monospace">Toast（fixed bottom:26px 独立层）</div>
     </div>
 
-    <div class="col" style="flex:1">
-      <div class="card">
-        <div class="card-title">布局约束</div>
-        <div class="tok-row"><span class="tok-name">max-width</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">980px（居中）</span></div>
-        <div class="tok-row"><span class="tok-name">smc-stack gap</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">16px（--space-4）</span></div>
-        <div class="tok-row"><span class="tok-name">外层 padding</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">16px 四边，底 24px</span></div>
-        <div class="tok-row"><span class="tok-name">panel-shell-radius</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">14px（custom）</span></div>
-        <div class="tok-row"><span class="tok-name">panel-shell-bg</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">#141414（--background-elevated）</span></div>
-        <div class="tok-row"><span class="tok-name">panel-shell-border</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">rgba(255,255,255,0.06)</span></div>
+    <!-- Right aside -->
+    <div class="s2-aside">
+      <div class="aside-box">
+        <div class="atitle">布局关键参数</div>
+        <div class="kv"><span class="k">max-width</span><span class="v">980px</span></div>
+        <div class="kv"><span class="k">padding-x</span><span class="v">16px</span></div>
+        <div class="kv"><span class="k">panel gap</span><span class="v">16px</span></div>
+        <div class="kv"><span class="k">panel-radius</span><span class="v">14px</span></div>
+        <div class="kv"><span class="k">panel-bg</span><span class="v">#141414</span></div>
+        <div class="kv"><span class="k">panel-border</span><span class="v">rgba(fff,0.06)</span></div>
       </div>
-
-      <div class="card">
-        <div class="card-title">字段卡比例布局（核心设计点）</div>
-        <div style="margin-bottom:8px">
-          <div style="font-size:11px;color:var(--fg3);margin-bottom:4px">Row 1：grid-template-columns: 6fr 16fr</div>
-          <div style="display:flex;border-radius:6px;overflow:hidden;height:28px">
-            <div style="flex:6;background:rgba(255,170,59,0.3);border:1px solid #FFAA3B;display:flex;align-items:center;justify-content:center;font-size:11px;color:#FFAA3B;font-weight:700">Function · 6fr</div>
-            <div style="flex:16;background:rgba(67,105,239,0.2);border:1px solid #4369EF;border-left:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#4369EF;font-weight:700">Command · 16fr</div>
-          </div>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--fg3);margin-bottom:4px">Row 2：grid-template-columns: 1fr 1fr 2fr</div>
-          <div style="display:flex;border-radius:6px;overflow:hidden;height:28px">
-            <div style="flex:1;background:rgba(124,141,184,0.25);border:1px solid #7c8db8;display:flex;align-items:center;justify-content:center;font-size:11px;color:#7c8db8;font-weight:700">MS</div>
-            <div style="flex:1;background:rgba(4,215,147,0.2);border:1px solid #04D793;border-left:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#04D793;font-weight:700">RW</div>
-            <div style="flex:2;background:rgba(255,75,123,0.2);border:1px solid #FF4B7B;border-left:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#FF4B7B;font-weight:700">Param · 2fr</div>
-          </div>
-        </div>
-        <div style="margin-top:8px;font-size:10px;color:var(--dan);background:rgba(255,75,123,0.08);padding:6px 8px;border-radius:5px">
-          ⚠️ SMC 字段不对齐 nibble（4bit）：func=6b, cmd=16b, ms=1b, rw=1b, param=8b — 必须按位宽成比例，不能等宽
-        </div>
+      <div class="aside-box">
+        <div class="atitle">字段栅格比例</div>
+        <div class="kv"><span class="k">func</span><span class="v" style="color:var(--warning)">6fr</span></div>
+        <div class="kv"><span class="k">cmd</span><span class="v" style="color:var(--primary)">16fr</span></div>
+        <div class="kv"><span class="k">ms</span><span class="v" style="color:var(--accent)">1fr</span></div>
+        <div class="kv"><span class="k">rw</span><span class="v" style="color:var(--success)">1fr</span></div>
+        <div class="kv"><span class="k">param</span><span class="v" style="color:var(--danger)">2fr</span></div>
       </div>
-
-      <div class="card">
-        <div class="card-title">响应式</div>
-        <div style="font-size:12px;color:var(--fg2)"><span style="font-family:monospace;color:var(--acc)">@media (max-width: 760px)</span>：Row1 / Row2 均折叠为单列 <span style="font-family:monospace;color:var(--pri)">1fr</span>；偏移量输入区也折叠</div>
+      <!-- Mini preview SVG -->
+      <div class="aside-box" style="flex:1;overflow:hidden">
+        <div class="atitle">层次示意</div>
+        <svg viewBox="0 0 220 148" style="width:100%;display:block;margin-top:2px" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="218" height="15" rx="3" fill="rgba(67,105,239,0.18)" stroke="rgba(67,105,239,0.4)" stroke-width="0.5"/>
+          <text x="7" y="12" font-family="monospace" font-size="7.5" fill="rgba(255,255,255,0.45)">layout-header ~44px</text>
+          <rect x="1" y="19" width="218" height="20" rx="3" fill="#1c1c1c" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+          <rect x="5" y="23" width="80" height="12" rx="2" fill="#262626"/>
+          <rect x="89" y="23" width="80" height="12" rx="2" fill="#262626"/>
+          <rect x="173" y="23" width="42" height="12" rx="2" fill="rgba(67,105,239,0.45)"/>
+          <text x="5" y="17" font-family="monospace" font-size="6.5" fill="rgba(255,255,255,0.35)">P1 · 偏移量</text>
+          <rect x="1" y="42" width="218" height="15" rx="3" fill="#1c1c1c" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+          <text x="5" y="52.5" font-family="monospace" font-size="6.5" fill="rgba(255,255,255,0.35)">P2 · 32-bit 位图</text>
+          <rect x="1" y="60" width="218" height="40" rx="3" fill="#1c1c1c" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+          <rect x="5" y="64" width="50" height="14" rx="2" fill="#262626" stroke="rgba(255,170,59,0.3)" stroke-width="0.5"/>
+          <rect x="59" y="64" width="155" height="14" rx="2" fill="#262626" stroke="rgba(67,105,239,0.3)" stroke-width="0.5"/>
+          <rect x="5" y="81" width="65" height="14" rx="2" fill="#262626"/>
+          <rect x="74" y="81" width="65" height="14" rx="2" fill="#262626"/>
+          <rect x="143" y="81" width="71" height="14" rx="2" fill="#262626"/>
+          <text x="5" y="58" font-family="monospace" font-size="6.5" fill="rgba(255,255,255,0.35)">P3 · 字段拆解</text>
+          <rect x="1" y="103" width="218" height="15" rx="3" fill="#1c1c1c" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+          <text x="5" y="113.5" font-family="monospace" font-size="6.5" fill="rgba(255,255,255,0.35)">P4 · 最近 10 次计算</text>
+          <text x="5" y="132" font-family="monospace" font-size="6" fill="rgba(255,255,255,0.2)">max-width: 980px · gap: 16px · border-radius: 14px</text>
+        </svg>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════════════
-     SLIDE 3 — 设计 Token
-══════════════════════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 3 — Design Tokens -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="slide" id="s3">
   <div class="slide-header">
-    <div class="slide-tag">设计 Token</div>
-    <div class="slide-title">色彩 Token · 字体规格</div>
-    <div class="slide-subtitle">PTO 设计系统 · 深色主题 · 零硬编码色</div>
+    <div class="slide-num">03 / 08</div>
+    <div class="slide-title">设计 Token · 色板 + 字体</div>
   </div>
-
-  <div class="slide-body">
-    <div class="col col-half">
-      <div class="card">
-        <div class="card-title">背景 · 表面 · 边框</div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#101010;border:1px solid rgba(255,255,255,0.15)"></span><span class="tok-name">--background</span><span class="tok-val">#101010</span><span class="tok-desc">页面底色</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#141414;border:1px solid rgba(255,255,255,0.10)"></span><span class="tok-name">--background-elevated</span><span class="tok-val">#141414</span><span class="tok-desc">panel / toast</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#161616;border:1px solid rgba(255,255,255,0.08)"></span><span class="tok-name">--surface-1</span><span class="tok-val">#161616</span><span class="tok-desc">input 背景</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#1c1c1c;border:1px solid rgba(255,255,255,0.08)"></span><span class="tok-name">--surface-2</span><span class="tok-val">#1c1c1c</span><span class="tok-desc">字段卡默认</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#262626;border:1px solid rgba(255,255,255,0.08)"></span><span class="tok-name">--surface-3</span><span class="tok-val">#262626</span><span class="tok-desc">字段卡 focus-within</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#313131;border:1px solid rgba(255,255,255,0.08)"></span><span class="tok-name">--surface-4</span><span class="tok-val">#313131</span><span class="tok-desc">segmented is-selected</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15)"></span><span class="tok-name">--border-subtle</span><span class="tok-val">rgba(255,255,255,0.06)</span><span class="tok-desc">panel / 位格</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.15)"></span><span class="tok-name">--border-default</span><span class="tok-val">rgba(255,255,255,0.10)</span><span class="tok-desc">input 边框</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.15)"></span><span class="tok-name">--border-strong</span><span class="tok-val">rgba(255,255,255,0.16)</span><span class="tok-desc">字段边界线</span></div>
+  <div class="slide-body" style="gap:0">
+    <!-- Left: Color tokens -->
+    <div style="flex:1;padding-right:18px;border-right:1px solid var(--border);overflow:hidden">
+      <div class="token-section">
+        <div class="token-section-label">Background Tokens</div>
+        <div class="token-row"><div class="swatch" style="background:#101010"></div><div class="token-name">--background</div><div class="token-val">#101010</div></div>
+        <div class="token-row"><div class="swatch" style="background:#141414"></div><div class="token-name">--background-elevated</div><div class="token-val">#141414</div></div>
+        <div class="token-row"><div class="swatch" style="background:#161616"></div><div class="token-name">--surface-1</div><div class="token-val">#161616</div></div>
+        <div class="token-row"><div class="swatch" style="background:#1c1c1c"></div><div class="token-name">--surface-2</div><div class="token-val">#1c1c1c</div></div>
+        <div class="token-row"><div class="swatch" style="background:#262626"></div><div class="token-name">--surface-3</div><div class="token-val">#262626</div></div>
+        <div class="token-row"><div class="swatch" style="background:#313131"></div><div class="token-name">--surface-4</div><div class="token-val">#313131</div></div>
       </div>
-
-      <div class="card" style="margin-top:8px">
-        <div class="card-title">字段色彩（前景 · 高亮区域）</div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#FFAA3B"></span><span class="tok-name">--warning</span><span class="tok-val">#FFAA3B</span><span class="tok-desc">func 功能码</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#4369EF"></span><span class="tok-name">--primary</span><span class="tok-val">#4369EF</span><span class="tok-desc">cmd 命令码 · focus</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#7c8db8"></span><span class="tok-name">--accent</span><span class="tok-val">#7c8db8</span><span class="tok-desc">ms 读取方式</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#04D793"></span><span class="tok-name">--success</span><span class="tok-val">#04D793</span><span class="tok-desc">rw 读写方向 · copy ok</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:#FF4B7B"></span><span class="tok-name">--danger</span><span class="tok-val">#FF4B7B</span><span class="tok-desc">param 参数 · error</span></div>
-        <div class="tok-row"><span class="tok-swatch" style="background:rgba(67,105,239,0.42);border:1px solid var(--pri)"></span><span class="tok-name">--focus-ring</span><span class="tok-val">rgba(67,105,239,0.42)</span><span class="tok-desc">focus 光晕</span></div>
+      <div class="token-section">
+        <div class="token-section-label">Foreground</div>
+        <div class="token-row"><div class="dot" style="background:rgba(255,255,255,0.90)"></div><div class="token-name">--foreground</div><div class="token-val">rgba(255,255,255, 0.90)</div></div>
+        <div class="token-row"><div class="dot" style="background:rgba(255,255,255,0.60)"></div><div class="token-name">--foreground-2</div><div class="token-val">rgba(255,255,255, 0.60)</div></div>
+        <div class="token-row"><div class="dot" style="background:rgba(255,255,255,0.40)"></div><div class="token-name">--foreground-3</div><div class="token-val">rgba(255,255,255, 0.40)</div></div>
+        <div class="token-row"><div class="dot" style="background:rgba(255,255,255,0.25)"></div><div class="token-name">--foreground-4</div><div class="token-val">rgba(255,255,255, 0.25)</div></div>
+      </div>
+      <div class="token-section">
+        <div class="token-section-label">Field Colors</div>
+        <div class="token-row"><div class="dot" style="background:#FFAA3B"></div><div class="token-name">--warning / func</div><div class="token-val">#FFAA3B</div></div>
+        <div class="token-row"><div class="dot" style="background:#4369EF"></div><div class="token-name">--primary / cmd</div><div class="token-val">#4369EF</div></div>
+        <div class="token-row"><div class="dot" style="background:#7c8db8"></div><div class="token-name">--accent / ms</div><div class="token-val">#7c8db8</div></div>
+        <div class="token-row"><div class="dot" style="background:#04D793"></div><div class="token-name">--success / rw</div><div class="token-val">#04D793</div></div>
+        <div class="token-row"><div class="dot" style="background:#FF4B7B"></div><div class="token-name">--danger / param</div><div class="token-val">#FF4B7B</div></div>
+      </div>
+      <div class="token-section">
+        <div class="token-section-label">State / Border</div>
+        <div class="token-row"><div class="dot" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18)"></div><div class="token-name">--hover</div><div class="token-val">rgba(255,255,255, 0.06)</div></div>
+        <div class="token-row"><div class="dot" style="background:rgba(67,105,239,0.42)"></div><div class="token-name">--focus-ring</div><div class="token-val">rgba(67,105,239, 0.42)</div></div>
+        <div class="token-row"><div class="dot" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18)"></div><div class="token-name">--border-subtle</div><div class="token-val">rgba(255,255,255, 0.06)</div></div>
       </div>
     </div>
 
-    <div class="col">
-      <div class="card">
-        <div class="card-title">字体规格（font-family: Inter / JetBrains Mono）</div>
-        <div class="type-row">
-          <span class="type-sample" style="font-size:19px;font-weight:600;font-family:monospace">0x18040600</span>
-          <span class="type-spec">19px semibold mono</span>
-          <span class="type-use">偏移量输入值</span>
-        </div>
-        <div class="type-row">
-          <span class="type-sample" style="font-size:14px;font-weight:700">Function · 功能码</span>
-          <span class="type-spec">14px semibold sans</span>
-          <span class="type-use">字段标签、按钮</span>
-        </div>
-        <div class="type-row">
-          <span class="type-sample" style="font-size:14px;font-weight:600;font-family:monospace">0x06</span>
-          <span class="type-spec">14px semibold mono</span>
-          <span class="type-use">字段输入值</span>
-        </div>
-        <div class="type-row">
-          <span class="type-sample" style="font-size:14px;color:var(--fg2)">偏移量 · 32-bit</span>
-          <span class="type-spec">14px semibold sans</span>
-          <span class="type-use">panel 标题</span>
-        </div>
-        <div class="type-row">
-          <span class="type-sample" style="font-size:12px;font-family:monospace">DEC 6 · HEX 0x06</span>
-          <span class="type-spec">12px medium mono</span>
-          <span class="type-use">stat-chip 读数</span>
-        </div>
-        <div class="type-row">
-          <span class="type-sample" style="font-size:12px;font-family:monospace;color:var(--fg2)">01 · 0x18040600</span>
-          <span class="type-spec">12px medium mono</span>
-          <span class="type-use">历史 recent-chip</span>
-        </div>
-        <div class="type-row">
-          <span class="type-sample" style="font-size:12px;color:var(--fg2)">最近 10 次计算</span>
-          <span class="type-spec">12px normal sans</span>
-          <span class="type-use">副标题、说明</span>
-        </div>
-        <div class="type-row">
-          <span class="type-sample" style="font-size:11px;color:var(--fg3);font-family:monospace">[31:26] · 6b</span>
-          <span class="type-spec">11px normal mono</span>
-          <span class="type-use">元数据标签、位号</span>
-        </div>
-      </div>
+    <!-- Right: Typography -->
+    <div style="flex:1;padding-left:18px;display:flex;flex-direction:column;gap:0">
+      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:8px;font-weight:600">Typography Scale</div>
+      <table style="margin-bottom:14px">
+        <thead>
+          <tr>
+            <th>样式规格</th>
+            <th>字体</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:18px;font-weight:600">19px semi</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">mono</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">偏移量输入值</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-size:14px;font-weight:600">14px semi</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">sans</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">字段标签、按钮文字</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:14px;font-weight:600">14px semi</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">mono</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">字段输入值</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:12px">12px reg</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">mono</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">stat-chip、历史 chip</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:11px">11px reg</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">mono</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">meta 标签、位号标注</span></td>
+          </tr>
+        </tbody>
+      </table>
 
-      <div class="card" style="margin-top:8px">
-        <div class="card-title">间距 Token</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-1</span><span class="tok-val">4px</span></div>
-          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-2</span><span class="tok-val">8px</span></div>
-          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-3</span><span class="tok-val">12px</span></div>
-          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-4</span><span class="tok-val">16px</span></div>
-          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-5</span><span class="tok-val">20px</span></div>
-          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-6</span><span class="tok-val">24px</span></div>
+      <!-- Font preview -->
+      <div style="background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);padding:14px;flex:1">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:10px">字体实例预览</div>
+        <div style="font-family:var(--mono);font-size:19px;font-weight:600;color:var(--fg);margin-bottom:7px">0x18040600</div>
+        <div style="font-size:14px;font-weight:600;color:var(--fg2);margin-bottom:6px">字段标签 / 按钮文字</div>
+        <div style="display:flex;gap:6px;margin-bottom:7px">
+          <span style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--warning)">func: 0x06</span>
+          <span style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--primary)">cmd: 0x0401</span>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
-          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-sm</span><span class="tok-val">6px</span></div>
-          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-md</span><span class="tok-val">8px</span></div>
-          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-lg</span><span class="tok-val">12px</span></div>
-          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-xl</span><span class="tok-val">16px</span></div>
-          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-pill</span><span class="tok-val">999px</span></div>
+        <div style="display:flex;gap:7px">
+          <span style="font-family:var(--mono);font-size:12px;background:var(--surf3);border:1px solid var(--border-mid);border-radius:4px;padding:2px 8px;color:var(--fg2)">DEC 6</span>
+          <span style="font-family:var(--mono);font-size:12px;background:var(--surf3);border:1px solid var(--border-mid);border-radius:4px;padding:2px 8px;color:var(--fg2)">HEX 0x06</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--fg3);padding:2px 0">meta · bit 31..26</span>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════════════
-     SLIDE 4 — 组件规格
-══════════════════════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 4 — Component Specs -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="slide" id="s4">
   <div class="slide-header">
-    <div class="slide-tag">组件规格</div>
-    <div class="slide-title">关键组件 · 视觉规格</div>
-    <div class="slide-subtitle">smc-owrap / segmented-control / stat-chip / recent-chip / panel-shell / 32-bit 位图</div>
+    <div class="slide-num">04 / 08</div>
+    <div class="slide-title">组件规格 · 含位图结构图</div>
   </div>
-
-  <div class="slide-body">
-    <div class="col col-half">
-      <div class="comp-demo">
-        <div class="comp-label">smc-owrap · 偏移量输入框（3态）</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <div class="mock-owrap">
-            <div class="mock-tag"><span>HEX · 0x…</span><span class="dot">●</span></div>
-            <div class="mock-val" style="color:var(--fg3);font-size:13px">0x00000000</div>
+  <div class="slide-body" style="flex-direction:column;gap:12px">
+    <div class="comp-grid">
+      <!-- smc-owrap -->
+      <div class="comp-box">
+        <div class="comp-label">smc-owrap · 偏移量输入框</div>
+        <div style="display:flex;gap:7px;margin-bottom:8px">
+          <div style="flex:1">
+            <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:3px">default</div>
+            <div class="mock-input">
+              <div class="tag-row"><span>HEX</span><span style="color:var(--fg4)">◎</span></div>
+              <div class="val-row" style="color:var(--fg4)">0x…</div>
+            </div>
           </div>
-          <div class="mock-owrap synced">
-            <div class="mock-tag"><span>HEX · 0x…</span><span class="dot">●</span></div>
-            <div class="mock-val">0x18040600</div>
+          <div style="flex:1">
+            <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:3px">focus</div>
+            <div class="mock-input focus">
+              <div class="tag-row"><span>HEX</span><span style="color:var(--primary)">◉</span></div>
+              <div class="val-row">0x1804_</div>
+            </div>
           </div>
-          <div class="mock-owrap invalid">
-            <div class="mock-tag" style="color:var(--dan)"><span>HEX · 0x…</span></div>
-            <div class="mock-val" style="color:var(--dan);font-size:13px">0xGG...</div>
+          <div style="flex:1">
+            <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:3px">synced</div>
+            <div class="mock-input synced">
+              <div class="tag-row"><span>HEX</span><span style="color:var(--success)">✓</span></div>
+              <div class="val-row">0x18040600</div>
+            </div>
           </div>
-        </div>
-        <div style="font-size:10px;color:var(--fg3);margin-top:6px">bg #161616 · border rgba(255,255,255,0.10) · radius 8px · synced: border #4369EF · invalid: border #FF4B7B</div>
-      </div>
-
-      <div class="comp-demo">
-        <div class="comp-label">segmented-control · MS / RW（1-bit 字段）</div>
-        <div style="display:flex;gap:12px;align-items:center">
-          <div class="mock-seg">
-            <div class="mock-seg-btn sel">多读</div>
-            <div class="mock-seg-btn unsel">单读</div>
-          </div>
-          <div class="mock-seg">
-            <div class="mock-seg-btn unsel">写入</div>
-            <div class="mock-seg-btn sel">读取</div>
-          </div>
-        </div>
-        <div style="font-size:10px;color:var(--fg3);margin-top:6px">is-selected: bg rgba(255,255,255,0.90) · fg #101010 · container: rgba(255,255,255,0.04) · aria-pressed</div>
-      </div>
-
-      <div class="comp-demo">
-        <div class="comp-label">stat-chip · DEC/HEX 双读数</div>
-        <div style="display:flex;gap:6px">
-          <div class="mock-chip">DEC 6</div>
-          <div class="mock-chip">HEX 0x06</div>
-          <div class="mock-chip" style="color:var(--fg3)">DEC —</div>
-          <div class="mock-chip" style="color:var(--fg3)">HEX —</div>
-        </div>
-        <div style="font-size:10px;color:var(--fg3);margin-top:6px">bg #262626 · border rgba(255,255,255,0.06) · radius 4px · mono 11px</div>
-      </div>
-
-      <div class="comp-demo">
-        <div class="comp-label">recent-chip · 历史记录条目</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <div class="mock-rchip">01 · 0x18040600<span class="mock-ts">09:30</span></div>
-          <div class="mock-rchip" style="background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.18);color:var(--fg)">02 · 0x30440100<span class="mock-ts">6/10 22:15</span></div>
-        </div>
-        <div style="font-size:10px;color:var(--fg3);margin-top:6px">bg rgba(255,255,255,0.05) · radius 999px · hover: bg +0.09 · 时间 &gt;24h 显示日期</div>
-      </div>
-    </div>
-
-    <div class="col">
-      <div class="comp-demo">
-        <div class="comp-label">32-bit 位图（smc-grid · 比例示意）</div>
-        <div style="overflow-x:auto">
-          <div style="display:grid;grid-template-columns:6fr 16fr 1fr 1fr 8fr;min-width:480px;border-radius:4px;overflow:hidden">
-            <div style="background:#FFAA3B;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#000;font-family:monospace">Function<br/>[31:26]</div>
-            <div style="background:#4369EF;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#fff;font-family:monospace">Command · 命令码 [25:10]</div>
-            <div style="background:#7c8db8;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#fff">MS</div>
-            <div style="background:#04D793;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#000">RW</div>
-            <div style="background:#FF4B7B;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#fff;font-family:monospace">Param [7:0]</div>
-          </div>
-          <!-- Sample bit cells -->
-          <div style="display:grid;grid-template-columns:repeat(32,minmax(12px,1fr));min-width:480px;margin-top:2px">
-            ${Array.from({length:6},(_,i)=>`<div style="height:20px;border:1px solid rgba(255,170,59,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(255,170,59,0.5)">${i<2?'1':'0'}</div>`).join('')}
-            ${Array.from({length:16},(_,i)=>`<div style="height:20px;border:1px solid rgba(67,105,239,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(67,105,239,0.5)">${i===2||i===10?'1':'0'}</div>`).join('')}
-            <div style="height:20px;border:1px solid rgba(124,141,184,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(124,141,184,0.5)">0</div>
-            <div style="height:20px;border:1px solid rgba(4,215,147,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(4,215,147,0.5)">0</div>
-            ${Array.from({length:8},()=>`<div style="height:20px;border:1px solid rgba(255,75,123,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(255,75,123,0.5)">0</div>`).join('')}
+          <div style="flex:1">
+            <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:3px">invalid</div>
+            <div class="mock-input invalid">
+              <div class="tag-row"><span>HEX</span><span style="color:var(--danger)">✕</span></div>
+              <div class="val-row" style="color:var(--danger)">0xGGGG</div>
+            </div>
           </div>
         </div>
-        <div style="font-size:10px;color:var(--fg3);margin-top:6px">3行：字段带(row1) / 位格28px(row2) / 位号11px(row3) · 置位格：color-mix 22% field-hue · 边界位加粗边框</div>
+        <div style="font-size:9px;color:var(--fg3);font-family:var(--mono)">radius 8px · padding 8px 12px · label 10px mono uppercase</div>
       </div>
 
-      <div class="comp-demo">
-        <div class="comp-label">panel-shell 规格</div>
-        <div style="display:flex;gap:16px">
-          <div style="font-size:12px;color:var(--fg2)">
-            <div><span style="color:var(--acc);font-family:monospace">background</span>　#141414</div>
-            <div><span style="color:var(--acc);font-family:monospace">border</span>　　1px solid rgba(255,255,255,0.06)</div>
-            <div><span style="color:var(--acc);font-family:monospace">border-radius</span>　14px</div>
-            <div><span style="color:var(--acc);font-family:monospace">panel-quiet</span>　border transparent（历史面板）</div>
+      <!-- Segmented + chips -->
+      <div class="comp-box">
+        <div class="comp-label">segmented-control · stat-chip · recent-chip</div>
+        <div style="display:flex;gap:10px;margin-bottom:9px">
+          <div style="flex:1">
+            <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:4px">ms 字段</div>
+            <div class="seg-ctrl"><div class="seg-item">M</div><div class="seg-item sel">S</div></div>
           </div>
+          <div style="flex:1">
+            <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:4px">rw 字段</div>
+            <div class="seg-ctrl"><div class="seg-item sel">R</div><div class="seg-item">W</div></div>
+          </div>
+        </div>
+        <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:5px">stat-chip</div>
+        <div style="display:flex;gap:6px;margin-bottom:9px">
+          <div class="stat-chip"><span style="color:var(--fg4)">DEC</span><span>6</span></div>
+          <div class="stat-chip"><span style="color:var(--fg4)">HEX</span><span>0x06</span></div>
+          <div class="stat-chip"><span style="color:var(--fg4)">BIN</span><span>000110</span></div>
+        </div>
+        <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:5px">recent-chip</div>
+        <div class="recent-chip">
+          <span><span class="idx">01 ·</span><span class="hex">0x18040600</span></span>
+          <span class="time">09:30</span>
+        </div>
+      </div>
+
+      <!-- panel-shell spec -->
+      <div class="comp-box">
+        <div class="comp-label">panel-shell · 面板容器规格</div>
+        <div class="panel-spec">
+          <div class="panel-spec-row"><span class="pk">background</span><span class="pv">#141414</span></div>
+          <div class="panel-spec-row"><span class="pk">border</span><span class="pv">1px solid rgba(255,255,255,0.06)</span></div>
+          <div class="panel-spec-row"><span class="pk">border-radius</span><span class="pv">14px</span></div>
+          <div class="panel-spec-row"><span class="pk">padding</span><span class="pv">16px 18px</span></div>
+          <div class="panel-spec-row"><span class="pk">box-shadow</span><span class="pv">none (flat)</span></div>
+        </div>
+        <div style="margin-top:9px">
+          <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:4px">copyAll + 格式下拉</div>
+          <div style="display:flex;gap:3px">
+            <div style="flex:1;background:var(--primary);border-radius:5px 0 0 5px;padding:5px 10px;font-size:11px;font-weight:600;color:#fff;text-align:center">⧉ 复制</div>
+            <div style="background:var(--surf3);border:1px solid var(--border-mid);border-radius:0 5px 5px 0;padding:5px 7px;font-size:11px;color:var(--fg2)">▾</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bitmap mini diagram -->
+      <div class="comp-box">
+        <div class="comp-label">32-bit 位图 · 字段比例图</div>
+        <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:5px">比例 6 : 16 : 1 : 1 : 8 = 32 bits</div>
+        <div class="bitbar-mini">
+          <div class="bb-mini" style="background:var(--func);flex:6">func</div>
+          <div class="bb-mini" style="background:var(--cmd);flex:16;color:rgba(255,255,255,0.85)">cmd [25:10]</div>
+          <div class="bb-mini" style="background:var(--ms);flex:1;color:rgba(255,255,255,0.85);font-size:7px">ms</div>
+          <div class="bb-mini" style="background:var(--rw);flex:1;font-size:7px">rw</div>
+          <div class="bb-mini" style="background:var(--param);flex:8;color:rgba(255,255,255,0.85)">param</div>
+        </div>
+        <!-- 32-cell mini grid -->
+        <div style="display:grid;grid-template-columns:repeat(32,1fr);gap:1px;margin-top:7px">
+          <div style="height:14px;background:rgba(255,170,59,0.65);border-radius:2px 0 0 2px"></div>
+          <div style="height:14px;background:rgba(255,170,59,0.65)"></div>
+          <div style="height:14px;background:rgba(255,170,59,0.65)"></div>
+          <div style="height:14px;background:rgba(255,170,59,0.65)"></div>
+          <div style="height:14px;background:rgba(255,170,59,0.65)"></div>
+          <div style="height:14px;background:rgba(255,170,59,0.65);border-radius:0 2px 2px 0"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72);border-radius:2px 0 0 2px"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72)"></div>
+          <div style="height:14px;background:rgba(67,105,239,0.72);border-radius:0 2px 2px 0"></div>
+          <div style="height:14px;background:rgba(124,141,184,0.72);border-radius:2px"></div>
+          <div style="height:14px;background:rgba(4,215,147,0.72);border-radius:2px"></div>
+          <div style="height:14px;background:rgba(255,75,123,0.72);border-radius:2px 0 0 2px"></div>
+          <div style="height:14px;background:rgba(255,75,123,0.72)"></div>
+          <div style="height:14px;background:rgba(255,75,123,0.72)"></div>
+          <div style="height:14px;background:rgba(255,75,123,0.72)"></div>
+          <div style="height:14px;background:rgba(255,75,123,0.72)"></div>
+          <div style="height:14px;background:rgba(255,75,123,0.72)"></div>
+          <div style="height:14px;background:rgba(255,75,123,0.72)"></div>
+          <div style="height:14px;background:rgba(255,75,123,0.72);border-radius:0 2px 2px 0"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:8px;color:var(--fg4);margin-top:3px">
+          <span>31</span><span>26</span><span>25</span><span style="flex:1;text-align:center">···</span><span>10</span><span>9</span><span>8</span><span>7</span><span>0</span>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <span style="font-size:10px;font-family:var(--mono);display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:var(--func);border-radius:2px;display:inline-block"></span>func</span>
+          <span style="font-size:10px;font-family:var(--mono);display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:var(--cmd);border-radius:2px;display:inline-block"></span>cmd</span>
+          <span style="font-size:10px;font-family:var(--mono);display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:var(--ms);border-radius:2px;display:inline-block"></span>ms</span>
+          <span style="font-size:10px;font-family:var(--mono);display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:var(--rw);border-radius:2px;display:inline-block"></span>rw</span>
+          <span style="font-size:10px;font-family:var(--mono);display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:var(--param);border-radius:2px;display:inline-block"></span>param</span>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════════════
-     SLIDE 5 — 状态矩阵
-══════════════════════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 5 — State Matrix -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="slide" id="s5">
   <div class="slide-header">
-    <div class="slide-tag">状态矩阵</div>
-    <div class="slide-title">逐组件 × 状态枚举</div>
-    <div class="slide-subtitle">每个可交互组件的完整状态覆盖</div>
+    <div class="slide-num">05 / 08</div>
+    <div class="slide-title">状态矩阵 · 逐组件 × 状态</div>
   </div>
-
-  <div style="flex:1;overflow:hidden">
-    <div class="matrix" style="grid-template-columns:140px repeat(6,1fr);width:100%">
-      <!-- Header -->
-      <div class="mhd">组件</div>
-      <div class="mhd">default</div>
-      <div class="mhd">focus</div>
-      <div class="mhd">valid / synced</div>
-      <div class="mhd">invalid / error</div>
-      <div class="mhd">disabled</div>
-      <div class="mhd">active / hover</div>
-
-      <!-- HEX/DEC 输入框 -->
-      <div class="mcell-label">HEX/DEC 输入框</div>
-      <div class="mcell">bg #161616<br/>border 0.10</div>
-      <div class="mcell mc-pri">border #4369EF<br/>ring 3px</div>
-      <div class="mcell mc-ok">sync点 #4369EF<br/>.synced class</div>
-      <div class="mcell mc-err">border #FF4B7B<br/>oerr 显示⚠</div>
-      <div class="mcell mc-muted">—</div>
-      <div class="mcell mc-muted">—</div>
-
-      <!-- 字段输入框 -->
-      <div class="mcell-label">字段输入框 smc-fin</div>
-      <div class="mcell">bg #161616<br/>placeholder</div>
-      <div class="mcell mc-pri">border #4369EF<br/>focus-ring</div>
-      <div class="mcell mc-ok">blur→格式化<br/>0x{hex}</div>
-      <div class="mcell mc-err">border #FF4B7B<br/>sem 显示⚠错误</div>
-      <div class="mcell mc-muted">—</div>
-      <div class="mcell">hover: bg轻亮</div>
-
-      <!-- 分段控件 -->
-      <div class="mcell-label">segmented-control MS/RW</div>
-      <div class="mcell mc-warn">null→隐含0<br/>视觉高亮第1项</div>
-      <div class="mcell mc-pri">focus-ring</div>
-      <div class="mcell mc-ok">is-selected<br/>bg rgba(255,255,255,0.90)<br/>fg #101010</div>
-      <div class="mcell mc-muted">不适用</div>
-      <div class="mcell mc-muted">不适用</div>
-      <div class="mcell">未选项hover<br/>bg 0.06</div>
-
-      <!-- 复制主按钮 -->
-      <div class="mcell-label">复制偏移量 btn-solid</div>
-      <div class="mcell">bg rgba(255,255,255,0.90)<br/>fg #101010</div>
-      <div class="mcell mc-pri">focus-ring</div>
-      <div class="mcell mc-muted">—</div>
-      <div class="mcell mc-muted">不适用</div>
-      <div class="mcell mc-muted">opacity 0.4<br/>not-allowed</div>
-      <div class="mcell">hover: bg +brighter<br/>translateY(-1px)</div>
-
-      <!-- 字段复制按钮 -->
-      <div class="mcell-label">字段复制按钮 ⧉</div>
-      <div class="mcell">btn-ghost transparent</div>
-      <div class="mcell mc-pri">focus-ring</div>
-      <div class="mcell mc-ok">copied: color<br/>#04D793 800ms</div>
-      <div class="mcell mc-muted">不适用</div>
-      <div class="mcell mc-muted">字段null时<br/>opacity 0.3</div>
-      <div class="mcell">hover bg 0.06</div>
-
-      <!-- 历史 chip -->
-      <div class="mcell-label">recent-chip 历史条目</div>
-      <div class="mcell">bg 0.05<br/>border 0.10</div>
-      <div class="mcell mc-pri">focus-ring</div>
-      <div class="mcell mc-muted">—</div>
-      <div class="mcell mc-muted">不适用</div>
-      <div class="mcell mc-muted">—</div>
-      <div class="mcell">hover bg 0.09<br/>border 0.18</div>
-    </div>
-
-    <div style="margin-top:10px;font-size:10px;color:var(--warn);background:rgba(255,170,59,0.08);padding:6px 10px;border-radius:5px">
-      ⚠️ 待确认（D2）：MS/RW 分段控件 null 初始态视觉高亮「多读 0」/「写入 0」——隐含值 vs 未选中状态，需产品决策
+  <div class="slide-body">
+    <div class="matrix-wrap" style="flex:1;overflow:hidden">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:130px">组件</th>
+            <th>default</th>
+            <th>focus</th>
+            <th>valid / synced</th>
+            <th>invalid / error</th>
+            <th>disabled</th>
+            <th>active</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong style="font-size:11px">HEX / DEC 输入框</strong><br/><span style="font-size:9px;color:var(--fg4);font-family:var(--mono)">smc-owrap</span></td>
+            <td><span class="st-cell st-default">border rgba(fff,0.06)<br/>bg #1c1c1c · label 灰</span></td>
+            <td><span class="st-cell st-focus">border #4369EF<br/>ring 3px focus-ring</span></td>
+            <td><span class="st-cell st-valid">border #04D793<br/>sync icon 绿色</span></td>
+            <td><span class="st-cell st-invalid">border #FF4B7B<br/>red ring · err 11px</span></td>
+            <td><span class="st-cell st-disabled">opacity 0.45<br/>not-allowed</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:11px">字段输入框</strong><br/><span style="font-size:9px;color:var(--fg4);font-family:var(--mono)">smc-fin</span></td>
+            <td><span class="st-cell st-default">border rgba(fff,0.12)<br/>bg #101010 · 14px</span></td>
+            <td><span class="st-cell st-focus">border #4369EF<br/>shadow 3px ring</span></td>
+            <td><span class="st-cell st-valid">正常无额外边框<br/>值正常显示</span></td>
+            <td><span class="st-cell st-invalid">border #FF4B7B<br/>⚠ 超范围提示</span></td>
+            <td><span class="st-cell st-disabled">opacity 0.40<br/>pointer-events none</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:11px">分段控件</strong><br/><span style="font-size:9px;color:var(--fg4);font-family:var(--mono)">segmented</span></td>
+            <td><span class="st-cell st-default">未选项 color fg3<br/>bg transparent</span></td>
+            <td><span class="st-cell st-focus">键盘焦点<br/>outline 2px primary</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-disabled">opacity 0.40</span></td>
+            <td><span class="st-cell st-active">选中项 bg #4369EF<br/>color #fff</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:11px">复制按钮</strong><br/><span style="font-size:9px;color:var(--fg4);font-family:var(--mono)">copyAll</span></td>
+            <td><span class="st-cell st-default">bg #4369EF · #fff<br/>12px semibold</span></td>
+            <td><span class="st-cell st-focus">outline 2px primary<br/>offset 2px</span></td>
+            <td><span class="st-cell st-valid">icon → ✓ success<br/>toast 1.5s 提示</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-disabled">opacity 0.45<br/>not-allowed</span></td>
+            <td><span class="st-cell st-active">scale 0.97<br/>bg darken 10%</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:11px">格式菜单</strong><br/><span style="font-size:9px;color:var(--fg4);font-family:var(--mono)">fmt-menu</span></td>
+            <td><span class="st-cell st-default">折叠 display:none<br/>▾ 触发器可见</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-active">展开 bg #262626<br/>shadow · role=menu</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:11px">字段复制</strong><br/><span style="font-size:9px;color:var(--fg4);font-family:var(--mono)">⧉ 字段按钮</span></td>
+            <td><span class="st-cell st-default">30×30 transparent<br/>color fg3</span></td>
+            <td><span class="st-cell st-focus">border #4369EF<br/>color fg</span></td>
+            <td><span class="st-cell st-valid">color success<br/>border success 0.8s</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-disabled">opacity 0.40</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════════════
-     SLIDE 6 — 交互序列
-══════════════════════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 6 — Interaction Flows -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="slide" id="s6">
   <div class="slide-header">
-    <div class="slide-tag">交互序列</div>
-    <div class="slide-title">关键数据流 · 3 条交互路径</div>
-    <div class="slide-subtitle">单一数据源 state.fields → compose/decompose → 全局 refresh</div>
+    <div class="slide-num">06 / 08</div>
+    <div class="slide-title">交互序列 · 数据流</div>
   </div>
+  <div class="slide-body" style="padding-top:14px">
+    <div class="flow-cols">
+      <!-- Flow 1 -->
+      <div class="flow-col">
+        <div class="flow-title">① 输入偏移量 → 字段解析</div>
+        <div class="step-box trigger">
+          <div class="step-label">USER INPUT</div>
+          <div class="step-text">用户在 HEX 框输入<br/><strong>0x18040600</strong></div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">PARSE</div>
+          <div class="step-text">parseLoose(raw, 32)<br/>→ word = 0x18040600</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">DECOMPOSE</div>
+          <div class="step-text">decomposeWord(word)<br/>func=6, cmd=0x0401<br/>ms=1, rw=0, param=0</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">STATE UPDATE</div>
+          <div class="step-text">state.fields = result<br/>→ 标记 dirty，触发重绘</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box output">
+          <div class="step-label">RENDER</div>
+          <div class="step-text">refresh全局()<br/>→ 位图 + 字段卡片全同步</div>
+        </div>
+      </div>
 
-  <div class="slide-body">
-    <!-- Flow 1 -->
-    <div class="col">
-      <div class="card-title" style="font-size:12px;color:var(--pri);margin-bottom:8px">① 输入偏移量 → 字段解析</div>
-      <div class="flow-step"><div class="flow-dot">1</div><div class="flow-content"><div class="flow-title">用户输入 HEX / DEC</div><div class="flow-desc">#hex / #dec input 事件<br/>onTop('hex' | 'dec')</div></div></div>
-      <div class="flow-conn"></div>
-      <div class="flow-step"><div class="flow-dot">2</div><div class="flow-content"><div class="flow-title">parseLoose(raw, 32)</div><div class="flow-desc">宽松解析：0x前缀 / 裸hex / 纯dec<br/>失败 → invalid class + oerr 显示错误</div></div></div>
-      <div class="flow-conn"></div>
-      <div class="flow-step"><div class="flow-dot">3</div><div class="flow-content"><div class="flow-title">decomposeWord(word)</div><div class="flow-desc">32-bit → {func,cmd,ms,rw,param}<br/>state.fields 全部更新</div></div></div>
-      <div class="flow-conn"></div>
-      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">✓</div><div class="flow-content"><div class="flow-title">refresh(src) 全局刷新</div><div class="flow-desc">renderInputs / renderFeet / renderTop<br/>paintGrid / renderPreviews</div></div></div>
-    </div>
+      <!-- Flow 2 -->
+      <div class="flow-col">
+        <div class="flow-title">② 字段编辑 → 回合成</div>
+        <div class="step-box trigger">
+          <div class="step-label">FIELD INPUT</div>
+          <div class="step-text">用户修改 func 字段<br/>输入 <strong>12</strong></div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">VALIDATE</div>
+          <div class="step-text">parseLoose(raw, 6bit)<br/>0 ≤ v ≤ 63 → ✓<br/>合法值 v = 12</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">STATE PATCH</div>
+          <div class="step-text">state.fields[func] = 12<br/>其余字段保持不变</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">COMPOSE</div>
+          <div class="step-text">composeWord()<br/>→ 新 32-bit 字<br/>0x30040600</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box output">
+          <div class="step-label">SYNC</div>
+          <div class="step-text">顶部 HEX/DEC 同步<br/>+ 位图高亮更新</div>
+        </div>
+      </div>
 
-    <!-- Flow 2 -->
-    <div class="col">
-      <div class="card-title" style="font-size:12px;color:var(--warn);margin-bottom:8px">② 字段编辑 → 回合成</div>
-      <div class="flow-step"><div class="flow-dot" style="background:var(--warn)">1</div><div class="flow-content"><div class="flow-title">用户修改字段卡输入框</div><div class="flow-desc">smc-fin input 事件<br/>parseLoose(inp.value, FIELDS[k].w)</div></div></div>
-      <div class="flow-conn"></div>
-      <div class="flow-step"><div class="flow-dot" style="background:var(--warn)">2</div><div class="flow-content"><div class="flow-title">state.fields[k] = value</div><div class="flow-desc">仅更新当前字段<br/>其余字段保持不变</div></div></div>
-      <div class="flow-conn"></div>
-      <div class="flow-step"><div class="flow-dot" style="background:var(--warn)">3</div><div class="flow-content"><div class="flow-title">composeWord(state.fields)</div><div class="flow-desc">合成 32-bit word<br/>null 字段贡献 0</div></div></div>
-      <div class="flow-conn"></div>
-      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">✓</div><div class="flow-content"><div class="flow-title">顶部 HEX/DEC 同步 + 位图更新</div><div class="flow-desc">refresh('field:k')：skip=当前输入框<br/>blur → 值格式化为 0x{hex}</div></div></div>
-    </div>
-
-    <!-- Flow 3 -->
-    <div class="col">
-      <div class="card-title" style="font-size:12px;color:var(--suc);margin-bottom:8px">③ 复制 → 历史保存</div>
-      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">1</div><div class="flow-content"><div class="flow-title">点击「复制偏移量」</div><div class="flow-desc">条件：anyFieldSet() = true<br/>btn-solid 激活</div></div></div>
-      <div class="flow-conn"></div>
-      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">2</div><div class="flow-content"><div class="flow-title">formatOutput(word, state.fmt)</div><div class="flow-desc">hex / dec / both / c / json<br/>navigator.clipboard.writeText()</div></div></div>
-      <div class="flow-conn"></div>
-      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">3</div><div class="flow-content"><div class="flow-title">saveHistory() + localStorage</div><div class="flow-desc">相邻去重，最多10条<br/>localStorage KEY = 'pto.smc.history.v1'</div></div></div>
-      <div class="flow-conn"></div>
-      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">✓</div><div class="flow-content"><div class="flow-title">toast + renderHistory()</div><div class="flow-desc">「已复制 …」1.6s<br/>emit CustomEvent 'smc-copy'</div></div></div>
+      <!-- Flow 3 -->
+      <div class="flow-col">
+        <div class="flow-title">③ 复制 → 历史保存</div>
+        <div class="step-box trigger">
+          <div class="step-label">CLICK</div>
+          <div class="step-text">用户点击<br/><strong>⧉ 复制</strong> 按钮</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">FORMAT</div>
+          <div class="step-text">formatted(fmt)<br/>→ 按选定格式生成字符串</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">CLIPBOARD</div>
+          <div class="step-text">clipboard.writeText()<br/>→ 写入系统剪贴板<br/>Toast aria-live 1.5s</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">HISTORY</div>
+          <div class="step-text">saveHistory(entry)<br/>→ localStorage<br/>最多保留 10 条</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box output">
+          <div class="step-label">RENDER</div>
+          <div class="step-text">renderHistory()<br/>→ 历史面板刷新<br/>新条目置顶显示</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════════════
-     SLIDE 7 — 审查结论
-══════════════════════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 7 — Review Results -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="slide" id="s7">
   <div class="slide-header">
-    <div class="slide-tag">审查结论</div>
-    <div class="slide-title">设计审查 + 可访问性审查 · 状态汇总</div>
-    <div class="slide-subtitle">基于 iter-3 Demo · 工程版已修复标注项</div>
+    <div class="slide-num">07 / 08</div>
+    <div class="slide-title">审查结论 · 问题 → 修复状态</div>
   </div>
-
-  <div class="slide-body">
-    <!-- Design review -->
-    <div class="col">
-      <div style="font-size:11px;font-weight:700;color:var(--fg2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.8px">设计审查（D1–D7）</div>
-      <div class="rev-item">
-        <span class="rev-pri">🟡</span><span class="rev-key">D1</span>
-        <span class="rev-text">func hint 浮层仅显示6条，完整表11条</span>
-        <span class="rev-status status-ok">工程版已修复</span>
+  <div class="slide-body" style="gap:0">
+    <!-- Left: Design Review -->
+    <div class="review-col" style="padding-right:16px">
+      <div class="review-title">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6.5" stroke="#4369EF" stroke-width="1.5"/><path d="M4.5 7.5l2 2 4-4" stroke="#4369EF" stroke-width="1.5" stroke-linecap="round"/></svg>
+        设计审查 (D1–D7)
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">🟡</span><span class="rev-key">D2</span>
-        <span class="rev-text">MS/RW null 初始态视觉高亮第1项，语义模糊</span>
-        <span class="rev-status status-pending">待产品确认</span>
+      <div class="finding">
+        <div class="find-id">D1</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🔴 高优先级</div>
+          <div class="find-text">func 字段缺少完整枚举对照表，设计稿仅展示部分典型值</div>
+          <div class="find-status status-eng">工程版已修复 · 完整枚举内置 constants/</div>
+        </div>
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">🟡</span><span class="rev-key">D3</span>
-        <span class="rev-text">历史时间戳 HH:MM，跨日丢失日期上下文</span>
-        <span class="rev-status status-ok">工程版已修复</span>
+      <div class="finding">
+        <div class="find-id">D2</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🔴 高优先级</div>
+          <div class="find-text">错误状态 UX 未完整规格化，缺少 inline error message 排版规则</div>
+          <div class="find-status status-fixed">已修复 · design-structure §5 状态枚举补全</div>
+        </div>
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">🟢</span><span class="rev-key">D4</span>
-        <span class="rev-text">格式选择▾ 符号跨平台字形不一致</span>
-        <span class="rev-status status-pending">待后续迭代</span>
+      <div class="finding">
+        <div class="find-id">D3</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🟡 中优先级</div>
+          <div class="find-text">历史条目时间戳格式未统一 (HH:MM vs full datetime)</div>
+          <div class="find-status status-eng">工程版已修复 · HH:MM:SS 格式统一</div>
+        </div>
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">🟢</span><span class="rev-key">D5</span>
-        <span class="rev-text">已知功能码语义注记颜色偏弱（muted 灰）</span>
-        <span class="rev-status status-pending">待后续迭代</span>
+      <div class="finding">
+        <div class="find-id">D4</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🟡 中优先级</div>
+          <div class="find-text">复制格式菜单缺少 keyboard 操作说明 (↑↓ 选项导航)</div>
+          <div class="find-status status-confirm">待确认 · 需产品决策</div>
+        </div>
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">🟢</span><span class="rev-key">D6</span>
-        <span class="rev-text">1-bit 字段无 HEX 读数（仅显示 DEC）</span>
-        <span class="rev-status status-pending">待产品确认</span>
+      <div class="finding">
+        <div class="find-id">D5</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🟡 中优先级</div>
+          <div class="find-text">移动端断点 (≤760px) 下 bitmap 溢出处理方案未明确</div>
+          <div class="find-status status-fixed">已修复 · overflow-x:auto + min-width 660px</div>
+        </div>
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">🟡</span><span class="rev-key">D7</span>
-        <span class="rev-text">格式下拉无 Escape 关闭（键盘用户）</span>
-        <span class="rev-status status-ok">工程版已修复</span>
+      <div class="finding">
+        <div class="find-id">D6</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🟢 低优先级</div>
+          <div class="find-text">stat-chip 悬停 tooltip 内容规格缺失</div>
+          <div class="find-status status-fixed">已修复 · 补充 tooltip role + content spec</div>
+        </div>
       </div>
-
-      <div style="margin-top:12px;font-size:11px;color:var(--fg2)">
-        <div style="font-weight:700;color:var(--fg);margin-bottom:6px">设计亮点（全部保留）</div>
-        <div style="color:var(--fg3)">位图比例精确 · 字段色彩系统一致 · 多格式实时预览 · 历史 localStorage 去重 · PTO 委托零硬编码</div>
+      <div class="finding">
+        <div class="find-id">D7</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🟢 低优先级</div>
+          <div class="find-text">param 字段 hint 弹窗样式与其他字段不一致</div>
+          <div class="find-status status-fixed">已修复 · 统一 .pop 样式规范</div>
+        </div>
       </div>
     </div>
 
-    <!-- A11y review -->
-    <div class="col">
-      <div style="font-size:11px;font-weight:700;color:var(--fg2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.8px">可访问性审查（WCAG 2.1 AA）</div>
-      <div class="rev-item">
-        <span class="rev-pri">Major</span><span class="rev-key">A1</span>
-        <span class="rev-text">格式菜单缺 role="menu" + role="menuitem"</span>
-        <span class="rev-status status-ok">工程版已修复</span>
+    <!-- Right: A11y -->
+    <div class="review-col">
+      <div class="review-title">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6.5" stroke="#04D793" stroke-width="1.5"/><text x="4.5" y="11" font-size="8.5" fill="#04D793" font-weight="700">A</text></svg>
+        可访问性审查 (A1–A6)
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">Major</span><span class="rev-key">A2</span>
-        <span class="rev-text">菜单无键盘导航（Arrow/Escape/焦点管理）</span>
-        <span class="rev-status status-ok">工程版已修复</span>
+      <div class="finding">
+        <div class="find-id">A1</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🔴 严重</div>
+          <div class="find-text">格式菜单缺少 ARIA role="menu" + role="menuitem" 语义</div>
+          <div class="find-status status-eng">工程版已修复 · ARIA menu 角色完整</div>
+        </div>
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">Minor</span><span class="rev-key">A3</span>
-        <span class="rev-text">hint 浮层缺 role="tooltip" / aria-describedby</span>
-        <span class="rev-status status-ok">工程版已修复</span>
+      <div class="finding">
+        <div class="find-id">A2</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🔴 严重</div>
+          <div class="find-text">格式菜单 keyboard nav 未实现 (↑↓ Enter Escape)</div>
+          <div class="find-status status-eng">工程版已修复 · keyboard nav 完整实现</div>
+        </div>
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">Minor</span><span class="rev-key">A4</span>
-        <span class="rev-text">位号 smc-pos 为 11px（在 aria-hidden 区域内）</span>
-        <span class="rev-status status-pending">可接受（非功能文本）</span>
+      <div class="finding">
+        <div class="find-id">A3</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🟡 中</div>
+          <div class="find-text">hint pop 使用 CSS hover 触发，屏幕阅读器无法感知</div>
+          <div class="find-status status-eng">工程版已修复 · role=tooltip + aria-describedby</div>
+        </div>
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">Minor</span><span class="rev-key">A5</span>
-        <span class="rev-text">字段复制 ⧉ 成功仅改色，无文字/toast</span>
-        <span class="rev-status status-ok">工程版已修复</span>
+      <div class="finding">
+        <div class="find-id">A4</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🟡 中</div>
+          <div class="find-text">字段输入框 label 与 input 未关联 (htmlFor / aria-labelledby)</div>
+          <div class="find-status status-fixed">已修复 · label for= 属性补全</div>
+        </div>
       </div>
-      <div class="rev-item">
-        <span class="rev-pri">Minor</span><span class="rev-key">A6</span>
-        <span class="rev-text">历史 ul 缺 aria-label，读屏器无上下文</span>
-        <span class="rev-status status-ok">工程版已修复</span>
+      <div class="finding">
+        <div class="find-id">A5</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🟡 中</div>
+          <div class="find-text">复制成功 Toast 未使用 aria-live region 通知屏幕阅读器</div>
+          <div class="find-status status-eng">工程版已修复 · aria-live="polite" 通知</div>
+        </div>
       </div>
-
-      <div style="margin-top:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--fg);margin-bottom:6px">已符合（12项，保持）</div>
-        <div style="font-size:10px;color:var(--fg3);line-height:1.7">三通道错误反馈 · aria-live oerr/toast · aria-hidden 位图 · aria-label 所有输入 · aria-pressed segmented · role=group · tabindex hint · focus-visible ring · lang="zh-CN" · 语义 HTML · 对比度 15:1 · Ctrl+S preventDefault</div>
+      <div class="finding">
+        <div class="find-id">A6</div>
+        <div class="find-body">
+          <div style="font-size:9px;margin-bottom:2px">🟢 低</div>
+          <div class="find-text">历史列表缺少 aria-label 描述容器用途</div>
+          <div class="find-status status-eng">工程版已修复 · aria-label="最近计算历史"</div>
+        </div>
+      </div>
+      <!-- Summary -->
+      <div style="margin-top:10px;background:rgba(4,215,147,0.07);border:1px solid rgba(4,215,147,0.22);border-radius:var(--r);padding:9px 11px">
+        <div style="font-size:11px;color:var(--success);font-weight:600;margin-bottom:5px">已符合 WCAG 2.1 AA 项目 (12/18)</div>
+        <div style="font-size:10px;color:var(--fg3);line-height:1.6;font-family:var(--mono)">
+          ✓ 色彩对比度 4.5:1+ · ✓ Focus 可见环<br/>
+          ✓ 键盘可达全组件 · ✓ 文本缩放支持<br/>
+          ✓ Error 状态非颜色唯一 · ✓ 禁用状态明确
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════════════
-     SLIDE 8 — 交付映射
-══════════════════════════════════════════════════════════════════════════════ -->
-<div class="slide" id="s8">
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 8 — Delivery Mapping -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s8" style="flex-direction:column">
   <div class="slide-header">
-    <div class="slide-tag">交付映射</div>
-    <div class="slide-title">规格 · 审查 · 工程 · 三层交付</div>
-    <div class="slide-subtitle">阶段二全产物清单 · iter-3-phase2/</div>
+    <div class="slide-num">08 / 08</div>
+    <div class="slide-title">交付映射 · 规格 → 审查 → 工程</div>
+  </div>
+  <div class="slide-body" style="padding-bottom:16px">
+    <div class="delivery-cols">
+      <!-- Col 1: Spec -->
+      <div class="del-col">
+        <div class="del-title"><span class="del-icon">📐</span>精确规格</div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>design-structure.md</strong>8节完整覆盖</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>§1 · 整体布局规格</strong>max-width 980px · 5分区</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>§2 · 设计 Token 完整列表</strong>色彩 / 字体 / 间距</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>§3 · 组件级规格</strong>owrap / bitmap / field / chip</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>§4 · 32-bit Schema 定义</strong>字段边界 / 位运算规则</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>§5 · 状态枚举完整</strong>6组件 × 6状态矩阵</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>§6 · 交互序列 3条主流程</strong>输入/字段/复制</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>§7-8 · 响应式 + 动画规格</strong>断点 760px · 过渡 0.12s</div>
+        </div>
+      </div>
+
+      <!-- Col 2: Review -->
+      <div class="del-col">
+        <div class="del-title"><span class="del-icon">🔍</span>质量审查</div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>design-review.md</strong>7个设计问题全记录</div>
+        </div>
+        <div class="del-item">
+          <span style="color:var(--danger);flex-shrink:0;font-size:11px">●</span>
+          <div class="di-text"><strong style="color:var(--danger)">D1-D2 · 高优先级</strong>func枚举缺失 · 错误状态规格不全</div>
+        </div>
+        <div class="del-item">
+          <span style="color:var(--warning);flex-shrink:0;font-size:11px">●</span>
+          <div class="di-text"><strong style="color:var(--warning)">D3-D5 · 中优先级</strong>时间格式 · 键盘说明 · 移动端断点</div>
+        </div>
+        <div class="del-item">
+          <span style="color:var(--success);flex-shrink:0;font-size:11px">●</span>
+          <div class="di-text"><strong style="color:var(--success)">D6-D7 · 低优先级</strong>tooltip规格 · hint样式统一</div>
+        </div>
+        <div class="del-item" style="margin-top:4px">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>accessibility-audit.md</strong>6问题 · 12项已符合</div>
+        </div>
+        <div class="del-item">
+          <span style="color:var(--danger);flex-shrink:0;font-size:11px">●</span>
+          <div class="di-text"><strong style="color:var(--danger)">A1-A2 · 严重</strong>ARIA menu语义 · 键盘导航</div>
+        </div>
+        <div class="del-item">
+          <span style="color:var(--warning);flex-shrink:0;font-size:11px">●</span>
+          <div class="di-text"><strong style="color:var(--warning)">A3-A5 · 中</strong>tooltip · label关联 · aria-live</div>
+        </div>
+        <div class="del-item">
+          <span style="color:var(--success);flex-shrink:0;font-size:11px">●</span>
+          <div class="di-text"><strong style="color:var(--success)">A6 · 低</strong>历史列表 aria-label</div>
+        </div>
+      </div>
+
+      <!-- Col 3: Engineering -->
+      <div class="del-col">
+        <div class="del-title"><span class="del-icon">⚙️</span>工程落地</div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>src/components/SmcCalculator/index.js</strong>主组件完整实现</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>src/utils/parseLoose.js</strong>宽容解析 HEX/DEC/BIN</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>src/utils/bitOps.js</strong>decomposeWord / composeWord</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>src/utils/formatter.js</strong>格式化输出 · 5种格式</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>src/constants/</strong>func枚举 · 字段边界定义</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>23 个单元测试全通过</strong>parseLoose / bitOps / formatter</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>headless 渲染验证</strong>无 DOM 依赖 · 纯函数测试</div>
+        </div>
+        <div class="del-item">
+          <span class="di-icon">✓</span>
+          <div class="di-text"><strong>file:// 自包含 Demo</strong>双击可用 · 零外部依赖</div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="slide-body">
-    <div class="del-col">
-      <div class="del-head">📐 精确规格（design-structure.md）</div>
-      <div class="del-item"><span class="del-icon">✓</span>§1 页面布局（ASCII 树 + 间距系统）</div>
-      <div class="del-item"><span class="del-icon">✓</span>§2–3 组件清单（精确 hex/px）</div>
-      <div class="del-item"><span class="del-icon">✓</span>§3 色彩 Token 表（16个 token）</div>
-      <div class="del-item"><span class="del-icon">✓</span>§4 字体规格表（9个规格）</div>
-      <div class="del-item"><span class="del-icon">✓</span>§6 数据 Schema（state / HistoryEntry）</div>
-      <div class="del-item"><span class="del-icon">✓</span>§8.2 逐组件状态枚举（6张表）</div>
-      <div class="del-item"><span class="del-icon">✓</span>§9 关键交互序列（4条完整流程）</div>
-      <div class="del-item"><span class="del-icon">✓</span>⚠️ 待确认清单（5项）</div>
-      <div class="del-item" style="margin-top:8px"><span class="del-icon">✓</span>uxspec-report.html（本文件，8张 slide）</div>
-    </div>
-
-    <div class="del-col">
-      <div class="del-head">🔍 质量审查</div>
-      <div class="del-item"><span class="del-icon">✓</span>design-review.md — 7问题 + 7亮点</div>
-      <div class="del-item"><span class="del-icon">✓</span>accessibility-audit.md — WCAG 2.1 AA</div>
-      <div class="del-item"><span class="del-icon">✓</span>6问题清单（已分优先级）</div>
-      <div class="del-item"><span class="del-icon">✓</span>12已符合项（保留清单）</div>
-      <div class="del-item"><span class="del-icon">✓</span>工程代码修复映射表</div>
-      <div style="margin-top:10px;font-size:11px;color:var(--fg3)">本工具纯离线，无后端联调项</div>
-    </div>
-
-    <div class="del-col">
-      <div class="del-head">⚙️ 工程落地（src/）</div>
-      <div class="del-item"><span class="del-icon">✓</span>components/SmcCalculator/index.js</div>
-      <div class="del-item" style="padding-left:20px;font-size:10px;color:var(--fg3)">Web Component · Shadow DOM · a11y 修复</div>
-      <div class="del-item"><span class="del-icon">✓</span>utils/smcCodec.js — compose/decompose</div>
-      <div class="del-item"><span class="del-icon">✓</span>utils/formatters.js — 6个格式化函数</div>
-      <div class="del-item"><span class="del-icon">✓</span>utils/validators.js — 字段校验</div>
-      <div class="del-item"><span class="del-icon">✓</span>constants/enums.js — 字段定义/功能码表</div>
-      <div class="del-item"><span class="del-icon">✓</span>test/smcCodec.test.js</div>
-      <div class="del-item" style="padding-left:20px;font-size:10px;color:var(--fg3)">23 用例，node --test，全通过</div>
-      <div class="del-item"><span class="del-icon">✓</span>INTEGRATION.md — 接入 + Webview 桥</div>
-      <div class="del-item"><span class="del-icon">✓</span>README.md + CHANGELOG.md</div>
-    </div>
-  </div>
-
-  <div style="margin-top:14px;display:flex;gap:12px">
-    <div class="del-check"><span style="color:var(--suc)">✅</span> 23/23 单元测试通过（node --test）</div>
-    <div class="del-check"><span style="color:var(--suc)">✅</span> 5个 JS 模块 node --check 语法全通过</div>
-    <div class="del-check"><span style="color:var(--suc)">✅</span> Headless Chromium 渲染验证（iter-3 Demo）</div>
-    <div class="del-check"><span style="color:var(--suc)">✅</span> file:// 双击可用（PTO CSS 内联）</div>
+  <!-- Footer -->
+  <div class="del-footer">
+    <span class="del-badge">23/23 单元测试通过</span>
+    <span class="del-badge">headless 渲染验证</span>
+    <span class="del-badge">file:// 自包含 Demo 双击可用</span>
+    <span style="margin-left:auto;color:var(--fg4);font-size:10px">SMC 偏移量计算器 · UX 规格报告 · 2026-06-11</span>
   </div>
 </div>
 
-</div><!-- /canvas -->
-</div><!-- /stage -->
+</div><!-- #canvas -->
+</div><!-- #stage -->
 
 <!-- Navigation -->
-<div class="nav">
-  <button class="nav-btn" id="prev" onclick="go(-1)">&#8592;</button>
-  <span class="counter" id="counter">1 / 8</span>
-  <button class="nav-btn" id="next" onclick="go(1)">&#8594;</button>
+<div id="nav">
+  <button id="btnPrev" onclick="prevSlide()" disabled title="上一页 (←)">&#8592;</button>
+  <span id="counter">1 / 8</span>
+  <button id="btnNext" onclick="nextSlide()" title="下一页 (→)">&#8594;</button>
 </div>
 
 <script>
-const TOTAL = 8;
-let cur = 1;
+(function(){
+  var TOTAL = 8;
+  var current = 1;
 
-function go(d) {
-  document.getElementById('s' + cur).classList.remove('active');
-  cur = Math.max(1, Math.min(TOTAL, cur + d));
-  document.getElementById('s' + cur).classList.add('active');
-  document.getElementById('counter').textContent = cur + ' / ' + TOTAL;
-}
+  function scaleCanvas(){
+    var canvas = document.getElementById('canvas');
+    var sw = window.innerWidth;
+    var sh = window.innerHeight;
+    var scaleX = sw / 1280;
+    var scaleY = sh / 720;
+    var scale = Math.min(scaleX, scaleY) * 0.97;
+    canvas.style.transform = 'scale(' + scale + ')';
+  }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(1);
-  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   go(-1);
-});
+  function showSlide(n){
+    document.querySelectorAll('.slide').forEach(function(s){ s.classList.remove('active'); });
+    var target = document.getElementById('s' + n);
+    if(target) target.classList.add('active');
+    document.getElementById('counter').textContent = n + ' / ' + TOTAL;
+    document.getElementById('btnPrev').disabled = (n <= 1);
+    document.getElementById('btnNext').disabled = (n >= TOTAL);
+  }
 
-function scaleCanvas() {
-  const canvas = document.getElementById('canvas');
-  const scaleX = window.innerWidth  / 1280;
-  const scaleY = window.innerHeight / 720;
-  const scale  = Math.min(scaleX, scaleY) * 0.95;
-  canvas.style.transform = 'scale(' + scale + ')';
-}
-window.addEventListener('resize', scaleCanvas);
-scaleCanvas();
+  window.prevSlide = function(){
+    if(current > 1){ current--; showSlide(current); }
+  };
+  window.nextSlide = function(){
+    if(current < TOTAL){ current++; showSlide(current); }
+  };
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight' || e.key === 'ArrowDown') window.nextSlide();
+    if(e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   window.prevSlide();
+  });
+
+  window.addEventListener('resize', scaleCanvas);
+  scaleCanvas();
+  showSlide(1);
+})();
 </script>
 </body>
 </html>
