@@ -54,6 +54,7 @@ description: |
 >    `design-review.md` / `accessibility-audit.md` / `design-structure.md` / 工程代码 / `INTEGRATION.md` / `README.md` / `CHANGELOG.md` ——缺少任意一项视为本次执行未完成。
 > 3. **唯一合法的中途暂停**：Step 1 的目标工程信息询问（目录结构、状态管理方案等），其余不得暂停。
 > 4. Step 4（tech-selection.md）是「可选」，可快速跳过；但 Step 5–7 是「必出」，不能因跳过 Step 4 而漏掉 Step 5–7。
+> 5. **案例隔离**：文中 cooling-web-config（`pid_control_mode`/`32768`/Canvas 曲线）、SMC 计算器（命令字/位布局）等具体值均为**示范素材**。执行时枚举映射、魔法值、组件命名、消息协议一律从**当前 Demo 与后端约定**重新推导，禁止照搬案例值；当前需求没有的概念（Canvas/位字段/表达式…）跳过对应示范条目。
 
 ---
 
