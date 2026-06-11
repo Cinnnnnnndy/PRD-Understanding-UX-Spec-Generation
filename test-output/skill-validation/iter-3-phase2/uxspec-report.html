@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<title>SMC 偏移量计算器 · UX 规格报告</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0a;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Inter','Source Han Sans SC',sans-serif;overflow:hidden}
+.stage{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}
+.canvas{width:1280px;height:720px;position:relative;transform-origin:center center;background:#101010;overflow:hidden;border-radius:4px}
+.slide{position:absolute;inset:0;display:none;padding:52px 60px 44px}
+.slide.active{display:flex;flex-direction:column}
+
+/* nav */
+.nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:16px;z-index:100}
+.nav-btn{width:36px;height:36px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:rgba(255,255,255,0.7);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.nav-btn:hover{background:rgba(255,255,255,0.14)}
+.counter{color:rgba(255,255,255,0.5);font-size:13px;min-width:40px;text-align:center;font-family:monospace}
+
+/* common slide styles */
+.slide-header{margin-bottom:28px}
+.slide-tag{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#4369EF;margin-bottom:8px}
+.slide-title{font-size:28px;font-weight:700;color:rgba(255,255,255,0.92);line-height:1.2}
+.slide-subtitle{font-size:14px;color:rgba(255,255,255,0.50);margin-top:6px}
+.slide-body{flex:1;display:flex;gap:24px}
+.col{flex:1;display:flex;flex-direction:column;gap:12px}
+.col-half{flex:0 0 calc(50% - 12px)}
+
+/* tokens */
+:root{
+  --bg:#101010;--bg-el:#141414;--s1:#161616;--s2:#1c1c1c;--s3:#262626;--s4:#313131;
+  --fg:rgba(255,255,255,0.90);--fg2:rgba(255,255,255,0.60);--fg3:rgba(255,255,255,0.40);
+  --bd:rgba(255,255,255,0.08);--bd2:rgba(255,255,255,0.14);
+  --pri:#4369EF;--acc:#7c8db8;--suc:#04D793;--warn:#FFAA3B;--dan:#FF4B7B;
+  --foc:rgba(67,105,239,0.42);
+}
+
+/* cards */
+.card{background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:14px 16px}
+.card-title{font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--fg3);margin-bottom:10px}
+.card-sm{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}
+
+/* token chip */
+.tok-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px}
+.tok-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+.tok-name{color:var(--acc);font-family:monospace;min-width:155px;font-size:11px}
+.tok-val{color:var(--fg3);font-family:monospace;font-size:11px}
+.tok-desc{color:var(--fg2);font-size:11px;margin-left:4px}
+
+/* bit layout */
+.bit-row{display:flex;border-radius:6px;overflow:hidden;height:32px}
+.bit-seg{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;font-family:monospace}
+
+/* layout diagram */
+.lay-panel{background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.lay-label{font-size:12px;font-weight:600;color:var(--fg2)}
+.lay-detail{font-size:11px;color:var(--fg3);font-family:monospace}
+
+/* state matrix */
+.matrix{display:grid;border-radius:8px;overflow:hidden;border:1px solid var(--bd);font-size:11px}
+.mhd{background:var(--s3);color:var(--fg3);font-weight:600;font-size:10px;letter-spacing:0.5px;text-transform:uppercase;padding:6px 8px;text-align:center}
+.mcell{background:var(--s1);border-top:1px solid var(--bd);border-left:1px solid var(--bd);padding:5px 7px;color:var(--fg2);font-family:monospace;font-size:10px;text-align:center}
+.mcell-label{background:var(--s2);border-top:1px solid var(--bd);padding:5px 8px;color:var(--fg);font-size:11px;font-weight:600}
+.mc-ok{color:var(--suc)}
+.mc-err{color:var(--dan)}
+.mc-warn{color:var(--warn)}
+.mc-muted{color:var(--fg3)}
+.mc-pri{color:var(--pri)}
+
+/* flow */
+.flow-step{display:flex;align-items:flex-start;gap:10px;padding:8px 0}
+.flow-dot{width:24px;height:24px;border-radius:50%;background:var(--pri);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.flow-conn{width:1px;background:var(--bd2);height:14px;margin-left:11px}
+.flow-content{flex:1}
+.flow-title{font-size:12px;font-weight:600;color:var(--fg);margin-bottom:2px}
+.flow-desc{font-size:11px;color:var(--fg3);font-family:monospace}
+
+/* review items */
+.rev-item{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)}
+.rev-item:last-child{border-bottom:0}
+.rev-pri{font-size:12px;flex-shrink:0}
+.rev-key{font-size:11px;font-weight:600;color:var(--acc);min-width:24px}
+.rev-text{font-size:11px;color:var(--fg2);flex:1}
+.rev-status{font-size:10px;padding:1px 6px;border-radius:4px;flex-shrink:0;font-weight:600}
+.status-ok{background:rgba(4,215,147,0.15);color:var(--suc)}
+.status-pending{background:rgba(255,170,59,0.15);color:var(--warn)}
+
+/* delivery cols */
+.del-col{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:16px}
+.del-head{font-size:12px;font-weight:700;color:var(--fg);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bd)}
+.del-item{display:flex;align-items:flex-start;gap:6px;padding:4px 0;font-size:11px;color:var(--fg2)}
+.del-icon{color:var(--suc);flex-shrink:0}
+.del-check{background:rgba(4,215,147,0.12);border:1px solid rgba(4,215,147,0.25);border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--fg2);margin-top:8px}
+
+/* cover */
+.cover-stats{display:flex;gap:16px;margin-top:24px}
+.cstat{background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:14px 20px;text-align:center;flex:1}
+.cstat-num{font-size:28px;font-weight:700;color:var(--fg);font-family:monospace}
+.cstat-lbl{font-size:11px;color:var(--fg3);margin-top:4px}
+
+/* type table */
+.type-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--bd);font-size:12px}
+.type-row:last-child{border-bottom:0}
+.type-sample{font-weight:600;color:var(--fg);min-width:160px}
+.type-spec{color:var(--fg3);font-family:monospace;font-size:11px;min-width:140px}
+.type-use{color:var(--fg2);font-size:11px}
+
+/* comp demo */
+.comp-demo{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:8px}
+.comp-label{font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--fg3);margin-bottom:8px}
+
+/* mock UI components */
+.mock-owrap{background:var(--s1);border:1px solid rgba(255,255,255,0.10);border-radius:8px;padding:6px 10px;width:180px}
+.mock-tag{font-size:9px;color:var(--fg3);font-family:monospace;text-transform:uppercase;letter-spacing:0.4px;display:flex;justify-content:space-between}
+.mock-val{font-size:16px;font-weight:600;color:var(--fg);font-family:monospace}
+.mock-owrap.synced{border-color:var(--pri)}
+.mock-owrap.synced .mock-tag .dot{color:var(--pri)}
+.mock-owrap.invalid{border-color:var(--dan)}
+.mock-seg{display:inline-flex;gap:2px;padding:2px;border-radius:7px;border:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.04)}
+.mock-seg-btn{padding:3px 12px;border-radius:5px;font-size:12px;border:0;cursor:default}
+.mock-seg-btn.sel{background:rgba(255,255,255,0.90);color:#101010;font-weight:600}
+.mock-seg-btn.unsel{background:transparent;color:var(--fg3)}
+.mock-chip{display:inline-flex;align-items:center;padding:1px 6px;border-radius:4px;background:var(--s3);border:1px solid var(--bd);font-family:monospace;font-size:11px;color:var(--fg)}
+.mock-rchip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:999px;font-family:monospace;font-size:11px;color:var(--fg2)}
+.mock-ts{color:var(--fg3);margin-left:4px}
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="canvas" id="canvas">
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     SLIDE 1 — 封面
+══════════════════════════════════════════════════════════════════════════════ -->
+<div class="slide active" id="s1">
+  <div class="slide-header">
+    <div class="slide-tag">UX 规格报告 · 阶段二</div>
+    <div class="slide-title">SMC 偏移量计算器 · UX 规格报告</div>
+    <div class="slide-subtitle">基于 iter-3 优化后 Demo（PTO 设计系统版）· 2026-06-11 · 设计系统：pto-design-system</div>
+  </div>
+
+  <div class="cover-stats">
+    <div class="cstat"><div class="cstat-num">5</div><div class="cstat-lbl">字段 (func/cmd/ms/rw/param)</div></div>
+    <div class="cstat"><div class="cstat-num">32</div><div class="cstat-lbl">bit 位图可视化</div></div>
+    <div class="cstat"><div class="cstat-num">9</div><div class="cstat-lbl">专业级功能</div></div>
+    <div class="cstat"><div class="cstat-num">AA</div><div class="cstat-lbl">WCAG 2.1 可访问性</div></div>
+    <div class="cstat"><div class="cstat-num">23</div><div class="cstat-lbl">单元测试全通过</div></div>
+  </div>
+
+  <div style="margin-top:28px">
+    <div class="card-title">32-bit 命令字位布局</div>
+    <div class="bit-row" style="margin-top:8px">
+      <div class="bit-seg" style="flex:6;background:#FFAA3B;font-size:12px">func<br/><span style="font-size:9px;opacity:.8">[31:26]</span></div>
+      <div class="bit-seg" style="flex:16;background:#4369EF">Command · 命令码 [25:10]</div>
+      <div class="bit-seg" style="flex:1;background:#7c8db8;font-size:9px">MS</div>
+      <div class="bit-seg" style="flex:1;background:#04D793;font-size:9px">RW</div>
+      <div class="bit-seg" style="flex:8;background:#FF4B7B">param [7:0]</div>
+    </div>
+    <div style="display:flex;gap:0;margin-top:4px;font-family:monospace;font-size:10px;color:var(--fg3)">
+      <div style="flex:6;text-align:center">6b · 0–0x3F</div>
+      <div style="flex:16;text-align:center">16b · 0–0xFFFF</div>
+      <div style="flex:1;text-align:center;font-size:9px">1b</div>
+      <div style="flex:1;text-align:center;font-size:9px">1b</div>
+      <div style="flex:8;text-align:center">8b · 0–0xFF</div>
+    </div>
+  </div>
+
+  <div style="margin-top:auto;padding-top:20px;display:flex;gap:12px;font-size:12px;color:var(--fg3)">
+    <span>产品：BMC/固件工程师工具</span>
+    <span>·</span>
+    <span>场景：写/审配置批次时连用</span>
+    <span>·</span>
+    <span>关键需求：快、准、可带走、可复用</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     SLIDE 2 — 整体布局
+══════════════════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s2">
+  <div class="slide-header">
+    <div class="slide-tag">布局规格</div>
+    <div class="slide-title">页面分区结构</div>
+    <div class="slide-subtitle">垂直堆叠 · max-width 980px · gap 16px · 4个 panel-shell 区块</div>
+  </div>
+
+  <div class="slide-body">
+    <div class="col col-half" style="flex:0 0 340px">
+      <!-- Page header -->
+      <div style="background:transparent;border:1px dashed rgba(255,255,255,0.15);border-radius:8px;padding:10px 14px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--fg)">● SMC 偏移量计算器</div>
+            <div style="font-size:10px;color:var(--fg3);margin-top:2px">32-bit 命令字 ↔ 双向同步</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <div style="background:rgba(255,255,255,0.07);border:1px solid var(--bd);border-radius:5px;padding:3px 8px;font-size:11px;color:var(--fg3)">重置</div>
+            <div style="background:rgba(255,255,255,0.07);border:1px solid var(--bd);border-radius:5px;padding:3px 8px;font-size:11px;color:var(--fg3)">载入示例</div>
+          </div>
+        </div>
+      </div>
+      <!-- Panels -->
+      <div class="lay-panel"><span class="lay-label">偏移量 · 32-bit</span><span class="lay-detail">HEX + DEC 双输入 · 复制</span></div>
+      <div class="lay-panel"><span class="lay-label">32-bit 位图</span><span class="lay-detail">字段带/位格/位号 三行网格</span></div>
+      <div class="lay-panel"><span class="lay-label">字段拆解 · 双向编辑</span><span class="lay-detail">func/cmd/ms/rw/param</span></div>
+      <div class="lay-panel" style="border-color:rgba(255,255,255,0.05)"><span class="lay-label" style="opacity:.6">最近 10 次计算</span><span class="lay-detail">localStorage 持久化</span></div>
+      <div style="font-size:10px;color:var(--fg3);margin-top:4px;font-family:monospace">Toast（fixed bottom:26px 独立层）</div>
+    </div>
+
+    <div class="col" style="flex:1">
+      <div class="card">
+        <div class="card-title">布局约束</div>
+        <div class="tok-row"><span class="tok-name">max-width</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">980px（居中）</span></div>
+        <div class="tok-row"><span class="tok-name">smc-stack gap</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">16px（--space-4）</span></div>
+        <div class="tok-row"><span class="tok-name">外层 padding</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">16px 四边，底 24px</span></div>
+        <div class="tok-row"><span class="tok-name">panel-shell-radius</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">14px（custom）</span></div>
+        <div class="tok-row"><span class="tok-name">panel-shell-bg</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">#141414（--background-elevated）</span></div>
+        <div class="tok-row"><span class="tok-name">panel-shell-border</span><span style="font-family:monospace;font-size:12px;color:var(--fg)">rgba(255,255,255,0.06)</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">字段卡比例布局（核心设计点）</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:11px;color:var(--fg3);margin-bottom:4px">Row 1：grid-template-columns: 6fr 16fr</div>
+          <div style="display:flex;border-radius:6px;overflow:hidden;height:28px">
+            <div style="flex:6;background:rgba(255,170,59,0.3);border:1px solid #FFAA3B;display:flex;align-items:center;justify-content:center;font-size:11px;color:#FFAA3B;font-weight:700">Function · 6fr</div>
+            <div style="flex:16;background:rgba(67,105,239,0.2);border:1px solid #4369EF;border-left:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#4369EF;font-weight:700">Command · 16fr</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--fg3);margin-bottom:4px">Row 2：grid-template-columns: 1fr 1fr 2fr</div>
+          <div style="display:flex;border-radius:6px;overflow:hidden;height:28px">
+            <div style="flex:1;background:rgba(124,141,184,0.25);border:1px solid #7c8db8;display:flex;align-items:center;justify-content:center;font-size:11px;color:#7c8db8;font-weight:700">MS</div>
+            <div style="flex:1;background:rgba(4,215,147,0.2);border:1px solid #04D793;border-left:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#04D793;font-weight:700">RW</div>
+            <div style="flex:2;background:rgba(255,75,123,0.2);border:1px solid #FF4B7B;border-left:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#FF4B7B;font-weight:700">Param · 2fr</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:var(--dan);background:rgba(255,75,123,0.08);padding:6px 8px;border-radius:5px">
+          ⚠️ SMC 字段不对齐 nibble（4bit）：func=6b, cmd=16b, ms=1b, rw=1b, param=8b — 必须按位宽成比例，不能等宽
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">响应式</div>
+        <div style="font-size:12px;color:var(--fg2)"><span style="font-family:monospace;color:var(--acc)">@media (max-width: 760px)</span>：Row1 / Row2 均折叠为单列 <span style="font-family:monospace;color:var(--pri)">1fr</span>；偏移量输入区也折叠</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     SLIDE 3 — 设计 Token
+══════════════════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s3">
+  <div class="slide-header">
+    <div class="slide-tag">设计 Token</div>
+    <div class="slide-title">色彩 Token · 字体规格</div>
+    <div class="slide-subtitle">PTO 设计系统 · 深色主题 · 零硬编码色</div>
+  </div>
+
+  <div class="slide-body">
+    <div class="col col-half">
+      <div class="card">
+        <div class="card-title">背景 · 表面 · 边框</div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#101010;border:1px solid rgba(255,255,255,0.15)"></span><span class="tok-name">--background</span><span class="tok-val">#101010</span><span class="tok-desc">页面底色</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#141414;border:1px solid rgba(255,255,255,0.10)"></span><span class="tok-name">--background-elevated</span><span class="tok-val">#141414</span><span class="tok-desc">panel / toast</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#161616;border:1px solid rgba(255,255,255,0.08)"></span><span class="tok-name">--surface-1</span><span class="tok-val">#161616</span><span class="tok-desc">input 背景</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#1c1c1c;border:1px solid rgba(255,255,255,0.08)"></span><span class="tok-name">--surface-2</span><span class="tok-val">#1c1c1c</span><span class="tok-desc">字段卡默认</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#262626;border:1px solid rgba(255,255,255,0.08)"></span><span class="tok-name">--surface-3</span><span class="tok-val">#262626</span><span class="tok-desc">字段卡 focus-within</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#313131;border:1px solid rgba(255,255,255,0.08)"></span><span class="tok-name">--surface-4</span><span class="tok-val">#313131</span><span class="tok-desc">segmented is-selected</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15)"></span><span class="tok-name">--border-subtle</span><span class="tok-val">rgba(255,255,255,0.06)</span><span class="tok-desc">panel / 位格</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.15)"></span><span class="tok-name">--border-default</span><span class="tok-val">rgba(255,255,255,0.10)</span><span class="tok-desc">input 边框</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.15)"></span><span class="tok-name">--border-strong</span><span class="tok-val">rgba(255,255,255,0.16)</span><span class="tok-desc">字段边界线</span></div>
+      </div>
+
+      <div class="card" style="margin-top:8px">
+        <div class="card-title">字段色彩（前景 · 高亮区域）</div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#FFAA3B"></span><span class="tok-name">--warning</span><span class="tok-val">#FFAA3B</span><span class="tok-desc">func 功能码</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#4369EF"></span><span class="tok-name">--primary</span><span class="tok-val">#4369EF</span><span class="tok-desc">cmd 命令码 · focus</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#7c8db8"></span><span class="tok-name">--accent</span><span class="tok-val">#7c8db8</span><span class="tok-desc">ms 读取方式</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#04D793"></span><span class="tok-name">--success</span><span class="tok-val">#04D793</span><span class="tok-desc">rw 读写方向 · copy ok</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:#FF4B7B"></span><span class="tok-name">--danger</span><span class="tok-val">#FF4B7B</span><span class="tok-desc">param 参数 · error</span></div>
+        <div class="tok-row"><span class="tok-swatch" style="background:rgba(67,105,239,0.42);border:1px solid var(--pri)"></span><span class="tok-name">--focus-ring</span><span class="tok-val">rgba(67,105,239,0.42)</span><span class="tok-desc">focus 光晕</span></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card">
+        <div class="card-title">字体规格（font-family: Inter / JetBrains Mono）</div>
+        <div class="type-row">
+          <span class="type-sample" style="font-size:19px;font-weight:600;font-family:monospace">0x18040600</span>
+          <span class="type-spec">19px semibold mono</span>
+          <span class="type-use">偏移量输入值</span>
+        </div>
+        <div class="type-row">
+          <span class="type-sample" style="font-size:14px;font-weight:700">Function · 功能码</span>
+          <span class="type-spec">14px semibold sans</span>
+          <span class="type-use">字段标签、按钮</span>
+        </div>
+        <div class="type-row">
+          <span class="type-sample" style="font-size:14px;font-weight:600;font-family:monospace">0x06</span>
+          <span class="type-spec">14px semibold mono</span>
+          <span class="type-use">字段输入值</span>
+        </div>
+        <div class="type-row">
+          <span class="type-sample" style="font-size:14px;color:var(--fg2)">偏移量 · 32-bit</span>
+          <span class="type-spec">14px semibold sans</span>
+          <span class="type-use">panel 标题</span>
+        </div>
+        <div class="type-row">
+          <span class="type-sample" style="font-size:12px;font-family:monospace">DEC 6 · HEX 0x06</span>
+          <span class="type-spec">12px medium mono</span>
+          <span class="type-use">stat-chip 读数</span>
+        </div>
+        <div class="type-row">
+          <span class="type-sample" style="font-size:12px;font-family:monospace;color:var(--fg2)">01 · 0x18040600</span>
+          <span class="type-spec">12px medium mono</span>
+          <span class="type-use">历史 recent-chip</span>
+        </div>
+        <div class="type-row">
+          <span class="type-sample" style="font-size:12px;color:var(--fg2)">最近 10 次计算</span>
+          <span class="type-spec">12px normal sans</span>
+          <span class="type-use">副标题、说明</span>
+        </div>
+        <div class="type-row">
+          <span class="type-sample" style="font-size:11px;color:var(--fg3);font-family:monospace">[31:26] · 6b</span>
+          <span class="type-spec">11px normal mono</span>
+          <span class="type-use">元数据标签、位号</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:8px">
+        <div class="card-title">间距 Token</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-1</span><span class="tok-val">4px</span></div>
+          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-2</span><span class="tok-val">8px</span></div>
+          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-3</span><span class="tok-val">12px</span></div>
+          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-4</span><span class="tok-val">16px</span></div>
+          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-5</span><span class="tok-val">20px</span></div>
+          <div class="tok-row"><span class="tok-name" style="min-width:80px">--space-6</span><span class="tok-val">24px</span></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-sm</span><span class="tok-val">6px</span></div>
+          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-md</span><span class="tok-val">8px</span></div>
+          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-lg</span><span class="tok-val">12px</span></div>
+          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-xl</span><span class="tok-val">16px</span></div>
+          <div class="tok-row"><span class="tok-name" style="min-width:90px">--radius-pill</span><span class="tok-val">999px</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     SLIDE 4 — 组件规格
+══════════════════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s4">
+  <div class="slide-header">
+    <div class="slide-tag">组件规格</div>
+    <div class="slide-title">关键组件 · 视觉规格</div>
+    <div class="slide-subtitle">smc-owrap / segmented-control / stat-chip / recent-chip / panel-shell / 32-bit 位图</div>
+  </div>
+
+  <div class="slide-body">
+    <div class="col col-half">
+      <div class="comp-demo">
+        <div class="comp-label">smc-owrap · 偏移量输入框（3态）</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="mock-owrap">
+            <div class="mock-tag"><span>HEX · 0x…</span><span class="dot">●</span></div>
+            <div class="mock-val" style="color:var(--fg3);font-size:13px">0x00000000</div>
+          </div>
+          <div class="mock-owrap synced">
+            <div class="mock-tag"><span>HEX · 0x…</span><span class="dot">●</span></div>
+            <div class="mock-val">0x18040600</div>
+          </div>
+          <div class="mock-owrap invalid">
+            <div class="mock-tag" style="color:var(--dan)"><span>HEX · 0x…</span></div>
+            <div class="mock-val" style="color:var(--dan);font-size:13px">0xGG...</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--fg3);margin-top:6px">bg #161616 · border rgba(255,255,255,0.10) · radius 8px · synced: border #4369EF · invalid: border #FF4B7B</div>
+      </div>
+
+      <div class="comp-demo">
+        <div class="comp-label">segmented-control · MS / RW（1-bit 字段）</div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <div class="mock-seg">
+            <div class="mock-seg-btn sel">多读</div>
+            <div class="mock-seg-btn unsel">单读</div>
+          </div>
+          <div class="mock-seg">
+            <div class="mock-seg-btn unsel">写入</div>
+            <div class="mock-seg-btn sel">读取</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--fg3);margin-top:6px">is-selected: bg rgba(255,255,255,0.90) · fg #101010 · container: rgba(255,255,255,0.04) · aria-pressed</div>
+      </div>
+
+      <div class="comp-demo">
+        <div class="comp-label">stat-chip · DEC/HEX 双读数</div>
+        <div style="display:flex;gap:6px">
+          <div class="mock-chip">DEC 6</div>
+          <div class="mock-chip">HEX 0x06</div>
+          <div class="mock-chip" style="color:var(--fg3)">DEC —</div>
+          <div class="mock-chip" style="color:var(--fg3)">HEX —</div>
+        </div>
+        <div style="font-size:10px;color:var(--fg3);margin-top:6px">bg #262626 · border rgba(255,255,255,0.06) · radius 4px · mono 11px</div>
+      </div>
+
+      <div class="comp-demo">
+        <div class="comp-label">recent-chip · 历史记录条目</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div class="mock-rchip">01 · 0x18040600<span class="mock-ts">09:30</span></div>
+          <div class="mock-rchip" style="background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.18);color:var(--fg)">02 · 0x30440100<span class="mock-ts">6/10 22:15</span></div>
+        </div>
+        <div style="font-size:10px;color:var(--fg3);margin-top:6px">bg rgba(255,255,255,0.05) · radius 999px · hover: bg +0.09 · 时间 &gt;24h 显示日期</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="comp-demo">
+        <div class="comp-label">32-bit 位图（smc-grid · 比例示意）</div>
+        <div style="overflow-x:auto">
+          <div style="display:grid;grid-template-columns:6fr 16fr 1fr 1fr 8fr;min-width:480px;border-radius:4px;overflow:hidden">
+            <div style="background:#FFAA3B;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#000;font-family:monospace">Function<br/>[31:26]</div>
+            <div style="background:#4369EF;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#fff;font-family:monospace">Command · 命令码 [25:10]</div>
+            <div style="background:#7c8db8;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#fff">MS</div>
+            <div style="background:#04D793;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#000">RW</div>
+            <div style="background:#FF4B7B;padding:4px;text-align:center;font-size:10px;font-weight:700;color:#fff;font-family:monospace">Param [7:0]</div>
+          </div>
+          <!-- Sample bit cells -->
+          <div style="display:grid;grid-template-columns:repeat(32,minmax(12px,1fr));min-width:480px;margin-top:2px">
+            ${Array.from({length:6},(_,i)=>`<div style="height:20px;border:1px solid rgba(255,170,59,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(255,170,59,0.5)">${i<2?'1':'0'}</div>`).join('')}
+            ${Array.from({length:16},(_,i)=>`<div style="height:20px;border:1px solid rgba(67,105,239,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(67,105,239,0.5)">${i===2||i===10?'1':'0'}</div>`).join('')}
+            <div style="height:20px;border:1px solid rgba(124,141,184,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(124,141,184,0.5)">0</div>
+            <div style="height:20px;border:1px solid rgba(4,215,147,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(4,215,147,0.5)">0</div>
+            ${Array.from({length:8},()=>`<div style="height:20px;border:1px solid rgba(255,75,123,0.3);border-right:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(255,75,123,0.5)">0</div>`).join('')}
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--fg3);margin-top:6px">3行：字段带(row1) / 位格28px(row2) / 位号11px(row3) · 置位格：color-mix 22% field-hue · 边界位加粗边框</div>
+      </div>
+
+      <div class="comp-demo">
+        <div class="comp-label">panel-shell 规格</div>
+        <div style="display:flex;gap:16px">
+          <div style="font-size:12px;color:var(--fg2)">
+            <div><span style="color:var(--acc);font-family:monospace">background</span>　#141414</div>
+            <div><span style="color:var(--acc);font-family:monospace">border</span>　　1px solid rgba(255,255,255,0.06)</div>
+            <div><span style="color:var(--acc);font-family:monospace">border-radius</span>　14px</div>
+            <div><span style="color:var(--acc);font-family:monospace">panel-quiet</span>　border transparent（历史面板）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     SLIDE 5 — 状态矩阵
+══════════════════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s5">
+  <div class="slide-header">
+    <div class="slide-tag">状态矩阵</div>
+    <div class="slide-title">逐组件 × 状态枚举</div>
+    <div class="slide-subtitle">每个可交互组件的完整状态覆盖</div>
+  </div>
+
+  <div style="flex:1;overflow:hidden">
+    <div class="matrix" style="grid-template-columns:140px repeat(6,1fr);width:100%">
+      <!-- Header -->
+      <div class="mhd">组件</div>
+      <div class="mhd">default</div>
+      <div class="mhd">focus</div>
+      <div class="mhd">valid / synced</div>
+      <div class="mhd">invalid / error</div>
+      <div class="mhd">disabled</div>
+      <div class="mhd">active / hover</div>
+
+      <!-- HEX/DEC 输入框 -->
+      <div class="mcell-label">HEX/DEC 输入框</div>
+      <div class="mcell">bg #161616<br/>border 0.10</div>
+      <div class="mcell mc-pri">border #4369EF<br/>ring 3px</div>
+      <div class="mcell mc-ok">sync点 #4369EF<br/>.synced class</div>
+      <div class="mcell mc-err">border #FF4B7B<br/>oerr 显示⚠</div>
+      <div class="mcell mc-muted">—</div>
+      <div class="mcell mc-muted">—</div>
+
+      <!-- 字段输入框 -->
+      <div class="mcell-label">字段输入框 smc-fin</div>
+      <div class="mcell">bg #161616<br/>placeholder</div>
+      <div class="mcell mc-pri">border #4369EF<br/>focus-ring</div>
+      <div class="mcell mc-ok">blur→格式化<br/>0x{hex}</div>
+      <div class="mcell mc-err">border #FF4B7B<br/>sem 显示⚠错误</div>
+      <div class="mcell mc-muted">—</div>
+      <div class="mcell">hover: bg轻亮</div>
+
+      <!-- 分段控件 -->
+      <div class="mcell-label">segmented-control MS/RW</div>
+      <div class="mcell mc-warn">null→隐含0<br/>视觉高亮第1项</div>
+      <div class="mcell mc-pri">focus-ring</div>
+      <div class="mcell mc-ok">is-selected<br/>bg rgba(255,255,255,0.90)<br/>fg #101010</div>
+      <div class="mcell mc-muted">不适用</div>
+      <div class="mcell mc-muted">不适用</div>
+      <div class="mcell">未选项hover<br/>bg 0.06</div>
+
+      <!-- 复制主按钮 -->
+      <div class="mcell-label">复制偏移量 btn-solid</div>
+      <div class="mcell">bg rgba(255,255,255,0.90)<br/>fg #101010</div>
+      <div class="mcell mc-pri">focus-ring</div>
+      <div class="mcell mc-muted">—</div>
+      <div class="mcell mc-muted">不适用</div>
+      <div class="mcell mc-muted">opacity 0.4<br/>not-allowed</div>
+      <div class="mcell">hover: bg +brighter<br/>translateY(-1px)</div>
+
+      <!-- 字段复制按钮 -->
+      <div class="mcell-label">字段复制按钮 ⧉</div>
+      <div class="mcell">btn-ghost transparent</div>
+      <div class="mcell mc-pri">focus-ring</div>
+      <div class="mcell mc-ok">copied: color<br/>#04D793 800ms</div>
+      <div class="mcell mc-muted">不适用</div>
+      <div class="mcell mc-muted">字段null时<br/>opacity 0.3</div>
+      <div class="mcell">hover bg 0.06</div>
+
+      <!-- 历史 chip -->
+      <div class="mcell-label">recent-chip 历史条目</div>
+      <div class="mcell">bg 0.05<br/>border 0.10</div>
+      <div class="mcell mc-pri">focus-ring</div>
+      <div class="mcell mc-muted">—</div>
+      <div class="mcell mc-muted">不适用</div>
+      <div class="mcell mc-muted">—</div>
+      <div class="mcell">hover bg 0.09<br/>border 0.18</div>
+    </div>
+
+    <div style="margin-top:10px;font-size:10px;color:var(--warn);background:rgba(255,170,59,0.08);padding:6px 10px;border-radius:5px">
+      ⚠️ 待确认（D2）：MS/RW 分段控件 null 初始态视觉高亮「多读 0」/「写入 0」——隐含值 vs 未选中状态，需产品决策
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     SLIDE 6 — 交互序列
+══════════════════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s6">
+  <div class="slide-header">
+    <div class="slide-tag">交互序列</div>
+    <div class="slide-title">关键数据流 · 3 条交互路径</div>
+    <div class="slide-subtitle">单一数据源 state.fields → compose/decompose → 全局 refresh</div>
+  </div>
+
+  <div class="slide-body">
+    <!-- Flow 1 -->
+    <div class="col">
+      <div class="card-title" style="font-size:12px;color:var(--pri);margin-bottom:8px">① 输入偏移量 → 字段解析</div>
+      <div class="flow-step"><div class="flow-dot">1</div><div class="flow-content"><div class="flow-title">用户输入 HEX / DEC</div><div class="flow-desc">#hex / #dec input 事件<br/>onTop('hex' | 'dec')</div></div></div>
+      <div class="flow-conn"></div>
+      <div class="flow-step"><div class="flow-dot">2</div><div class="flow-content"><div class="flow-title">parseLoose(raw, 32)</div><div class="flow-desc">宽松解析：0x前缀 / 裸hex / 纯dec<br/>失败 → invalid class + oerr 显示错误</div></div></div>
+      <div class="flow-conn"></div>
+      <div class="flow-step"><div class="flow-dot">3</div><div class="flow-content"><div class="flow-title">decomposeWord(word)</div><div class="flow-desc">32-bit → {func,cmd,ms,rw,param}<br/>state.fields 全部更新</div></div></div>
+      <div class="flow-conn"></div>
+      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">✓</div><div class="flow-content"><div class="flow-title">refresh(src) 全局刷新</div><div class="flow-desc">renderInputs / renderFeet / renderTop<br/>paintGrid / renderPreviews</div></div></div>
+    </div>
+
+    <!-- Flow 2 -->
+    <div class="col">
+      <div class="card-title" style="font-size:12px;color:var(--warn);margin-bottom:8px">② 字段编辑 → 回合成</div>
+      <div class="flow-step"><div class="flow-dot" style="background:var(--warn)">1</div><div class="flow-content"><div class="flow-title">用户修改字段卡输入框</div><div class="flow-desc">smc-fin input 事件<br/>parseLoose(inp.value, FIELDS[k].w)</div></div></div>
+      <div class="flow-conn"></div>
+      <div class="flow-step"><div class="flow-dot" style="background:var(--warn)">2</div><div class="flow-content"><div class="flow-title">state.fields[k] = value</div><div class="flow-desc">仅更新当前字段<br/>其余字段保持不变</div></div></div>
+      <div class="flow-conn"></div>
+      <div class="flow-step"><div class="flow-dot" style="background:var(--warn)">3</div><div class="flow-content"><div class="flow-title">composeWord(state.fields)</div><div class="flow-desc">合成 32-bit word<br/>null 字段贡献 0</div></div></div>
+      <div class="flow-conn"></div>
+      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">✓</div><div class="flow-content"><div class="flow-title">顶部 HEX/DEC 同步 + 位图更新</div><div class="flow-desc">refresh('field:k')：skip=当前输入框<br/>blur → 值格式化为 0x{hex}</div></div></div>
+    </div>
+
+    <!-- Flow 3 -->
+    <div class="col">
+      <div class="card-title" style="font-size:12px;color:var(--suc);margin-bottom:8px">③ 复制 → 历史保存</div>
+      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">1</div><div class="flow-content"><div class="flow-title">点击「复制偏移量」</div><div class="flow-desc">条件：anyFieldSet() = true<br/>btn-solid 激活</div></div></div>
+      <div class="flow-conn"></div>
+      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">2</div><div class="flow-content"><div class="flow-title">formatOutput(word, state.fmt)</div><div class="flow-desc">hex / dec / both / c / json<br/>navigator.clipboard.writeText()</div></div></div>
+      <div class="flow-conn"></div>
+      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">3</div><div class="flow-content"><div class="flow-title">saveHistory() + localStorage</div><div class="flow-desc">相邻去重，最多10条<br/>localStorage KEY = 'pto.smc.history.v1'</div></div></div>
+      <div class="flow-conn"></div>
+      <div class="flow-step"><div class="flow-dot" style="background:var(--suc)">✓</div><div class="flow-content"><div class="flow-title">toast + renderHistory()</div><div class="flow-desc">「已复制 …」1.6s<br/>emit CustomEvent 'smc-copy'</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     SLIDE 7 — 审查结论
+══════════════════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s7">
+  <div class="slide-header">
+    <div class="slide-tag">审查结论</div>
+    <div class="slide-title">设计审查 + 可访问性审查 · 状态汇总</div>
+    <div class="slide-subtitle">基于 iter-3 Demo · 工程版已修复标注项</div>
+  </div>
+
+  <div class="slide-body">
+    <!-- Design review -->
+    <div class="col">
+      <div style="font-size:11px;font-weight:700;color:var(--fg2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.8px">设计审查（D1–D7）</div>
+      <div class="rev-item">
+        <span class="rev-pri">🟡</span><span class="rev-key">D1</span>
+        <span class="rev-text">func hint 浮层仅显示6条，完整表11条</span>
+        <span class="rev-status status-ok">工程版已修复</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">🟡</span><span class="rev-key">D2</span>
+        <span class="rev-text">MS/RW null 初始态视觉高亮第1项，语义模糊</span>
+        <span class="rev-status status-pending">待产品确认</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">🟡</span><span class="rev-key">D3</span>
+        <span class="rev-text">历史时间戳 HH:MM，跨日丢失日期上下文</span>
+        <span class="rev-status status-ok">工程版已修复</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">🟢</span><span class="rev-key">D4</span>
+        <span class="rev-text">格式选择▾ 符号跨平台字形不一致</span>
+        <span class="rev-status status-pending">待后续迭代</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">🟢</span><span class="rev-key">D5</span>
+        <span class="rev-text">已知功能码语义注记颜色偏弱（muted 灰）</span>
+        <span class="rev-status status-pending">待后续迭代</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">🟢</span><span class="rev-key">D6</span>
+        <span class="rev-text">1-bit 字段无 HEX 读数（仅显示 DEC）</span>
+        <span class="rev-status status-pending">待产品确认</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">🟡</span><span class="rev-key">D7</span>
+        <span class="rev-text">格式下拉无 Escape 关闭（键盘用户）</span>
+        <span class="rev-status status-ok">工程版已修复</span>
+      </div>
+
+      <div style="margin-top:12px;font-size:11px;color:var(--fg2)">
+        <div style="font-weight:700;color:var(--fg);margin-bottom:6px">设计亮点（全部保留）</div>
+        <div style="color:var(--fg3)">位图比例精确 · 字段色彩系统一致 · 多格式实时预览 · 历史 localStorage 去重 · PTO 委托零硬编码</div>
+      </div>
+    </div>
+
+    <!-- A11y review -->
+    <div class="col">
+      <div style="font-size:11px;font-weight:700;color:var(--fg2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.8px">可访问性审查（WCAG 2.1 AA）</div>
+      <div class="rev-item">
+        <span class="rev-pri">Major</span><span class="rev-key">A1</span>
+        <span class="rev-text">格式菜单缺 role="menu" + role="menuitem"</span>
+        <span class="rev-status status-ok">工程版已修复</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">Major</span><span class="rev-key">A2</span>
+        <span class="rev-text">菜单无键盘导航（Arrow/Escape/焦点管理）</span>
+        <span class="rev-status status-ok">工程版已修复</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">Minor</span><span class="rev-key">A3</span>
+        <span class="rev-text">hint 浮层缺 role="tooltip" / aria-describedby</span>
+        <span class="rev-status status-ok">工程版已修复</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">Minor</span><span class="rev-key">A4</span>
+        <span class="rev-text">位号 smc-pos 为 11px（在 aria-hidden 区域内）</span>
+        <span class="rev-status status-pending">可接受（非功能文本）</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">Minor</span><span class="rev-key">A5</span>
+        <span class="rev-text">字段复制 ⧉ 成功仅改色，无文字/toast</span>
+        <span class="rev-status status-ok">工程版已修复</span>
+      </div>
+      <div class="rev-item">
+        <span class="rev-pri">Minor</span><span class="rev-key">A6</span>
+        <span class="rev-text">历史 ul 缺 aria-label，读屏器无上下文</span>
+        <span class="rev-status status-ok">工程版已修复</span>
+      </div>
+
+      <div style="margin-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--fg);margin-bottom:6px">已符合（12项，保持）</div>
+        <div style="font-size:10px;color:var(--fg3);line-height:1.7">三通道错误反馈 · aria-live oerr/toast · aria-hidden 位图 · aria-label 所有输入 · aria-pressed segmented · role=group · tabindex hint · focus-visible ring · lang="zh-CN" · 语义 HTML · 对比度 15:1 · Ctrl+S preventDefault</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     SLIDE 8 — 交付映射
+══════════════════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s8">
+  <div class="slide-header">
+    <div class="slide-tag">交付映射</div>
+    <div class="slide-title">规格 · 审查 · 工程 · 三层交付</div>
+    <div class="slide-subtitle">阶段二全产物清单 · iter-3-phase2/</div>
+  </div>
+
+  <div class="slide-body">
+    <div class="del-col">
+      <div class="del-head">📐 精确规格（design-structure.md）</div>
+      <div class="del-item"><span class="del-icon">✓</span>§1 页面布局（ASCII 树 + 间距系统）</div>
+      <div class="del-item"><span class="del-icon">✓</span>§2–3 组件清单（精确 hex/px）</div>
+      <div class="del-item"><span class="del-icon">✓</span>§3 色彩 Token 表（16个 token）</div>
+      <div class="del-item"><span class="del-icon">✓</span>§4 字体规格表（9个规格）</div>
+      <div class="del-item"><span class="del-icon">✓</span>§6 数据 Schema（state / HistoryEntry）</div>
+      <div class="del-item"><span class="del-icon">✓</span>§8.2 逐组件状态枚举（6张表）</div>
+      <div class="del-item"><span class="del-icon">✓</span>§9 关键交互序列（4条完整流程）</div>
+      <div class="del-item"><span class="del-icon">✓</span>⚠️ 待确认清单（5项）</div>
+      <div class="del-item" style="margin-top:8px"><span class="del-icon">✓</span>uxspec-report.html（本文件，8张 slide）</div>
+    </div>
+
+    <div class="del-col">
+      <div class="del-head">🔍 质量审查</div>
+      <div class="del-item"><span class="del-icon">✓</span>design-review.md — 7问题 + 7亮点</div>
+      <div class="del-item"><span class="del-icon">✓</span>accessibility-audit.md — WCAG 2.1 AA</div>
+      <div class="del-item"><span class="del-icon">✓</span>6问题清单（已分优先级）</div>
+      <div class="del-item"><span class="del-icon">✓</span>12已符合项（保留清单）</div>
+      <div class="del-item"><span class="del-icon">✓</span>工程代码修复映射表</div>
+      <div style="margin-top:10px;font-size:11px;color:var(--fg3)">本工具纯离线，无后端联调项</div>
+    </div>
+
+    <div class="del-col">
+      <div class="del-head">⚙️ 工程落地（src/）</div>
+      <div class="del-item"><span class="del-icon">✓</span>components/SmcCalculator/index.js</div>
+      <div class="del-item" style="padding-left:20px;font-size:10px;color:var(--fg3)">Web Component · Shadow DOM · a11y 修复</div>
+      <div class="del-item"><span class="del-icon">✓</span>utils/smcCodec.js — compose/decompose</div>
+      <div class="del-item"><span class="del-icon">✓</span>utils/formatters.js — 6个格式化函数</div>
+      <div class="del-item"><span class="del-icon">✓</span>utils/validators.js — 字段校验</div>
+      <div class="del-item"><span class="del-icon">✓</span>constants/enums.js — 字段定义/功能码表</div>
+      <div class="del-item"><span class="del-icon">✓</span>test/smcCodec.test.js</div>
+      <div class="del-item" style="padding-left:20px;font-size:10px;color:var(--fg3)">23 用例，node --test，全通过</div>
+      <div class="del-item"><span class="del-icon">✓</span>INTEGRATION.md — 接入 + Webview 桥</div>
+      <div class="del-item"><span class="del-icon">✓</span>README.md + CHANGELOG.md</div>
+    </div>
+  </div>
+
+  <div style="margin-top:14px;display:flex;gap:12px">
+    <div class="del-check"><span style="color:var(--suc)">✅</span> 23/23 单元测试通过（node --test）</div>
+    <div class="del-check"><span style="color:var(--suc)">✅</span> 5个 JS 模块 node --check 语法全通过</div>
+    <div class="del-check"><span style="color:var(--suc)">✅</span> Headless Chromium 渲染验证（iter-3 Demo）</div>
+    <div class="del-check"><span style="color:var(--suc)">✅</span> file:// 双击可用（PTO CSS 内联）</div>
+  </div>
+</div>
+
+</div><!-- /canvas -->
+</div><!-- /stage -->
+
+<!-- Navigation -->
+<div class="nav">
+  <button class="nav-btn" id="prev" onclick="go(-1)">&#8592;</button>
+  <span class="counter" id="counter">1 / 8</span>
+  <button class="nav-btn" id="next" onclick="go(1)">&#8594;</button>
+</div>
+
+<script>
+const TOTAL = 8;
+let cur = 1;
+
+function go(d) {
+  document.getElementById('s' + cur).classList.remove('active');
+  cur = Math.max(1, Math.min(TOTAL, cur + d));
+  document.getElementById('s' + cur).classList.add('active');
+  document.getElementById('counter').textContent = cur + ' / ' + TOTAL;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(1);
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   go(-1);
+});
+
+function scaleCanvas() {
+  const canvas = document.getElementById('canvas');
+  const scaleX = window.innerWidth  / 1280;
+  const scaleY = window.innerHeight / 720;
+  const scale  = Math.min(scaleX, scaleY) * 0.95;
+  canvas.style.transform = 'scale(' + scale + ')';
+}
+window.addEventListener('resize', scaleCanvas);
+scaleCanvas();
+</script>
+</body>
+</html>
