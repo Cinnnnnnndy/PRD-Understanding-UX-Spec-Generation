@@ -1,32 +1,31 @@
 # SMC 偏移量计算器 · UI 设计优化简报（优化模式 · 专业级完成度）
 
 > 模式判定：**优化模式**——输入是已有 UI（`preview-smc-calculator.html`），目标不是「修几个审查点」，而是把它做到**专业工程工具的完成度**：高频专业用户期待的能力（全保真可视化、双向同步、多格式导出、可复用历史、示例/重置）要主动补齐，而不是等用户提。
-> 目标宿主：openUBMC Studio shell（暗色、靛蓝强调、字段 hue 配色），故优化同时把工具迁入 Studio 设计系统。
+> **视觉 = 插入的设计系统（见 §A，本轮为 PTO）；功能 = §B/§C，与视觉无关。**
 
 ## 设计角色与领域上下文
 
 你是一位专注于 Developer Tools / 工程工具的 UI 设计师 + 前端。
 - 产品：SMC 偏移量计算器——BMC 固件 32-bit 命令字 ↔ 5 字段（功能码/命令码/MS/RW/参数）双向编解码器。
 - 目标用户：BMC/固件工程师，熟十六进制与位运算；高频阵发使用（写/审一批配置时连用）；要求**快、准、结果可带走、可复用**。
-- 风格：openUBMC Studio 暗色工程工具系，信息密度高、mono 字体、功能优先。
+- 信息密度高、mono 字体表达数值、功能优先。
 
 ---
 
-## §A 设计系统基线（openUBMC Studio shell · 不可发明新 token）
+## §A 设计系统（可插拔槽位 · 本轮 = PTO）
 
-| 用途 | token / hex | 说明 |
-|------|------------|------|
-| 页面背景 | `--bg #0d0f14` | |
-| 卡片/面板 | `--bg-elev-1 #161922` / `-2 #1c2029` / `-3 #252a36` | 三级抬升 |
-| 边框 | `--border #262b36` / `--border-strong #39414f` | |
-| 强调（靛蓝） | `--accent #4f6ef7` / `--accent-soft rgba(79,110,247,.16)` | 主操作/focus/active |
-| 语义 | `--err #f06570` / `--ok #34d399` / `--warn #f5b454` | |
-| 文字 | `--text #e6e9f0` / `--text-dim #9aa3b2` / `--text-mute #6b7384` / `--placeholder #566073` | |
-| 圆角 | `--radius 6px` / `--radius-lg 10px` | |
-| 字体 | `--font-mono`（所有数值/位/hex） + system sans（正文） | |
-| **字段 hue** | func `#f59e6b` · cmd `#4f6ef7` · ms `#a78bfa` · rw `#34d399` · param `#f5b454` | 位图、字段卡顶边、图例、swatch **全程同一套配色** |
+**设计系统 = `pto-design-system`**（`design-systems/pto-design-system/`）。视觉决策**全部委托给它**，不在本提示词写死 hex：
 
-> 字段 hue 是本工具的视觉主线：同一个字段在「32-bit 位图 / 字段卡顶边 / 图例 / 输入框 swatch」里必须用同一个 hue，让用户一眼把「某段位 ↔ 某个字段」对应起来。
+> 生成前先读 `design-systems/pto-design-system/SKILL.md` + `references/DESIGN.md` + `references/quick-reference.md` + `tokens/*.css`。按其 **Workflow B（改造）** 把本功能规格当作待改造 demo：
+> - 所有颜色用 PTO 语义 token：`var(--background)` / `var(--surface-1..4)` / `var(--foreground)` / `var(--foreground-secondary)` / `var(--foreground-muted)` / `var(--primary)` / `var(--success)` / `var(--warning)` / `var(--danger)`；**无任何硬编码 `#xxxxxx`**。
+> - 间距用 `var(--space-1..6)`，圆角用 `var(--radius-*)`，字体用 `var(--font-sans)` / `var(--font-mono)`，字号用 `--text-*` 排版组合。
+> - 按钮只用 `btn` / `btn btn-solid` / `btn btn-ghost`；分段用 `segmented-control` / `tab-control`；卡片/面板用 PTO 的 panel/card 语言；**不自创 `.my-*` class**。
+> - 删除原 demo 的旧容器装饰（左侧高亮竖条、私有卡片描边、内阴影、渐变），按 `references/retrofit-container-audit.md` 跑残留检查。
+> - 先输出**迁移对照表**（元素 → PTO class/token → 要删的旧装饰）再改 HTML（见 `design-systems/pto-design-system/SKILL.md` Workflow B）。
+
+> **字段配色映射到 PTO 语义色**（位图/字段卡/图例/swatch 全程一致）：func→`--warning`(橙) · cmd→`--primary`(蓝) · ms→`--accent` · rw→`--success`(绿) · param→`--ark-orange-500`。具体取色以 PTO token 为准，按 components.css「避免大面积透明色填充」原则：卡片底用中性 surface，字段色只用在小色块/tag/位段高亮。
+
+> 换项目时，只把本 §A 的 `pto-design-system` 换成别的设计系统包；§B/§C 一字不动。
 
 ---
 

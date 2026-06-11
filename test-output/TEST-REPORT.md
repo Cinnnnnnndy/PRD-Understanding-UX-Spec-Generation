@@ -113,3 +113,25 @@
 
 **循环状态：已收敛，停止。** 再迭代不会暴露新的能力级 gap；craft 差异属「再出一版 Demo」范畴，非 skill 职责。
 
+---
+
+## 7. 第五轮 · 把「设计系统」做成可插拔单元
+
+**反馈**：上轮唯一缺口（不知道用哪个设计系统）不该靠「这一次对齐」解决；目标是**优化提示词，让之后每一次都能对齐**。且设计系统应是**可替换单元**（每个项目视觉标准不同）。本轮及后续实验用 **PTO 设计系统**（github.com/yinyucheng0601/pto-design-system）。
+
+**架构调整（核心）：把视觉决策从 skill 里抽出来，做成一个插拔槽位。**
+
+```
+功能完成度规格（可移植，design-system 无关）  ×  设计系统（可插拔）  =  每次都对齐
+```
+
+| # | 处理 |
+|---|------|
+| 落库 | clone 完整 PTO 包，vendored 核心到 `design-systems/pto-design-system/`（tokens/css/references/SKILL/preview/swimlane/assets + 11 个 pattern 契约，664K）；重型 graphviz/pattern 运行时指向 GitHub |
+| 插拔层 | 新增 `design-systems/README.md`：说明「功能可移植 × 设计系统可插拔」原则、当前激活 = PTO、如何换设计系统 |
+| **skill** | phase1：①生成前「必问门」从「问宿主」改为「**选设计系统单元**」；②新增「**委托给插入的设计系统**」步骤（读其 SKILL/tokens，按其 Workflow 改造，不自创视觉）；③优化模式 §A 模板从「写死基线」改为「**可插拔槽位**」（A-1 委托外部设计系统 / A-2 才回退提取）；④设计点新增「功能规格可移植，设计系统可插拔」 |
+| demo-prompt | `phase1/demo-prompt.md` §A 改为委托 PTO（语义 token、btn/segmented-control/panel-shell、Workflow B、删旧装饰）；§B/§C 能力规格一字不动 |
+| 验证 | `skill-validation/iter-2/pto-migration-table.md`：对 iter-1 功能规格跑 PTO Workflow B 迁移对照表，证明「功能 0 改动、视觉 100% 委托 PTO」（历史/示例甚至命中 PTO 现成 `recent-chip`/`empty-card`/`sample-row`） |
+
+**结论**：设计系统不再是 skill 里硬编码或每次重猜的东西，而是一个**槽位**。优化一次提示词（功能规格 + 委托机制），之后换任何项目只换设计系统包，生成的 Demo 自动对齐该项目视觉。
+
