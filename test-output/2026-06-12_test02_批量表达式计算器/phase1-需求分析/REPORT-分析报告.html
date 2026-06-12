@@ -191,6 +191,12 @@ body {
 .crit-row .cr-text strong { color: var(--text); font-weight: 500; }
 
 /* ─── Slide 8: Opportunities + Value ─── */
+/* ─── Slide 7b: 首用 30 秒走查 ─── */
+#s7b { grid-template-rows: auto auto 1fr; padding: 40px; gap: 8px; align-content: start; }
+#s7b .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; }
+#s7b .opp-table td { vertical-align: top; line-height: 1.5; }
+#s7b .opp-table td:first-child { white-space: nowrap; font-weight: 600; color: var(--text3); }
+
 #s8 { grid-template-rows: auto 1fr; padding: 40px; gap: 20px; }
 #s8 .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; }
 #s8 .opp-body { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
@@ -258,7 +264,7 @@ body {
       <span class="meta-val">2026-06-12</span>
     </div>
   </div>
-  <div class="slide-num">1 / 9</div>
+  <div class="slide-num">1 / 10</div>
 </div>
 </div>
 
@@ -338,7 +344,7 @@ body {
       <div class="bc-link">落点：E 机会点 B1–B6 / G 边界问题（魔法 token 冲突）</div>
     </div>
   </div>
-  <div class="slide-num">2 / 9</div>
+  <div class="slide-num">2 / 10</div>
 </div>
 </div>
 
@@ -403,7 +409,7 @@ body {
       </table>
     </div>
   </div>
-  <div class="slide-num">3 / 9</div>
+  <div class="slide-num">3 / 10</div>
 </div>
 </div>
 
@@ -437,7 +443,7 @@ body {
       <div class="sc-expr">$1 |&gt; expr(($1 + 0x100) % 0x10000) |&gt; string.format("0x%04X", $1) |&gt; string.upper($1)</div>
     </div>
   </div>
-  <div class="slide-num">4 / 9</div>
+  <div class="slide-num">4 / 10</div>
 </div>
 </div>
 
@@ -508,7 +514,7 @@ body {
       </div>
     </div>
   </div>
-  <div class="slide-num">5 / 9</div>
+  <div class="slide-num">5 / 10</div>
 </div>
 </div>
 
@@ -559,14 +565,14 @@ body {
       </div>
     </div>
   </div>
-  <div class="slide-num">6 / 9</div>
+  <div class="slide-num">6 / 10</div>
 </div>
 </div>
 
 <!-- Slide 7: Critique (4-dimension) -->
 <div class="slide-wrapper">
 <div class="slide" id="s7">
-  <div class="s-title">现有 UI 四维审查</div>
+  <div class="s-title">现有 UI 审查 · 维度 1–4（功能 / 语言 / 视觉 / 边界）—— 首用走查五镜见下页</div>
   <div class="crit-grid">
     <div class="crit-card">
       <h3><span class="dim-icon">⚙</span> 功能完整性</h3>
@@ -629,7 +635,53 @@ body {
       </div>
     </div>
   </div>
-  <div class="slide-num">7 / 9</div>
+  <div class="slide-num">7 / 10</div>
+</div>
+</div>
+
+<!-- Slide 7b: First-use 30s walkthrough (五镜) · before→after，与 demo-prompt §B/§C 同源 -->
+<div class="slide-wrapper">
+<div class="slide" id="s7b">
+  <div class="s-title">首用 30 秒走查（五镜）· 现状 → 目标对照</div>
+  <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px;line-height:1.5;">
+    以「第一次打开页面的固件工程师」视角走查。问题 ID（B11–B15）与 <code style="font-family:monospace;">demo-prompt §B</code> <strong style="color:var(--text);">同源</strong>，目标状态回流自 §C——报告与提示词是同一张清单的两种渲染，不是两份独立分析。
+  </div>
+  <table class="opp-table">
+    <thead><tr><th>镜</th><th>ID</th><th>现状（量化 Finding）</th><th>目标状态（Demo 验收规格）</th><th>优先级</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>镜1 首屏与空态</td><td>B11</td>
+        <td>首屏约 50% 空白；唯一引导是一句不可点击的灰字「等待输入…」</td>
+        <td>右栏空态展示 3 张可点击示例卡片（表达式 + 预填值 + 预期结果），一键填入并自动应用 〔工程师·30 秒上手〕</td>
+        <td><span class="tag tag-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td>镜2 可扫读性</td><td>B12</td>
+        <td>语法要素挤在 1–2 行散文里，一行 &gt;20 个可扫读项</td>
+        <td>分类 Chip 组（输入/字符串/自定义），hover 出签名说明，点击插入光标处 〔QA·不记语法拼表达式〕</td>
+        <td><span class="tag tag-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td>镜3 空间叙事</td><td>B13</td>
+        <td>单栏纵排；1920px 宽屏右侧 ≥40% 空白，操作↔反馈视线纵向折返</td>
+        <td>双栏：左 55% 表达式+参数（操作），右 45% 管道轨迹+结果（反馈）；步骤编号 ①②③④ 〔宽屏·同屏对照〕</td>
+        <td><span class="tag tag-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td>镜4 数据流可视化</td><td>B14</td>
+        <td>阶段结果纯文本堆叠，无连接元素，「管道」心智模型在 UI 上不可见</td>
+        <td>阶段间竖线 + 箭头串联；每阶段「入 → 函数 → 出」三段式 + 类型标注；最终结果高亮 〔调试链路核对〕</td>
+        <td><span class="tag tag-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td>镜5 结果状态编码</td><td>B15</td>
+        <td>行级有状态色但无全局摘要，「过没过」要逐行扫或读底部统计</td>
+        <td>表格顶部常驻通过率 badge「✓ 通过 18/20」，全过绿 / 有失败红，点击即筛选不匹配 〔批量回归一眼读结论〕</td>
+        <td><span class="tag tag-p1">P1</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="slide-num">8 / 10</div>
 </div>
 </div>
 
@@ -639,7 +691,7 @@ body {
   <div class="s-title">设计机会点 · 商业价值与优先级</div>
   <div class="opp-body">
     <div class="opp-table-wrap">
-      <h3>机会点全表（H 商业价值节）</h3>
+      <h3>机会点全表（H 商业价值节 · 功能/视觉维；首用走查 B11–B15 五项见上页对照表）</h3>
       <table class="opp-table">
         <thead><tr><th>ID</th><th>机会点</th><th>类型</th><th>实现成本</th><th>优先级</th></tr></thead>
         <tbody>
@@ -722,17 +774,17 @@ body {
         <div class="vs-prio">
           <div class="vs-prio-row">
             <span class="vp-label" style="color:var(--p0)">P0</span>
-            <div class="vp-bar" style="width:30%;background:var(--p0);"></div>
-            <span class="vp-text">3 项 · 阻碍核心体验</span>
+            <div class="vp-bar" style="width:40%;background:var(--p0);"></div>
+            <span class="vp-text">6 项 · 阻碍核心体验（含首用走查 B11–B13）</span>
           </div>
           <div class="vs-prio-row">
             <span class="vp-label" style="color:var(--p1)">P1</span>
-            <div class="vp-bar" style="width:50%;background:var(--p1);"></div>
-            <span class="vp-text">5 项 · 提升专业度</span>
+            <div class="vp-bar" style="width:47%;background:var(--p1);"></div>
+            <span class="vp-text">7 项 · 提升专业度（含走查 B14–B15）</span>
           </div>
           <div class="vs-prio-row">
             <span class="vp-label" style="color:var(--p2)">P2</span>
-            <div class="vp-bar" style="width:20%;background:var(--p2);"></div>
+            <div class="vp-bar" style="width:13%;background:var(--p2);"></div>
             <span class="vp-text">2 项 · 视觉一致性</span>
           </div>
         </div>
@@ -753,7 +805,7 @@ body {
       </div>
     </div>
   </div>
-  <div class="slide-num">8 / 9</div>
+  <div class="slide-num">9 / 10</div>
 </div>
 </div>
 
@@ -824,7 +876,7 @@ body {
     下一步：基于以上策略生成优化版 Demo → 选择设计系统后执行 Phase 2 · UX Spec 输出
     <br><span>P0 三项（F2 inline 校验 + C1 快捷键 + C5 模板变量面板）是 Sprint 1 最小可交付单元</span>
   </div>
-  <div class="slide-num">9 / 9</div>
+  <div class="slide-num">10 / 10</div>
 </div>
 </div>
 
