@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管道表达式批量评估器 · 需求分析报告</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #161b22;
+  --bg3: #21262d;
+  --border: #30363d;
+  --accent: #58a6ff;
+  --accent2: #3fb950;
+  --accent3: #f78166;
+  --accent4: #e3b341;
+  --accent5: #bc8cff;
+  --text: #e6edf3;
+  --text2: #8b949e;
+  --text3: #c9d1d9;
+  --p0: #f78166;
+  --p1: #e3b341;
+  --p2: #8b949e;
+  --match: #3fb950;
+  --mismatch: #f78166;
+  --slide-w: 1920px;
+  --slide-h: 1080px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #060810;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  padding: 32px 16px 80px;
+}
+.slide-wrapper {
+  width: min(1280px, 100%);
+  aspect-ratio: 16/9;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,.6);
+}
+.slide {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  display: grid;
+}
+
+/* ─── Slide Nav ─── */
+.nav { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 999; display: flex; gap: 6px; }
+.nav-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); cursor: pointer; transition: background .2s; }
+.nav-dot.active { background: var(--accent); }
+
+/* ─── Common ─── */
+.tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+.tag-b { background: rgba(88,166,255,.15); color: var(--accent); border: 1px solid rgba(88,166,255,.3); }
+.tag-u { background: rgba(63,185,80,.15); color: var(--accent2); border: 1px solid rgba(63,185,80,.3); }
+.tag-t { background: rgba(188,140,255,.15); color: var(--accent5); border: 1px solid rgba(188,140,255,.3); }
+.tag-p { background: rgba(247,129,102,.15); color: var(--accent3); border: 1px solid rgba(247,129,102,.3); }
+.tag-p0 { background: rgba(247,129,102,.2); color: var(--p0); border: 1px solid rgba(247,129,102,.4); }
+.tag-p1 { background: rgba(227,179,65,.2); color: var(--p1); border: 1px solid rgba(227,179,65,.4); }
+.tag-p2 { background: rgba(139,148,158,.2); color: var(--p2); border: 1px solid rgba(139,148,158,.4); }
+.slide-num { position: absolute; bottom: 24px; right: 32px; font-size: 11px; color: var(--text2); }
+.offline-note { position: absolute; top: 20px; right: 24px; font-size: 10px; color: var(--accent4); background: rgba(227,179,65,.1); border: 1px solid rgba(227,179,65,.3); padding: 2px 8px; border-radius: 10px; }
+
+/* ─── Slide 1: Cover ─── */
+#s1 { background: linear-gradient(135deg, #0d1117 0%, #161b22 40%, #0d1117 100%); align-items: center; justify-items: center; place-content: center; text-align: center; }
+#s1 .cover-tag { font-size: 12px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; }
+#s1 h1 { font-size: clamp(24px,3vw,42px); font-weight: 700; line-height: 1.2; margin-bottom: 12px; background: linear-gradient(135deg, #e6edf3, #58a6ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+#s1 .subtitle { font-size: clamp(13px,1.5vw,18px); color: var(--text2); margin-bottom: 36px; }
+#s1 .meta-row { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+#s1 .meta-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#s1 .meta-label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+#s1 .meta-val { font-size: 14px; color: var(--text3); font-weight: 500; }
+#s1 .grid-bg { position: absolute; inset: 0; background-image: linear-gradient(rgba(88,166,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(88,166,255,.04) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+#s1 .glow { position: absolute; width: 40%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(88,166,255,.12) 0%, transparent 70%); left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+
+/* ─── Slide 2: BUTP ─── */
+#s2 { grid-template-rows: auto 1fr; padding: 40px; gap: 24px; }
+#s2 .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 12px; }
+#s2 .butp-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 16px; }
+.butp-card { background: var(--bg2); border-radius: 8px; padding: 20px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+.butp-card::before { content: ''; position: absolute; inset: 0; opacity: .06; border-radius: 8px; }
+.butp-card.card-b::before { background: var(--accent); }
+.butp-card.card-u::before { background: var(--accent2); }
+.butp-card.card-t::before { background: var(--accent5); }
+.butp-card.card-p::before { background: var(--accent3); }
+.butp-card .bc-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.butp-card .bc-letter { font-size: clamp(20px,2.5vw,32px); font-weight: 800; line-height: 1; }
+.card-b .bc-letter { color: var(--accent); }
+.card-u .bc-letter { color: var(--accent2); }
+.card-t .bc-letter { color: var(--accent5); }
+.card-p .bc-letter { color: var(--accent3); }
+.butp-card .bc-name { font-size: clamp(12px,1.3vw,16px); font-weight: 600; color: var(--text); }
+.butp-card .bc-items { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.butp-card .bc-items li { font-size: clamp(10px,1vw,13px); color: var(--text2); padding-left: 14px; position: relative; line-height: 1.45; }
+.butp-card .bc-items li::before { content: '›'; position: absolute; left: 0; color: inherit; opacity: .7; }
+.butp-card .bc-items li .src { font-size: 9px; color: var(--text2); opacity: .7; margin-left: 4px; }
+.butp-card .bc-link { margin-top: 8px; font-size: 10px; color: var(--text2); opacity: .8; }
+.butp-card .bc-link span { color: var(--accent); }
+
+/* ─── Slide 3: Concept ─── */
+#s3 { grid-template-rows: auto 1fr; padding: 40px; gap: 20px; }
+#s3 .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; }
+#s3 .concept-body { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+#s3 .pipe-diagram { background: var(--bg2); border-radius: 8px; padding: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; }
+#s3 .pipe-diagram code { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: clamp(10px,1.1vw,13px); color: var(--accent); background: var(--bg3); padding: 10px 14px; border-radius: 6px; display: block; line-height: 1.7; }
+#s3 .pipe-steps { display: flex; flex-direction: column; gap: 10px; }
+.pipe-step { display: flex; align-items: flex-start; gap: 12px; }
+.pipe-step .step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #0d1117; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+.pipe-step .step-body { flex: 1; }
+.pipe-step .step-title { font-size: clamp(11px,1.1vw,13px); font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.pipe-step .step-desc { font-size: clamp(10px,1vw,12px); color: var(--text2); line-height: 1.45; }
+#s3 .fn-table-wrap { background: var(--bg2); border-radius: 8px; padding: 20px; border: 1px solid var(--border); overflow: hidden; }
+#s3 .fn-table-wrap h3 { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: .5px; }
+#s3 .fn-table { width: 100%; border-collapse: collapse; font-size: clamp(9px,.95vw,12px); }
+#s3 .fn-table th { text-align: left; color: var(--text2); font-weight: 500; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+#s3 .fn-table td { padding: 5px 8px; border-bottom: 1px solid rgba(48,54,61,.5); color: var(--text3); }
+#s3 .fn-table td code { font-family: 'Cascadia Code', 'Consolas', monospace; color: var(--accent); background: rgba(88,166,255,.1); padding: 1px 4px; border-radius: 3px; font-size: .9em; }
+#s3 .fn-table tr:last-child td { border-bottom: none; }
+
+/* ─── Slide 4: Scenarios ─── */
+#s4 { grid-template-rows: auto 1fr; padding: 40px; gap: 20px; }
+#s4 .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; }
+#s4 .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 14px; }
+.sc-card { background: var(--bg2); border-radius: 8px; padding: 18px; border: 1px solid var(--border); display: grid; grid-template-rows: auto auto 1fr auto; gap: 8px; }
+.sc-num { font-size: 11px; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.sc-title { font-size: clamp(12px,1.3vw,16px); font-weight: 700; color: var(--text); }
+.sc-desc { font-size: clamp(10px,.95vw,12px); color: var(--text2); line-height: 1.55; }
+.sc-expr { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: clamp(9px,.9vw,11px); color: var(--accent); background: var(--bg3); padding: 6px 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; }
+
+/* ─── Slide 5: Users + Flow ─── */
+#s5 { grid-template-rows: auto 1fr; padding: 40px; gap: 20px; }
+#s5 .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; }
+#s5 .uf-body { display: grid; grid-template-columns: 1fr 1.8fr; gap: 20px; }
+#s5 .user-card { background: var(--bg2); border-radius: 8px; padding: 20px; border: 1px solid var(--border); }
+#s5 .user-card h3 { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px; }
+.persona { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.persona:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.persona-name { font-size: clamp(12px,1.2vw,15px); font-weight: 700; color: var(--text); }
+.persona-role { font-size: 11px; color: var(--accent); }
+.persona-attrs { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.persona-attrs li { font-size: clamp(10px,.95vw,12px); color: var(--text2); padding-left: 12px; position: relative; }
+.persona-attrs li::before { content: '•'; position: absolute; left: 2px; }
+#s5 .flow-wrap { background: var(--bg2); border-radius: 8px; padding: 20px; border: 1px solid var(--border); }
+#s5 .flow-wrap h3 { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 16px; text-transform: uppercase; letter-spacing: .5px; }
+.flow-row { display: flex; align-items: center; gap: 0; margin-bottom: 10px; }
+.flow-box { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: clamp(10px,.95vw,12px); color: var(--text); text-align: center; min-width: 80px; flex-shrink: 0; }
+.flow-box.highlight { border-color: var(--accent); background: rgba(88,166,255,.08); color: var(--accent); }
+.flow-box.warn { border-color: var(--p0); background: rgba(247,129,102,.08); }
+.flow-arrow { color: var(--text2); padding: 0 6px; font-size: 14px; flex-shrink: 0; }
+.flow-note { font-size: 10px; color: var(--p0); margin-left: 8px; }
+
+/* ─── Slide 6: Design System Baseline ─── */
+#s6 { grid-template-rows: auto 1fr; padding: 40px; gap: 20px; }
+#s6 .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; }
+#s6 .ds-body { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
+#s6 .token-table-wrap { background: var(--bg2); border-radius: 8px; padding: 20px; border: 1px solid var(--border); overflow: hidden; }
+#s6 .token-table-wrap h3 { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: .5px; }
+.token-table { width: 100%; border-collapse: collapse; font-size: clamp(9px,.9vw,11px); }
+.token-table th { text-align: left; color: var(--text2); font-weight: 500; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.token-table td { padding: 4px 6px; border-bottom: 1px solid rgba(48,54,61,.4); color: var(--text3); }
+.token-table td:first-child code { font-family: 'Cascadia Code', 'Consolas', monospace; color: var(--accent5); font-size: .9em; }
+.token-table .swatch { width: 14px; height: 14px; border-radius: 2px; display: inline-block; vertical-align: middle; border: 1px solid rgba(255,255,255,.1); }
+#s6 .gap-panel { display: flex; flex-direction: column; gap: 12px; }
+.gap-item { background: var(--bg2); border-radius: 8px; padding: 14px 16px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+.gap-item .gi-title { font-size: clamp(11px,1.1vw,13px); font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.gap-item .gi-desc { font-size: clamp(10px,.9vw,11px); color: var(--text2); line-height: 1.5; }
+.gap-item .gi-fix { font-size: clamp(9px,.85vw,11px); color: var(--accent2); background: rgba(63,185,80,.08); border-radius: 4px; padding: 4px 8px; }
+
+/* ─── Slide 7: Critique ─── */
+#s7 { grid-template-rows: auto 1fr; padding: 40px; gap: 20px; }
+#s7 .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; }
+#s7 .crit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.crit-card { background: var(--bg2); border-radius: 8px; padding: 16px; border: 1px solid var(--border); }
+.crit-card h3 { font-size: clamp(11px,1.2vw,14px); font-weight: 700; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.crit-card h3 .dim-icon { font-size: 16px; }
+.crit-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(48,54,61,.5); }
+.crit-row:last-child { border-bottom: none; }
+.crit-row .cr-tag { flex-shrink: 0; margin-top: 2px; }
+.crit-row .cr-text { font-size: clamp(10px,.9vw,12px); color: var(--text2); line-height: 1.45; }
+.crit-row .cr-text strong { color: var(--text); font-weight: 500; }
+
+/* ─── Slide 8: Opportunities + Value ─── */
+#s8 { grid-template-rows: auto 1fr; padding: 40px; gap: 20px; }
+#s8 .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; }
+#s8 .opp-body { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
+.opp-table-wrap { background: var(--bg2); border-radius: 8px; padding: 20px; border: 1px solid var(--border); overflow: hidden; }
+.opp-table-wrap h3 { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: .5px; }
+.opp-table { width: 100%; border-collapse: collapse; font-size: clamp(9px,.9vw,12px); }
+.opp-table th { text-align: left; color: var(--text2); font-weight: 500; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+.opp-table td { padding: 6px 8px; border-bottom: 1px solid rgba(48,54,61,.4); color: var(--text3); line-height: 1.4; vertical-align: top; }
+.opp-table tr:last-child td { border-bottom: none; }
+.opp-table .cost-g { color: var(--accent2); }
+.opp-table .cost-y { color: var(--accent4); }
+.opp-table .cost-r { color: var(--accent3); }
+.value-summary { display: flex; flex-direction: column; gap: 12px; }
+.vs-block { background: var(--bg2); border-radius: 8px; padding: 16px; border: 1px solid var(--border); }
+.vs-block h3 { font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px; }
+.vs-prio { display: flex; flex-direction: column; gap: 6px; }
+.vs-prio-row { display: flex; align-items: center; gap: 10px; }
+.vs-prio-row .vp-label { font-size: 11px; font-weight: 700; width: 24px; flex-shrink: 0; }
+.vs-prio-row .vp-bar { height: 6px; border-radius: 3px; transition: width .3s; }
+.vs-prio-row .vp-text { font-size: 11px; color: var(--text2); }
+
+/* ─── Slide 9: Synthesis ─── */
+#s9 { grid-template-rows: auto 1fr; padding: 40px; gap: 20px; }
+#s9 .s-title { font-size: clamp(16px,2vw,26px); font-weight: 700; }
+#s9 .syn-body { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.syn-col { background: var(--bg2); border-radius: 8px; padding: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+.syn-col h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.col-pain h3 { color: var(--accent3); }
+.col-insight h3 { color: var(--accent4); }
+.col-strategy h3 { color: var(--accent2); }
+.syn-item { padding: 10px 12px; border-radius: 6px; font-size: clamp(10px,.95vw,12px); color: var(--text2); line-height: 1.55; position: relative; }
+.col-pain .syn-item { background: rgba(247,129,102,.08); border-left: 3px solid rgba(247,129,102,.5); }
+.col-insight .syn-item { background: rgba(227,179,65,.08); border-left: 3px solid rgba(227,179,65,.5); }
+.col-strategy .syn-item { background: rgba(63,185,80,.08); border-left: 3px solid rgba(63,185,80,.5); }
+.syn-item strong { color: var(--text); font-weight: 600; display: block; margin-bottom: 3px; }
+.syn-footer { grid-column: 1/-1; text-align: center; font-size: 12px; color: var(--text2); padding: 12px; background: var(--bg2); border-radius: 8px; border: 1px solid var(--border); }
+.syn-footer span { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- Slide 1: Cover -->
+<div class="slide-wrapper">
+<div class="slide" id="s1">
+  <div class="grid-bg"></div>
+  <div class="glow"></div>
+  <div class="cover-tag">Phase 1 · 需求分析报告</div>
+  <h1>管道表达式批量评估器</h1>
+  <p class="subtitle">BMC Studio · VS Code WebView 插件工具 · 存量优化分析</p>
+  <div class="meta-row">
+    <div class="meta-item">
+      <span class="meta-label">输入形态</span>
+      <span class="meta-val">单页 HTML 原型</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">分析框架</span>
+      <span class="meta-val">BUTP · A–H 八节</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">目标平台</span>
+      <span class="meta-val">VS Code WebView</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">分析日期</span>
+      <span class="meta-val">2026-06-12</span>
+    </div>
+  </div>
+  <div class="slide-num">1 / 9</div>
+</div>
+</div>
+
+<!-- Slide 2: BUTP -->
+<div class="slide-wrapper">
+<div class="slide" id="s2">
+  <div class="offline-note">⚠ T/P 含推断·待确认（离线环境）</div>
+  <div class="s-title">
+    <span>BUTP 四维需求分析</span>
+  </div>
+  <div class="butp-grid">
+    <div class="butp-card card-b">
+      <div class="bc-header">
+        <div class="bc-letter">B</div>
+        <div>
+          <div class="bc-name">商业价值 Business</div>
+          <span class="tag tag-b">向下→ H 商业价值</span>
+        </div>
+      </div>
+      <ul class="bc-items">
+        <li>BMC Studio 插件的核心用户群是固件配置工程师，调试效率直接影响插件留存率 <span class="src">【输入】</span></li>
+        <li>减少手工逐条验证耗时（现状估计约 5–20 min/轮），批量执行可量化提速 <span class="src">【推断·待确认】</span></li>
+        <li>对内工具提升研发效率，间接降低产品缺陷率；对外工具提升用户黏性 <span class="src">【推断·待确认】</span></li>
+        <li>VS Code 插件市场可见度：质量高的工具类插件有口碑传播效应 <span class="src">【推断·待确认】</span></li>
+      </ul>
+      <div class="bc-link">落点：H1降低调试成本 / H2提升插件竞争力</div>
+    </div>
+    <div class="butp-card card-u">
+      <div class="bc-header">
+        <div class="bc-letter">U</div>
+        <div>
+          <div class="bc-name">用户需求 User</div>
+          <span class="tag tag-u">向下→ C 用户画像 / D 核心流程</span>
+        </div>
+      </div>
+      <ul class="bc-items">
+        <li>主用户：BMC 固件配置工程师，需要快速验证管道表达式在多组参数下的行为 <span class="src">【输入】</span></li>
+        <li>次要用户：QA 工程师，需要批量回归，输入/输出矩阵较大 <span class="src">【推断·待确认】</span></li>
+        <li>用户习惯 VS Code 键盘驱动操作，期望全程不依赖鼠标 <span class="src">【推断·待确认】</span></li>
+        <li>测试用例需要复用（工作流中会跨 session 反复使用相同用例集） <span class="src">【推断·待确认】</span></li>
+        <li>Debug 模式下需要看到每个管道阶段的中间值 <span class="src">【输入·代码实现可见】</span></li>
+      </ul>
+      <div class="bc-link">落点：C1固件工程师画像 / D1调试主路径</div>
+    </div>
+    <div class="butp-card card-t">
+      <div class="bc-header">
+        <div class="bc-letter">T</div>
+        <div>
+          <div class="bc-name">趋势洞察 Trend</div>
+          <span class="tag tag-t">向下→ F 竞品参考</span>
+        </div>
+      </div>
+      <ul class="bc-items">
+        <li>VS Code 插件已成为开发工具标准分发形式，WebView 内嵌工具是主流交互模式 <span class="src">【推断·待确认（离线）】</span></li>
+        <li>开发者工具向"零跳转"体验演进（内嵌 REPL/Playground 趋势） <span class="src">【推断·待确认（离线）】</span></li>
+        <li>Inline 错误提示（LSP 风格）已成为开发者工具 UX 基线期望 <span class="src">【推断·待确认（离线）】</span></li>
+        <li>设计系统 token 化是 VS Code 生态插件的工程规范，支持亮/暗主题自动适配 <span class="src">【推断·待确认（离线）】</span></li>
+      </ul>
+      <div class="bc-link">落点：F 竞品（VS Code 官方 Webview 设计规范）</div>
+    </div>
+    <div class="butp-card card-p">
+      <div class="bc-header">
+        <div class="bc-letter">P</div>
+        <div>
+          <div class="bc-name">痛点挖掘 Pain-point</div>
+          <span class="tag tag-p">向下→ E 机会点 / G 注意事项</span>
+        </div>
+      </div>
+      <ul class="bc-items">
+        <li>表达式错误仅在"应用"后通过 alert() 弹出，无实时反馈，打断输入流 <span class="src">【输入·代码可见】</span></li>
+        <li>批量结果表格中有 11 处英文字符串，与中文界面不一致，显得草稿感 <span class="src">【输入·代码可见】</span></li>
+        <li>参数徽章全部硬编码为 SYNC 类型，类型区分功能预留但未接入 <span class="src">【输入·代码可见】</span></li>
+        <li>硬编码颜色约 30 处，不支持 VS Code 暗主题 <span class="src">【输入·代码可见】</span></li>
+        <li>无键盘快捷键（Ctrl+Enter/F5），开发者操作流中频繁切换键鼠 <span class="src">【输入+推断】</span></li>
+        <li>模板变量通道完全为空，功能对用户不可见 <span class="src">【输入·代码可见】</span></li>
+      </ul>
+      <div class="bc-link">落点：E 机会点 B1–B6 / G 边界问题（魔法 token 冲突）</div>
+    </div>
+  </div>
+  <div class="slide-num">2 / 9</div>
+</div>
+</div>
+
+<!-- Slide 3: Concept -->
+<div class="slide-wrapper">
+<div class="slide" id="s3">
+  <div class="s-title">
+    <span>核心概念：管道表达式语法</span>
+  </div>
+  <div class="concept-body">
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="pipe-diagram">
+        <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">语法示例</div>
+        <code>$1;$2 |> expr($1 + $2) |> string.format("和: %.2f", $1)</code>
+        <code>$1 |> string.upper($1) |> string.gsub($1, "A", "B")</code>
+        <code>$1;$2 |> expr($1 &gt; $2 ? $1 : $2)</code>
+      </div>
+      <div class="pipe-steps">
+        <div class="pipe-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">输入声明段</div>
+            <div class="step-desc"><code style="font-family:monospace;color:var(--accent);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">$1;$2;$3</code> — 用分号分隔，定义 N 个位置参数，自动类型推导（数字/布尔/null/字符串）</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">管道运算符 <code style="font-family:monospace;color:var(--accent);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;"> |&gt; </code></div>
+            <div class="step-desc">两侧必须有空格；前一阶段输出自动成为下一阶段第一参数</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">阶段函数</div>
+            <div class="step-desc">7 个内置函数：<code style="font-family:monospace;color:var(--accent);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">expr / string.format / string.cmp / string.sub / string.gsub / string.upper / string.lower</code>；省略括号时等同 <code style="font-family:monospace;color:var(--accent);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">expr()</code></div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Lua 真值 + ?/: 三目</div>
+            <div class="step-desc">仅 <code style="font-family:monospace;color:var(--accent4);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">null/undefined/false</code> 为假，<code style="font-family:monospace;color:var(--accent2);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">0</code> 和 <code style="font-family:monospace;color:var(--accent2);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">""</code> 均为真；<code style="font-family:monospace;color:var(--accent);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">?</code>→<code style="font-family:monospace;color:var(--accent);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">and</code>，<code style="font-family:monospace;color:var(--accent);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">:</code>→<code style="font-family:monospace;color:var(--accent);background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:.9em;">or</code></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fn-table-wrap">
+      <h3>内置函数一览</h3>
+      <table class="fn-table">
+        <thead><tr><th>函数</th><th>签名</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>expr</code></td><td><code>expr(expression)</code></td><td>算术/逻辑表达式求值（SafeExpressionParser）</td></tr>
+          <tr><td><code>string.format</code></td><td><code>format(fmt, ...)</code></td><td>C-style printf 格式化</td></tr>
+          <tr><td><code>string.cmp</code></td><td><code>cmp(a, b)</code></td><td>字符串相等比较（去引号后）</td></tr>
+          <tr><td><code>string.sub</code></td><td><code>sub(s, start, end)</code></td><td>Lua 风格子串（1-based，负数从末尾）</td></tr>
+          <tr><td><code>string.gsub</code></td><td><code>gsub(s, pat, repl)</code></td><td>Lua 模式替换 → JS RegExp</td></tr>
+          <tr><td><code>string.upper</code></td><td><code>upper(s)</code></td><td>转大写</td></tr>
+          <tr><td><code>string.lower</code></td><td><code>lower(s)</code></td><td>转小写</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="slide-num">3 / 9</div>
+</div>
+</div>
+
+<!-- Slide 4: Scenarios -->
+<div class="slide-wrapper">
+<div class="slide" id="s4">
+  <div class="s-title">使用场景分析</div>
+  <div class="scenario-grid">
+    <div class="sc-card">
+      <div class="sc-num">场景 01</div>
+      <div class="sc-title">固件配置值域验证</div>
+      <div class="sc-desc">工程师在 BMC Studio 中设置寄存器字段值后，需要验证编码后的数值是否在合法区间。用管道表达式批量验证多组配置值，一次性看出哪些组合越界。</div>
+      <div class="sc-expr">$1;$2 |&gt; expr($1 &lt;&lt; $2) |&gt; expr($1 &gt;= 0 and $1 &lt;= 0xFFFF)</div>
+    </div>
+    <div class="sc-card">
+      <div class="sc-num">场景 02</div>
+      <div class="sc-title">字符串格式化回归测试</div>
+      <div class="sc-desc">当修改了 string.format 或 gsub 逻辑后，需要确保历史用例的输出格式不变。粘贴测试用例集，一键批量回归，绿色全通才发布。</div>
+      <div class="sc-expr">$1 |&gt; string.gsub($1, "(%d+)", "[%1]") |&gt; string.format("[%s]", $1)</div>
+    </div>
+    <div class="sc-card">
+      <div class="sc-num">场景 03</div>
+      <div class="sc-title">边界值/空值安全检测</div>
+      <div class="sc-desc">测试当参数为 0、空字符串、null 时管道表达式是否能安全返回兜底值，而不是抛出异常（利用 Lua 真值特性做空值保护）。</div>
+      <div class="sc-expr">$1 |&gt; expr($1 or "默认值")</div>
+    </div>
+    <div class="sc-card">
+      <div class="sc-num">场景 04</div>
+      <div class="sc-title">数值转换链调试</div>
+      <div class="sc-desc">多步数值转换（偏移计算 → 格式化 → 范围判断）时，需要看到每个管道阶段的中间值，快速定位哪一步出错。调试模式实时展示 intermediates。</div>
+      <div class="sc-expr">$1 |&gt; expr(($1 + 0x100) % 0x10000) |&gt; string.format("0x%04X", $1) |&gt; string.upper($1)</div>
+    </div>
+  </div>
+  <div class="slide-num">4 / 9</div>
+</div>
+</div>
+
+<!-- Slide 5: Users + Flow -->
+<div class="slide-wrapper">
+<div class="slide" id="s5">
+  <div class="s-title">用户画像 · 核心操作流</div>
+  <div class="uf-body">
+    <div class="user-card">
+      <h3>用户画像</h3>
+      <div class="persona">
+        <div class="persona-name">固件配置工程师</div>
+        <div class="persona-role">主要用户 · P0</div>
+        <ul class="persona-attrs">
+          <li>深度使用 VS Code，键盘驱动</li>
+          <li>熟悉 C-style 表达式与位运算</li>
+          <li>每天验证 3–10 组配置参数</li>
+          <li>对 alert() 打断有强烈反感</li>
+          <li>期望：输入即得结果，无需点击</li>
+        </ul>
+      </div>
+      <div class="persona">
+        <div class="persona-name">QA 工程师</div>
+        <div class="persona-role">次要用户 · P1 【推断·待确认】</div>
+        <ul class="persona-attrs">
+          <li>需要跑 50–200 条批量回归用例</li>
+          <li>关注 matched/mismatched 统计率</li>
+          <li>需要导出结果存档</li>
+          <li>期望：支持粘贴 CSV/TSV 用例</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-wrap">
+      <h3>调试模式主路径（现状 vs 期望）</h3>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">▶ 现状流程（含痛点）</div>
+        <div class="flow-row">
+          <div class="flow-box">打开工具</div><div class="flow-arrow">→</div>
+          <div class="flow-box warn">输入表达式</div><div class="flow-arrow">→</div>
+          <div class="flow-box warn">点击"应用"</div><div class="flow-arrow">→</div>
+          <div class="flow-box warn">alert 报错</div><div class="flow-arrow">→</div>
+          <div class="flow-box warn">确认关闭</div><div class="flow-arrow">→</div>
+          <div class="flow-box">回焦点修改</div>
+        </div>
+        <div style="font-size:10px;color:var(--p0);margin-top:4px;">↑ 单次错误需 5 步才能重回输入状态</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">▶ 期望流程（优化后）</div>
+        <div class="flow-row">
+          <div class="flow-box">打开工具</div><div class="flow-arrow">→</div>
+          <div class="flow-box highlight">输入表达式</div><div class="flow-arrow">→</div>
+          <div class="flow-box highlight">inline 错误实时提示</div><div class="flow-arrow">→</div>
+          <div class="flow-box highlight">Ctrl+Enter 应用</div><div class="flow-arrow">→</div>
+          <div class="flow-box highlight">实时结果</div>
+        </div>
+        <div style="font-size:10px;color:var(--accent2);margin-top:4px;">↑ 全程不离键盘，错误在原地修复</div>
+      </div>
+      <div style="margin-top:14px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">▶ 批量测试主路径</div>
+        <div class="flow-row">
+          <div class="flow-box">应用表达式</div><div class="flow-arrow">→</div>
+          <div class="flow-box">切换批量模式</div><div class="flow-arrow">→</div>
+          <div class="flow-box">粘贴用例文本</div><div class="flow-arrow">→</div>
+          <div class="flow-box highlight">F5 执行全部</div><div class="flow-arrow">→</div>
+          <div class="flow-box">查看统计</div><div class="flow-arrow">→</div>
+          <div class="flow-box">导出结果</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">5 / 9</div>
+</div>
+</div>
+
+<!-- Slide 6: Design System Baseline -->
+<div class="slide-wrapper">
+<div class="slide" id="s6">
+  <div class="s-title">设计系统基线 · VS Code Token 规范</div>
+  <div class="ds-body">
+    <div class="token-table-wrap">
+      <h3>关键 CSS Token 映射</h3>
+      <table class="token-table">
+        <thead><tr><th>语义</th><th>CSS 变量</th><th style="width:60px">暗主题色</th></tr></thead>
+        <tbody>
+          <tr><td>主背景</td><td><code>--vscode-editor-background</code></td><td><span class="swatch" style="background:#1e1e1e"></span> #1e1e1e</td></tr>
+          <tr><td>侧边栏背景</td><td><code>--vscode-sideBar-background</code></td><td><span class="swatch" style="background:#252526"></span> #252526</td></tr>
+          <tr><td>主文字</td><td><code>--vscode-editor-foreground</code></td><td><span class="swatch" style="background:#d4d4d4"></span> #d4d4d4</td></tr>
+          <tr><td>聚焦边框</td><td><code>--vscode-focusBorder</code></td><td><span class="swatch" style="background:#007fd4"></span> #007fd4</td></tr>
+          <tr><td>主按钮背景</td><td><code>--vscode-button-background</code></td><td><span class="swatch" style="background:#0e639c"></span> #0e639c</td></tr>
+          <tr><td>成功色</td><td><code>--vscode-testing-iconPassed</code></td><td><span class="swatch" style="background:#73c991"></span> #73c991</td></tr>
+          <tr><td>失败色</td><td><code>--vscode-testing-iconFailed</code></td><td><span class="swatch" style="background:#f48771"></span> #f48771</td></tr>
+          <tr><td>警告色</td><td><code>--vscode-editorWarning-foreground</code></td><td><span class="swatch" style="background:#cca700"></span> #cca700</td></tr>
+          <tr><td>输入框背景</td><td><code>--vscode-input-background</code></td><td><span class="swatch" style="background:#3c3c3c"></span> #3c3c3c</td></tr>
+          <tr><td>校验错误边框</td><td><code>--vscode-inputValidation-errorBorder</code></td><td><span class="swatch" style="background:#be1100"></span> #be1100</td></tr>
+          <tr><td>边框通用</td><td><code>--vscode-panel-border</code></td><td><span class="swatch" style="background:#3c3c3c"></span> #3c3c3c</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="gap-panel">
+      <div class="gap-item">
+        <div class="gi-title"><span class="tag tag-p0">P0</span> 约 30 处硬编码颜色</div>
+        <div class="gi-desc">所有 <code style="font-family:monospace;color:var(--accent);font-size:.9em;">#xxxxxx</code> 直接写在 CSS 中，暗主题下完全失效</div>
+        <div class="gi-fix">→ 全部替换为 <code style="font-family:monospace;font-size:.9em;">--vscode-*</code> token</div>
+      </div>
+      <div class="gap-item">
+        <div class="gi-title"><span class="tag tag-p1">P1</span> 字体未使用宿主变量</div>
+        <div class="gi-desc">当前 font-family 硬编码，不跟随用户 VS Code 字体偏好设置</div>
+        <div class="gi-fix">→ <code style="font-family:monospace;font-size:.9em;">var(--vscode-font-family)</code> / <code style="font-family:monospace;font-size:.9em;">var(--vscode-editor-font-family)</code></div>
+      </div>
+      <div class="gap-item">
+        <div class="gi-title"><span class="tag tag-p1">P1</span> 按钮高度不一致</div>
+        <div class="gi-desc">部分按钮 32px，部分 40px，VS Code 工具栏标准为 28px</div>
+        <div class="gi-fix">→ 统一按钮高度 28px，padding 4px 12px</div>
+      </div>
+      <div class="gap-item">
+        <div class="gi-title"><span class="tag tag-p2">P2</span> 间距不统一</div>
+        <div class="gi-desc">各区域 padding/gap 从 8–24px 混用，无统一规范</div>
+        <div class="gi-fix">→ 使用 4/8/16px 三档间距体系</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">6 / 9</div>
+</div>
+</div>
+
+<!-- Slide 7: Critique (4-dimension) -->
+<div class="slide-wrapper">
+<div class="slide" id="s7">
+  <div class="s-title">现有 UI 四维审查</div>
+  <div class="crit-grid">
+    <div class="crit-card">
+      <h3><span class="dim-icon">⚙</span> 功能完整性</h3>
+      <div class="crit-row">
+        <span class="tag tag-p0 cr-tag">P0</span>
+        <div class="cr-text"><strong>无实时语法校验</strong> — 表达式错误通过 alert() 弹出，需 5 步操作才能恢复输入状态</div>
+      </div>
+      <div class="crit-row">
+        <span class="tag tag-p0 cr-tag">P0</span>
+        <div class="cr-text"><strong>模板变量通道为空</strong> — ${VarName} 替换逻辑存在但 templateVars 始终空 Map，功能对用户不可见</div>
+      </div>
+      <div class="crit-row">
+        <span class="tag tag-p1 cr-tag">P1</span>
+        <div class="cr-text"><strong>无键盘快捷键</strong> — Ctrl+Enter 未绑定，F5 未实现，开发者需频繁切换键鼠</div>
+      </div>
+      <div class="crit-row">
+        <span class="tag tag-p1 cr-tag">P1</span>
+        <div class="cr-text"><strong>无历史持久化</strong> — 页面刷新后表达式和用例均丢失</div>
+      </div>
+    </div>
+    <div class="crit-card">
+      <h3><span class="dim-icon">🌐</span> 语言与本地化</h3>
+      <div class="crit-row">
+        <span class="tag tag-p1 cr-tag">P1</span>
+        <div class="cr-text"><strong>11 处英文字符串</strong> — 表格表头和按钮标签（Input/Expected/Actual/Status/Execute All/Export Results/Total/Success/Failed/Matched/Mismatched）与中文界面混用</div>
+      </div>
+      <div class="crit-row">
+        <span class="tag tag-p1 cr-tag">P1</span>
+        <div class="cr-text"><strong>参数徽章语义缺失</strong> — 全部硬编码为 "SYNC"，badge-ref/const/literal/template 已定义 CSS 但从未渲染，5 种类型仅用 1 种</div>
+      </div>
+    </div>
+    <div class="crit-card">
+      <h3><span class="dim-icon">🎨</span> 视觉一致性</h3>
+      <div class="crit-row">
+        <span class="tag tag-p1 cr-tag">P1</span>
+        <div class="cr-text"><strong>全宽蓝色横幅</strong> — 顶部 #0078d4 全宽横幅高 ~56px，占可视区 12%，且硬编码颜色无法跟随主题切换</div>
+      </div>
+      <div class="crit-row">
+        <span class="tag tag-p2 cr-tag">P2</span>
+        <div class="cr-text"><strong>Emoji 标题</strong> — 4 个章节标题使用 🔬⚡📋 Emoji，与 VS Code 原生 Outline 风格不符；应改用 Codicons</div>
+      </div>
+      <div class="crit-row">
+        <span class="tag tag-p1 cr-tag">P1</span>
+        <div class="cr-text"><strong>约 30 处硬编码颜色</strong> — 不支持 VS Code 暗主题（默认暗色方案下部分文字与背景对比度不足）</div>
+      </div>
+    </div>
+    <div class="crit-card">
+      <h3><span class="dim-icon">⚠</span> 边界与安全</h3>
+      <div class="crit-row">
+        <span class="tag tag-p2 cr-tag">P2</span>
+        <div class="cr-text"><strong>魔法 token 冲突</strong> — 用户输入 <code style="font-family:monospace;color:var(--accent3);font-size:.9em;">__EMPTY_STRING__</code>/<code style="font-family:monospace;color:var(--accent3);font-size:.9em;">__NULL__</code>/<code style="font-family:monospace;color:var(--accent3);font-size:.9em;">__UNDEFINED__</code> 时会被误识别为特殊值（已知边界问题）</div>
+      </div>
+      <div class="crit-row">
+        <span class="tag tag-p2 cr-tag">P2</span>
+        <div class="cr-text"><strong>executeBatch 同步阻塞</strong> — 大量用例时主线程阻塞，仅用 setTimeout(0) 让一次 UI 刷新，极端情况下仍会卡顿</div>
+      </div>
+      <div class="crit-row">
+        <span class="tag tag-p2 cr-tag">P2</span>
+        <div class="cr-text"><strong>normOut 单引号限制</strong> — <code style="font-family:monospace;color:var(--accent);font-size:.9em;">/^["']|["']$/g</code> 只去一对外层引号，嵌套引号或两端不同引号无法处理</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">7 / 9</div>
+</div>
+</div>
+
+<!-- Slide 8: Opportunities + Value -->
+<div class="slide-wrapper">
+<div class="slide" id="s8">
+  <div class="s-title">设计机会点 · 商业价值与优先级</div>
+  <div class="opp-body">
+    <div class="opp-table-wrap">
+      <h3>机会点全表（H 商业价值节）</h3>
+      <table class="opp-table">
+        <thead><tr><th>ID</th><th>机会点</th><th>类型</th><th>实现成本</th><th>优先级</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>F2</td>
+            <td>表达式输入 inline 实时语法校验（替换 alert）</td>
+            <td>修复痛点</td>
+            <td class="cost-g">🟢 低</td>
+            <td><span class="tag tag-p0">P0</span></td>
+          </tr>
+          <tr>
+            <td>C1</td>
+            <td>Ctrl+Enter 应用表达式 / F5 执行批量快捷键</td>
+            <td>修复痛点</td>
+            <td class="cost-g">🟢 低</td>
+            <td><span class="tag tag-p0">P0</span></td>
+          </tr>
+          <tr>
+            <td>C5</td>
+            <td>模板变量手动注入面板（可视化 templateVars）</td>
+            <td>功能补全</td>
+            <td class="cost-y">🟡 中</td>
+            <td><span class="tag tag-p0">P0</span></td>
+          </tr>
+          <tr>
+            <td>F1</td>
+            <td>11 处英文字符串全面中文化</td>
+            <td>修复痛点</td>
+            <td class="cost-g">🟢 低</td>
+            <td><span class="tag tag-p1">P1</span></td>
+          </tr>
+          <tr>
+            <td>F5</td>
+            <td>参数徽章动态类型（SYNC/REF/CONST/LITERAL/TEMPLATE）</td>
+            <td>专业完善</td>
+            <td class="cost-y">🟡 中</td>
+            <td><span class="tag tag-p1">P1</span></td>
+          </tr>
+          <tr>
+            <td>C2</td>
+            <td>表达式+用例历史（localStorage 持久化）</td>
+            <td>专业完善</td>
+            <td class="cost-y">🟡 中</td>
+            <td><span class="tag tag-p1">P1</span></td>
+          </tr>
+          <tr>
+            <td>C3</td>
+            <td>批量结果筛选（全部/匹配/不匹配/错误）</td>
+            <td>专业完善</td>
+            <td class="cost-y">🟡 中</td>
+            <td><span class="tag tag-p1">P1</span></td>
+          </tr>
+          <tr>
+            <td>F3</td>
+            <td>顶栏重构（32px 紧凑，替换 56px 蓝色横幅）</td>
+            <td>修复痛点</td>
+            <td class="cost-g">🟢 低</td>
+            <td><span class="tag tag-p2">P2</span></td>
+          </tr>
+          <tr>
+            <td>F4</td>
+            <td>全面主题 token 化（~30 处硬编码颜色）</td>
+            <td>专业完善</td>
+            <td class="cost-y">🟡 中</td>
+            <td><span class="tag tag-p1">P1</span></td>
+          </tr>
+          <tr>
+            <td>F6</td>
+            <td>章节标题 Emoji → Codicons 替换</td>
+            <td>视觉一致</td>
+            <td class="cost-g">🟢 低</td>
+            <td><span class="tag tag-p2">P2</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="value-summary">
+      <div class="vs-block">
+        <h3>优先级分布</h3>
+        <div class="vs-prio">
+          <div class="vs-prio-row">
+            <span class="vp-label" style="color:var(--p0)">P0</span>
+            <div class="vp-bar" style="width:30%;background:var(--p0);"></div>
+            <span class="vp-text">3 项 · 阻碍核心体验</span>
+          </div>
+          <div class="vs-prio-row">
+            <span class="vp-label" style="color:var(--p1)">P1</span>
+            <div class="vp-bar" style="width:50%;background:var(--p1);"></div>
+            <span class="vp-text">5 项 · 提升专业度</span>
+          </div>
+          <div class="vs-prio-row">
+            <span class="vp-label" style="color:var(--p2)">P2</span>
+            <div class="vp-bar" style="width:20%;background:var(--p2);"></div>
+            <span class="vp-text">2 项 · 视觉一致性</span>
+          </div>
+        </div>
+      </div>
+      <div class="vs-block">
+        <h3>商业价值来源</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="font-size:12px;color:var(--text2);line-height:1.5;padding:8px;background:rgba(88,166,255,.06);border-radius:4px;border-left:3px solid var(--accent);">
+            <strong style="color:var(--text);">B：降低调试成本</strong><br>批量执行替代手工逐条验证，预计减少 60–80% 验证时间
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.5;padding:8px;background:rgba(63,185,80,.06);border-radius:4px;border-left:3px solid var(--accent2);">
+            <strong style="color:var(--text);">U：提升工具留存</strong><br>Inline 反馈 + 快捷键 = 开发者工具核心留存驱动力
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.5;padding:8px;background:rgba(227,179,65,.06);border-radius:4px;border-left:3px solid var(--accent4);">
+            <strong style="color:var(--text);">T：主题一致性信号</strong><br>完整的 VS Code token 化让工具看起来"原生"而非外来插入
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">8 / 9</div>
+</div>
+</div>
+
+<!-- Slide 9: Synthesis -->
+<div class="slide-wrapper">
+<div class="slide" id="s9">
+  <div class="s-title">综合结论：痛点 → 洞察 → 设计策略</div>
+  <div class="syn-body">
+    <div class="syn-col col-pain">
+      <h3>痛点 Pain</h3>
+      <div class="syn-item">
+        <strong>错误反馈断流</strong>
+        表达式出错仅 alert() 弹出，用户需 5 步才能恢复输入状态；每次错误都是一次完整的操作流中断
+      </div>
+      <div class="syn-item">
+        <strong>语言混用感</strong>
+        11 处英文字符串混入中文 UI，整体观感像未完成的内部 Demo，传递"草稿感"信号
+      </div>
+      <div class="syn-item">
+        <strong>主题适配断档</strong>
+        ~30 处硬编码颜色，暗主题（VS Code 默认）下颜色对比度失效，工具不像原生插件
+      </div>
+      <div class="syn-item">
+        <strong>隐藏功能无入口</strong>
+        模板变量通道和参数类型徽章均已实现逻辑/CSS，但用户完全无法感知和使用
+      </div>
+    </div>
+    <div class="syn-col col-insight">
+      <h3>洞察 Insight</h3>
+      <div class="syn-item">
+        <strong>开发者工具的留存核心是"节奏感"</strong>
+        任何打断输入节奏的交互（alert、焦点跳出、必须鼠标点击）都会显著降低工具的日活使用率
+      </div>
+      <div class="syn-item">
+        <strong>完成度信号影响信任度</strong>
+        语言混用、按钮样式不一致、未实现的预留功能会让用户感知到"这是个原型"，降低依赖意愿
+      </div>
+      <div class="syn-item">
+        <strong>主题一致性是"原生感"的最低门槛</strong>
+        VS Code 插件用户对主题适配有强烈期望，不适配暗主题等于在用户的主场环境里显得格格不入
+      </div>
+      <div class="syn-item">
+        <strong>功能可见性优先于功能完整性</strong>
+        模板变量功能逻辑已有，仅缺 UI 入口；补入口的成本远低于重写逻辑
+      </div>
+    </div>
+    <div class="syn-col col-strategy">
+      <h3>设计策略 Strategy</h3>
+      <div class="syn-item">
+        <strong>策略 S1：Inline 优先</strong>
+        所有错误提示从 alert() 迁移至 inline 组件（输入框下方/行内）；延迟 debounce 300ms 触发，不阻断输入
+      </div>
+      <div class="syn-item">
+        <strong>策略 S2：键盘完备</strong>
+        绑定 Ctrl+Enter（应用）/ F5（执行批量）/ Tab（参数跳转）；确保全程零鼠标操作路径
+      </div>
+      <div class="syn-item">
+        <strong>策略 S3：Token 化全替换</strong>
+        系统替换所有硬编码颜色为 <code style="font-family:monospace;color:var(--accent2);font-size:.9em;">--vscode-*</code> token；一次性解决亮/暗主题适配
+      </div>
+      <div class="syn-item">
+        <strong>策略 S4：打开功能入口</strong>
+        为模板变量添加折叠面板 UI；参数徽章改为动态渲染；中文化所有 UI 字符串
+      </div>
+    </div>
+  </div>
+  <div class="syn-footer">
+    下一步：基于以上策略生成优化版 Demo → 选择设计系统后执行 Phase 2 · UX Spec 输出
+    <br><span>P0 三项（F2 inline 校验 + C1 快捷键 + C5 模板变量面板）是 Sprint 1 最小可交付单元</span>
+  </div>
+  <div class="slide-num">9 / 9</div>
+</div>
+</div>
+
+</body>
+</html>
