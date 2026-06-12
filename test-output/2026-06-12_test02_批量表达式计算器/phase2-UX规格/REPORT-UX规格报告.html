@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>管道表达式批量评估器 · UX 规格报告</title>
+<style>
+/* ─── Reset & Root ─── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#101010;--bg-elev:#141414;--surf1:#161616;--surf2:#1c1c1c;--surf3:#262626;--surf4:#313131;
+  --fg:rgba(255,255,255,0.90);--fg2:rgba(255,255,255,0.60);--fg3:rgba(255,255,255,0.40);--fg4:rgba(255,255,255,0.25);
+  --primary:#4369EF;--success:#04D793;--warning:#FFAA3B;--danger:#FF4B7B;--accent:#7c8db8;
+  --hover:rgba(255,255,255,0.06);--focus-ring:rgba(67,105,239,0.42);--border:rgba(255,255,255,0.06);
+  --border-mid:rgba(255,255,255,0.12);--border-strong:rgba(255,255,255,0.20);
+  --mono:ui-monospace,'SF Mono','JetBrains Mono',Consolas,'Courier New',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC','PingFang SC',sans-serif;
+  --r:8px;--r-lg:14px;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:var(--sans)}
+
+/* ─── Viewport Scaler ─── */
+#stage{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:#000;
+}
+#canvas{
+  width:1280px;height:720px;
+  transform-origin:center center;
+  position:relative;overflow:hidden;
+}
+.slide{
+  position:absolute;inset:0;width:1280px;height:720px;
+  background:var(--bg);color:var(--fg);
+  display:none;flex-direction:column;
+}
+.slide.active{display:flex}
+
+/* ─── Nav Buttons ─── */
+#nav{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:12px;z-index:100;
+  background:rgba(16,16,16,0.88);border:1px solid var(--border-mid);
+  border-radius:100px;padding:8px 16px;backdrop-filter:blur(12px);
+}
+#nav button{
+  background:var(--surf3);border:1px solid var(--border-mid);color:var(--fg);
+  width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;transition:0.15s;
+}
+#nav button:hover{background:var(--primary);border-color:var(--primary)}
+#nav button:disabled{opacity:0.3;cursor:not-allowed}
+#counter{color:var(--fg2);font-family:var(--mono);font-size:13px;min-width:40px;text-align:center}
+
+/* ─── Shared Slide Parts ─── */
+.slide-header{
+  padding:24px 48px 0;display:flex;align-items:baseline;gap:16px;flex-shrink:0;
+}
+.slide-num{
+  font-family:var(--mono);font-size:11px;color:var(--fg4);letter-spacing:.12em;text-transform:uppercase;
+}
+.slide-title{
+  font-size:20px;font-weight:700;color:var(--fg);letter-spacing:-.01em;
+}
+.slide-body{
+  flex:1;padding:16px 48px 22px;display:flex;gap:0;min-height:0;
+}
+
+/* ─── Utility ─── */
+.mono{font-family:var(--mono)}
+.dim{color:var(--fg2)}
+.mute{color:var(--fg3)}
+.pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:100px;
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  border:1px solid currentColor;
+}
+.tag-primary{color:var(--primary)}
+.tag-success{color:var(--success)}
+.tag-warning{color:var(--warning)}
+.tag-danger{color:var(--danger)}
+.tag-accent{color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.swatch{width:14px;height:14px;border-radius:3px;display:inline-block;flex-shrink:0;border:1px solid rgba(255,255,255,0.08)}
+table{border-collapse:collapse;width:100%}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3);font-weight:600;
+   padding:6px 10px;text-align:left;border-bottom:1px solid var(--border-mid)}
+td{font-size:12px;padding:5px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+
+/* ────────────────────────────────────────────
+   SLIDE 1 — Cover
+─────────────────────────────────────────────*/
+.s1-kicker{font-family:var(--mono);font-size:12px;color:var(--primary);letter-spacing:.15em;text-transform:uppercase}
+.s1-h1{font-size:42px;font-weight:800;line-height:1.1;letter-spacing:-.02em;color:var(--fg)}
+.s1-h1 em{color:var(--primary);font-style:normal}
+.s1-sub{font-size:14px;color:var(--fg3);font-family:var(--mono);margin-top:4px}
+.s1-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.stat-box{
+  background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);
+  padding:11px 16px;display:flex;flex-direction:column;gap:3px;
+}
+.stat-box .val{font-size:20px;font-weight:700;font-family:var(--mono)}
+.stat-box .lbl{font-size:10px;color:var(--fg3)}
+
+/* ────────────────────────────────────────────
+   SLIDE 2 — Layout
+─────────────────────────────────────────────*/
+.layout-diagram{display:flex;flex-direction:column;gap:7px;flex:1}
+.ld-row{
+  background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);
+  padding:8px 12px;display:flex;align-items:flex-start;gap:10px;
+}
+.ld-label{
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg4);
+  white-space:nowrap;min-width:64px;padding-top:2px;font-family:var(--mono);
+}
+.ld-content{flex:1}
+.ld-title{font-size:12px;font-weight:600;color:var(--fg);margin-bottom:2px}
+.ld-sub{font-size:10px;color:var(--fg3);font-family:var(--mono)}
+.ld-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.lchip{
+  font-size:10px;font-family:var(--mono);padding:2px 7px;
+  background:var(--surf3);border:1px solid var(--border-mid);border-radius:4px;color:var(--fg2);
+}
+.s2-aside{width:240px;padding-left:14px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.aside-box{background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);padding:10px}
+.aside-box .atitle{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg4);margin-bottom:6px;font-weight:600}
+.kv{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--fg3);font-family:var(--mono)}
+.kv .v{color:var(--fg);font-family:var(--mono);font-weight:600}
+
+/* ────────────────────────────────────────────
+   SLIDE 3 — Tokens
+─────────────────────────────────────────────*/
+.token-section{margin-bottom:9px}
+.token-section-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:3px;font-weight:600}
+.token-row{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:4px}
+.token-row:hover{background:var(--hover)}
+.token-name{font-family:var(--mono);font-size:11px;color:var(--fg2);min-width:180px}
+.token-val{font-family:var(--mono);font-size:11px;color:var(--fg);flex:1}
+
+/* ────────────────────────────────────────────
+   SLIDE 4 & 5 — Components
+─────────────────────────────────────────────*/
+.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1}
+.comp-box{background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);padding:11px}
+.comp-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:8px;font-weight:600}
+.mock-textarea{background:var(--surf1);border:1px solid var(--border-mid);border-radius:6px;padding:7px 10px;font-family:var(--mono);font-size:11px;color:var(--fg2);line-height:1.4}
+.mock-textarea.focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)}
+.mock-textarea.invalid{border-color:var(--danger);box-shadow:0 0 0 3px rgba(255,75,123,0.22)}
+.mock-textarea.valid{border-color:var(--border-mid)}
+.inline-msg-demo{display:flex;align-items:flex-start;gap:6px;padding:5px 10px;border-radius:5px;font-size:11px;margin-top:4px}
+.inline-msg-demo.err{background:rgba(255,75,123,0.14);color:var(--danger)}
+.inline-msg-demo.ok{background:rgba(4,215,147,0.22);color:var(--success)}
+.op-chip-demo{display:inline-flex;align-items:center;padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);color:var(--fg2);margin:2px}
+.op-chip-demo.hover{background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.16);color:var(--fg);transform:translateY(-1px)}
+.stage-demo{background:var(--surf2);border:1px solid var(--border-mid);border-left:3px solid var(--primary);border-radius:var(--r);padding:8px 10px;margin-top:4px}
+.stage-demo.errored{border-color:var(--danger);border-left-color:var(--danger)}
+.stage-demo.skipped{opacity:0.45}
+.type-chip{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;font-size:10px;font-family:var(--mono)}
+.type-chip.number{background:rgba(67,105,239,0.16);color:var(--primary)}
+.type-chip.string{background:rgba(4,215,147,0.22);color:var(--success)}
+.type-chip.boolean{background:rgba(255,170,59,0.16);color:var(--warning)}
+.type-chip.null{background:rgba(255,255,255,0.06);color:var(--fg3)}
+.pass-badge-demo{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.pass-badge-demo.ok{background:var(--success);color:#08111f}
+.pass-badge-demo.bad{background:var(--danger);color:#fff}
+.final-result-demo{border-radius:var(--r);padding:10px 14px;text-align:center;font-size:13px;border:1px solid}
+.final-result-demo.waiting{border-color:var(--primary);color:var(--fg3);font-style:italic}
+.final-result-demo.success{border-color:var(--primary);color:var(--fg);font-weight:600;font-size:14px}
+.final-result-demo.error{border-color:var(--danger);color:var(--danger)}
+.ex-card-demo{background:var(--surf1);border:1px solid rgba(255,255,255,0.10);border-radius:10px;padding:9px 11px;margin-bottom:5px;font-size:11px}
+.ex-card-demo:hover{border-color:rgba(255,255,255,0.16);background:rgba(255,255,255,0.06)}
+.panel-spec{background:var(--bg-elev);border:1px solid var(--border-mid);border-radius:8px;padding:8px 10px}
+.panel-spec-row{display:flex;justify-content:space-between;font-size:10px;padding:2px 0;border-bottom:1px solid var(--border)}
+.panel-spec-row:last-child{border-bottom:none}
+.panel-spec-row .pk{color:var(--fg3);font-family:var(--mono)}
+.panel-spec-row .pv{color:var(--fg);font-family:var(--mono)}
+
+/* ────────────────────────────────────────────
+   SLIDE 6 — State Matrix
+─────────────────────────────────────────────*/
+.matrix-wrap table th{font-size:9px;padding:5px 6px}
+.matrix-wrap table td{font-size:9px;padding:4px 6px;line-height:1.35}
+.st-cell{border-radius:3px;padding:2px 4px;font-family:var(--mono);font-size:8.5px;display:inline-block;line-height:1.4}
+.st-default{background:var(--surf3);color:var(--fg3)}
+.st-focus{background:rgba(67,105,239,0.18);color:var(--primary)}
+.st-valid{background:rgba(4,215,147,0.13);color:var(--success)}
+.st-invalid{background:rgba(255,75,123,0.13);color:var(--danger)}
+.st-disabled{background:var(--surf2);color:var(--fg4)}
+.st-active{background:rgba(255,170,59,0.13);color:var(--warning)}
+.st-na{color:var(--fg4);font-size:9px;font-family:var(--mono)}
+.st-hover{background:rgba(255,255,255,0.08);color:var(--fg2)}
+.st-loading{background:rgba(67,105,239,0.10);color:var(--accent)}
+.st-empty{background:rgba(255,255,255,0.04);color:var(--fg4)}
+
+/* ────────────────────────────────────────────
+   SLIDE 7 — Flows
+─────────────────────────────────────────────*/
+.flow-cols{display:flex;gap:0;flex:1}
+.flow-col{flex:1;padding:0 12px;border-right:1px solid var(--border)}
+.flow-col:first-child{padding-left:0}
+.flow-col:last-child{border-right:none;padding-right:0}
+.flow-title{font-size:11px;font-weight:700;color:var(--fg);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border-mid);font-family:var(--mono)}
+.step-box{
+  background:var(--surf2);border:1px solid var(--border-mid);border-radius:6px;
+  padding:6px 10px;width:100%;font-family:var(--mono);
+}
+.step-box.trigger{border-color:var(--primary);background:rgba(67,105,239,0.10)}
+.step-box.process{border-color:var(--border-mid)}
+.step-box.output{border-color:var(--success);background:rgba(4,215,147,0.07)}
+.step-box.error-path{border-color:var(--danger);background:rgba(255,75,123,0.07)}
+.step-label{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:2px}
+.step-text{font-size:10px;color:var(--fg);line-height:1.45}
+.step-spacer{height:14px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.step-arrow-line{width:1px;flex:1;background:var(--border-mid)}
+.step-arrow-head{font-size:7px;color:var(--fg4);line-height:1}
+
+/* ────────────────────────────────────────────
+   SLIDE 8 — Accessibility & Design Review
+─────────────────────────────────────────────*/
+.review-col{flex:1}
+.review-col:last-child{padding-left:16px;border-left:1px solid var(--border)}
+.review-title{font-size:12px;font-weight:700;color:var(--fg);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.finding{display:flex;gap:7px;padding:4px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.finding:last-child{border-bottom:none}
+.find-id{font-family:var(--mono);font-size:10px;color:var(--fg4);min-width:24px;padding-top:1px}
+.find-body{flex:1}
+.find-text{font-size:10px;color:var(--fg);line-height:1.4}
+.find-status{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-family:var(--mono);
+             margin-top:2px;padding:2px 6px;border-radius:3px}
+.status-fixed{background:rgba(4,215,147,0.13);color:var(--success)}
+.status-warn{background:rgba(255,170,59,0.13);color:var(--warning)}
+.status-eng{background:rgba(67,105,239,0.13);color:var(--primary)}
+.strength-item{display:flex;gap:7px;padding:4px 0;border-bottom:1px solid var(--border);font-size:10px;color:var(--fg2)}
+.strength-item:last-child{border-bottom:none}
+.strength-num{font-family:var(--mono);color:var(--success);flex-shrink:0;font-weight:700}
+
+/* ────────────────────────────────────────────
+   SLIDE 9 — Opportunity Mapping
+─────────────────────────────────────────────*/
+.opp-table th{font-size:9px;padding:4px 7px}
+.opp-table td{font-size:9px;padding:3px 7px;line-height:1.35}
+.opp-table .landed{color:var(--success)}
+.opp-table .partial{color:var(--warning)}
+.opp-table .not-landed{color:var(--danger)}
+.opp-summary{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.opp-badge{background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);padding:6px 12px;font-family:var(--mono);font-size:10px}
+.opp-badge .ob-label{color:var(--fg4);font-size:9px;margin-bottom:2px}
+.opp-badge .ob-val{color:var(--success);font-weight:700;font-size:11px}
+
+/* ─── del-footer ─── */
+.del-footer{
+  flex-shrink:0;height:48px;
+  background:var(--surf2);border-top:1px solid var(--border-mid);
+  padding:0 48px;display:flex;align-items:center;gap:16px;
+  font-family:var(--mono);font-size:11px;color:var(--fg2);
+}
+.del-badge{display:inline-flex;align-items:center;gap:5px;color:var(--success)}
+.del-badge::before{content:'✅';font-size:11px}
+</style>
+</head>
+<body>
+
+<div id="stage">
+<div id="canvas">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 1 — 封面 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide active" id="s1" style="justify-content:center;padding:0 80px">
+  <div style="display:flex;flex-direction:column;gap:18px;max-width:920px">
+    <div class="s1-kicker">UX Specification Report · Phase 2 · PTO Design System · 2026-06-12</div>
+    <div class="s1-h1">管道表达式批量评估器<br/><em style="font-size:32px">· UX 规格报告 · Phase 2 设计交付</em></div>
+    <div class="s1-sub">Pipe Expression Batch Evaluator · 优化版 Demo v2（五镜走查版）</div>
+
+    <div class="s1-stats">
+      <div class="stat-box">
+        <div class="val" style="color:var(--primary)">9</div>
+        <div class="lbl">张幻灯片</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" style="color:var(--warning)">12</div>
+        <div class="lbl">个组件规格</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" style="color:var(--success)">34</div>
+        <div class="lbl">个单元测试通过</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" style="color:var(--danger);font-size:16px;padding-top:3px">12 项</div>
+        <div class="lbl">WCAG 2.1 AA 修复</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" style="color:var(--accent);font-size:15px;padding-top:3px">55 / 45</div>
+        <div class="lbl">双栏网格比</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" style="color:var(--fg);font-size:15px;padding-top:3px">PTO</div>
+        <div class="lbl">设计系统</div>
+      </div>
+    </div>
+
+    <!-- Architecture diagram -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+      <span class="pill tag-primary">双栏网格 55fr/45fr</span>
+      <span class="pill tag-success">管道数据流可视化</span>
+      <span class="pill tag-warning">批量用例虚拟滚动</span>
+      <span class="pill tag-danger">WCAG 2.1 AA 合规</span>
+      <span class="pill tag-accent">localStorage 历史持久化</span>
+      <span class="pill" style="color:var(--fg3)">postMessage 注入通道</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 2 — 整体布局 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s2">
+  <div class="slide-header">
+    <div class="slide-num">02 / 09</div>
+    <div class="slide-title">整体布局 · 页面分区</div>
+  </div>
+  <div class="slide-body" style="gap:14px">
+    <!-- Layout diagram left -->
+    <div class="layout-diagram">
+      <!-- Topbar -->
+      <div class="ld-row" style="background:rgba(67,105,239,0.07);border-color:rgba(67,105,239,0.22)">
+        <div class="ld-label" style="color:var(--primary)">TOPBAR</div>
+        <div class="ld-content">
+          <div class="ld-title">顶栏（.topbar）</div>
+          <div class="ld-sub">高 44px · bg ~#0e0e0e · border-radius 12px · border-bottom rgba(fff,0.06)</div>
+          <div class="ld-chips">
+            <span class="lchip">SVG 图标 18×18</span>
+            <span class="lchip">产品名称 16px/600</span>
+            <span class="lchip">BETA 标签</span>
+            <span class="lchip">主题切换 segmented</span>
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--fg4)">h: 44px</div>
+      </div>
+
+      <!-- Main grid -->
+      <div class="ld-row" style="flex:1;min-height:0;align-items:stretch;padding:0">
+        <!-- Left col -->
+        <div style="flex:55;padding:8px 10px;border-right:1px solid var(--border-mid)">
+          <div class="ld-label" style="color:var(--warning)">LEFT 55fr</div>
+          <div class="ld-title" style="font-size:12px;margin-bottom:3px">左栏（操作区）flex-col gap:16px</div>
+          <div class="ld-sub" style="margin-bottom:5px">① 表达式 panel → expr-textarea + op-panel + actions</div>
+          <div class="ld-sub" style="margin-bottom:5px">模式切换 tablist（调试模式 / 用例模式）</div>
+          <div class="ld-sub" style="margin-bottom:5px">[调试] ② 输入参数 + 模板变量 + 历史记录</div>
+          <div class="ld-sub">[用例] ② 加载测试用例 textarea + action-bar</div>
+          <div class="ld-chips" style="margin-top:6px">
+            <span class="lchip" style="border-color:rgba(255,170,59,0.4);color:var(--warning)">55fr</span>
+            <span class="lchip">flex-col</span>
+            <span class="lchip">gap: 16px</span>
+            <span class="lchip">panel: 16px pad</span>
+          </div>
+        </div>
+        <!-- Right col -->
+        <div style="flex:45;padding:8px 10px">
+          <div class="ld-label" style="color:var(--success)">RIGHT 45fr</div>
+          <div class="ld-title" style="font-size:12px;margin-bottom:3px">右栏（反馈区）flex-col gap:16px</div>
+          <div class="ld-sub" style="margin-bottom:5px">[调试·空态] ③ 示例卡片区（3张 ex-card）</div>
+          <div class="ld-sub" style="margin-bottom:5px">[调试·有数据] ③ 管道处理 panel + ④ 最终结果 panel</div>
+          <div class="ld-sub">[用例] ③ 批量执行 panel + ④ 执行结果 panel</div>
+          <div class="ld-chips" style="margin-top:6px">
+            <span class="lchip" style="border-color:rgba(4,215,147,0.4);color:var(--success)">45fr</span>
+            <span class="lchip">flex-col</span>
+            <span class="lchip">gap: 16px</span>
+            <span class="lchip">虚拟滚动</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div class="ld-row" style="background:rgba(255,255,255,0.02)">
+        <div class="ld-label">TOAST</div>
+        <div class="ld-content">
+          <div class="ld-title" style="font-size:12px">Toast 通知（#toast）</div>
+          <div class="ld-sub">fixed · right 20px · bottom 20px · z-index 400 · bg #313131 · border-radius 10px</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--fg4)">fixed</div>
+      </div>
+    </div>
+
+    <!-- Right aside -->
+    <div class="s2-aside">
+      <div class="aside-box">
+        <div class="atitle">布局关键参数</div>
+        <div class="kv"><span class="k">max-width</span><span class="v">1440px</span></div>
+        <div class="kv"><span class="k">padding</span><span class="v">16px 四边</span></div>
+        <div class="kv"><span class="k">grid-cols</span><span class="v">55fr / 45fr</span></div>
+        <div class="kv"><span class="k">grid-gap</span><span class="v">16px</span></div>
+        <div class="kv"><span class="k">breakpoint</span><span class="v">≤1024px 单栏</span></div>
+        <div class="kv"><span class="k">panel-pad</span><span class="v">16px</span></div>
+      </div>
+      <div class="aside-box">
+        <div class="atitle">间距系统（Space Token）</div>
+        <div class="kv"><span class="k">--space-2</span><span class="v">8px</span></div>
+        <div class="kv"><span class="k">--space-3</span><span class="v">12px</span></div>
+        <div class="kv"><span class="k">--space-4</span><span class="v">16px</span></div>
+        <div class="kv"><span class="k">table-row-h</span><span class="v">36px</span></div>
+        <div class="kv"><span class="k">op-chip-gap</span><span class="v">6px</span></div>
+      </div>
+      <!-- Mini SVG layout -->
+      <div class="aside-box" style="flex:1;overflow:hidden">
+        <div class="atitle">双栏层次示意</div>
+        <svg viewBox="0 0 220 150" style="width:100%;display:block;margin-top:2px" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="218" height="14" rx="3" fill="rgba(67,105,239,0.18)" stroke="rgba(67,105,239,0.4)" stroke-width="0.5"/>
+          <text x="7" y="11.5" font-family="monospace" font-size="7" fill="rgba(255,255,255,0.45)">.topbar · 44px · theme-seg</text>
+          <!-- main grid -->
+          <rect x="1" y="18" width="118" height="100" rx="3" fill="#1c1c1c" stroke="rgba(255,170,59,0.35)" stroke-width="0.5"/>
+          <rect x="122" y="18" width="97" height="100" rx="3" fill="#1c1c1c" stroke="rgba(4,215,147,0.35)" stroke-width="0.5"/>
+          <!-- left panels -->
+          <rect x="5" y="22" width="110" height="18" rx="2" fill="#262626"/>
+          <text x="8" y="34" font-family="monospace" font-size="6" fill="rgba(255,255,255,0.35)">① 表达式 + op-panel</text>
+          <rect x="5" y="43" width="110" height="9" rx="2" fill="rgba(67,105,239,0.25)"/>
+          <text x="8" y="50" font-family="monospace" font-size="5.5" fill="rgba(255,255,255,0.4)">调试/用例 mode-toggle</text>
+          <rect x="5" y="55" width="110" height="14" rx="2" fill="#262626"/>
+          <text x="8" y="65" font-family="monospace" font-size="6" fill="rgba(255,255,255,0.35)">② 输入参数 / 用例加载</text>
+          <rect x="5" y="72" width="110" height="12" rx="2" fill="#1a1a1a" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+          <text x="8" y="81" font-family="monospace" font-size="5.5" fill="rgba(255,255,255,0.3)">模板变量 + 历史记录</text>
+          <!-- left label -->
+          <text x="5" y="116" font-family="monospace" font-size="6.5" fill="rgba(255,170,59,0.55)">LEFT 55fr</text>
+          <!-- right panels -->
+          <rect x="126" y="22" width="89" height="20" rx="2" fill="rgba(4,215,147,0.08)" stroke="rgba(4,215,147,0.2)" stroke-width="0.5"/>
+          <text x="130" y="35" font-family="monospace" font-size="6" fill="rgba(4,215,147,0.5)">示例卡片 / 管道处理</text>
+          <rect x="126" y="46" width="89" height="30" rx="2" fill="#262626"/>
+          <text x="130" y="65" font-family="monospace" font-size="6" fill="rgba(255,255,255,0.35)">③ stage × N 数据流</text>
+          <rect x="126" y="80" width="89" height="14" rx="2" fill="#262626" stroke="rgba(67,105,239,0.2)" stroke-width="0.5"/>
+          <text x="130" y="90" font-family="monospace" font-size="6" fill="rgba(255,255,255,0.35)">④ 最终结果 / pass-badge</text>
+          <text x="126" y="116" font-family="monospace" font-size="6.5" fill="rgba(4,215,147,0.55)">RIGHT 45fr</text>
+          <text x="1" y="134" font-family="monospace" font-size="5.5" fill="rgba(255,255,255,0.2)">grid 55fr/45fr · gap 16px · ≤1024px → 1fr</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 3 — Design Tokens -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s3">
+  <div class="slide-header">
+    <div class="slide-num">03 / 09</div>
+    <div class="slide-title">设计 Token · 色板 + 字体规格</div>
+  </div>
+  <div class="slide-body" style="gap:0">
+    <!-- Left: Color tokens -->
+    <div style="flex:1;padding-right:18px;border-right:1px solid var(--border);overflow:hidden">
+      <div class="token-section">
+        <div class="token-section-label">Background Tokens</div>
+        <div class="token-row"><div class="swatch" style="background:#101010"></div><div class="token-name">--background</div><div class="token-val">#101010</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">页面底色</div></div>
+        <div class="token-row"><div class="swatch" style="background:#161616"></div><div class="token-name">--surface-1</div><div class="token-val">#161616</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">输入框/卡片背景</div></div>
+        <div class="token-row"><div class="swatch" style="background:#1c1c1c"></div><div class="token-name">--surface-2</div><div class="token-val">#1c1c1c</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">panel/stage背景</div></div>
+        <div class="token-row"><div class="swatch" style="background:#262626"></div><div class="token-name">--surface-3</div><div class="token-val">#262626</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">hover叠加</div></div>
+        <div class="token-row"><div class="swatch" style="background:#313131"></div><div class="token-name">--surface-4</div><div class="token-val">#313131</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">toast背景</div></div>
+      </div>
+      <div class="token-section">
+        <div class="token-section-label">Semantic Colors</div>
+        <div class="token-row"><div class="dot" style="background:#4369EF"></div><div class="token-name">--primary</div><div class="token-val">#4369EF</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">品牌蓝 · 主按钮 · 激活</div></div>
+        <div class="token-row"><div class="dot" style="background:#04D793"></div><div class="token-name">--success</div><div class="token-val">#04D793</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">绿 · 匹配 · string类型</div></div>
+        <div class="token-row"><div class="dot" style="background:#FFAA3B"></div><div class="token-name">--warning</div><div class="token-val">#FFAA3B</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">橙 · 警告 · boolean类型</div></div>
+        <div class="token-row"><div class="dot" style="background:#FF4B7B"></div><div class="token-name">--danger</div><div class="token-val">#FF4B7B</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">红 · 错误 · 不匹配</div></div>
+        <div class="token-row"><div class="dot" style="background:#7c8db8"></div><div class="token-name">--accent</div><div class="token-val">#7c8db8</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">辅助蓝灰</div></div>
+      </div>
+      <div class="token-section">
+        <div class="token-section-label">Foreground / Border</div>
+        <div class="token-row"><div class="dot" style="background:rgba(255,255,255,0.90)"></div><div class="token-name">--foreground</div><div class="token-val">rgba(255,255,255,0.90)</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">主文字</div></div>
+        <div class="token-row"><div class="dot" style="background:rgba(255,255,255,0.60)"></div><div class="token-name">--foreground-secondary</div><div class="token-val">rgba(255,255,255,0.60)</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">次级</div></div>
+        <div class="token-row"><div class="dot" style="background:rgba(255,255,255,0.40)"></div><div class="token-name">--foreground-muted</div><div class="token-val">rgba(255,255,255,0.40)</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">辅助</div></div>
+        <div class="token-row"><div class="dot" style="background:rgba(67,105,239,0.42)"></div><div class="token-name">--focus-ring</div><div class="token-val">rgba(67,105,239,0.42)</div><div style="font-size:10px;color:var(--fg4);font-family:var(--mono)">焦点轮廓</div></div>
+      </div>
+    </div>
+
+    <!-- Right: Typography -->
+    <div style="flex:1;padding-left:18px;display:flex;flex-direction:column;gap:0">
+      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:7px;font-weight:600">Typography Scale</div>
+      <table style="margin-bottom:12px">
+        <thead>
+          <tr>
+            <th>样式名</th>
+            <th>字号/字重</th>
+            <th>字族</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">display</span></td>
+            <td><span style="font-size:16px;font-weight:700;color:var(--fg)">28px / 700</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">sans</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">封面大标题</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">title-1</span></td>
+            <td><span style="font-size:14px;font-weight:600;color:var(--fg)">20px / 600</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">sans</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">最终结果值</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">title-2</span></td>
+            <td><span style="font-size:13px;font-weight:600;color:var(--fg)">16px / 600</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">sans</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">产品标题 / panel 标题</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">body</span></td>
+            <td><span style="font-size:12px;font-weight:400;color:var(--fg)">14px / 400</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">sans</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">正文 / 次级文字</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">body-sm</span></td>
+            <td><span style="font-size:11px;font-weight:400;color:var(--fg)">12px / 400</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">sans</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">inline-msg / 次级文字</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">label</span></td>
+            <td><span style="font-size:11px;font-weight:500;color:var(--fg)">11px / 500</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">sans</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">badge / BETA 标签 / chip</span></td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">mono</span></td>
+            <td><span style="font-family:var(--mono);font-size:11px;font-weight:500;color:var(--fg)">12px / 500</span></td>
+            <td><span style="font-family:var(--mono);font-size:10px;color:var(--fg3)">mono</span></td>
+            <td><span style="font-size:11px;color:var(--fg2)">表达式 / 代码 / 参数名</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <!-- Preview -->
+      <div style="background:var(--surf2);border:1px solid var(--border-mid);border-radius:var(--r);padding:12px;flex:1">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg4);margin-bottom:8px">字体预览</div>
+        <div style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--primary);margin-bottom:5px">$1 |&gt; string.upper |&gt; string.format("%s!")</div>
+        <div style="font-size:14px;font-weight:600;color:var(--fg);margin-bottom:4px">管道表达式批量评估器</div>
+        <div style="display:flex;gap:7px;align-items:center;margin-bottom:5px">
+          <span style="font-family:var(--mono);font-size:12px;background:rgba(4,215,147,0.22);color:var(--success);padding:1px 7px;border-radius:999px">string</span>
+          <span style="font-family:var(--mono);font-size:12px;background:rgba(67,105,239,0.16);color:var(--primary);padding:1px 7px;border-radius:999px">number</span>
+          <span style="font-family:var(--mono);font-size:12px;background:rgba(255,170,59,0.16);color:var(--warning);padding:1px 7px;border-radius:999px">boolean</span>
+        </div>
+        <div style="font-size:11px;color:var(--fg3);font-family:var(--mono)">body-sm 12px · label 11px/500 · mono 12px/500</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 4 — 组件规格（一）: 表达式编辑区 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s4">
+  <div class="slide-header">
+    <div class="slide-num">04 / 09</div>
+    <div class="slide-title">组件规格（一）· 表达式编辑区</div>
+  </div>
+  <div class="slide-body" style="flex-direction:column;gap:10px">
+    <div class="comp-grid">
+      <!-- Topbar -->
+      <div class="comp-box">
+        <div class="comp-label">Topbar · 顶栏容器</div>
+        <div style="background:#0e0e0e;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:0 12px;height:36px;display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="width:14px;height:14px;border-radius:3px;background:var(--primary);flex-shrink:0"></div>
+          <div style="font-size:11px;font-weight:600;color:var(--fg)">管道表达式批量评估器</div>
+          <div style="font-size:9px;color:var(--fg3);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:999px;padding:1px 6px;text-transform:uppercase;letter-spacing:.05em">BETA</div>
+          <div style="flex:1"></div>
+          <div style="display:flex;background:rgba(255,255,255,0.065);border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:2px;gap:2px">
+            <div style="padding:2px 7px;font-size:9px;background:var(--primary);color:#fff;border-radius:5px">dark</div>
+            <div style="padding:2px 7px;font-size:9px;color:var(--fg3)">light</div>
+            <div style="padding:2px 7px;font-size:9px;color:var(--fg3)">glass</div>
+          </div>
+        </div>
+        <div class="panel-spec">
+          <div class="panel-spec-row"><span class="pk">height</span><span class="pv">44px (comp-toolbar-height)</span></div>
+          <div class="panel-spec-row"><span class="pk">border-radius</span><span class="pv">12px (radius-lg)</span></div>
+          <div class="panel-spec-row"><span class="pk">padding</span><span class="pv">0 16px</span></div>
+          <div class="panel-spec-row"><span class="pk">theme-seg gap</span><span class="pv">3px · btn h 28px</span></div>
+        </div>
+      </div>
+
+      <!-- ExprTextarea states -->
+      <div class="comp-box">
+        <div class="comp-label">ExprTextarea · 表达式输入区 · 状态变体</div>
+        <div style="display:flex;gap:5px;flex-wrap:nowrap">
+          <div style="flex:1">
+            <div style="font-size:8px;color:var(--fg4);font-family:var(--mono);margin-bottom:2px;text-align:center">default</div>
+            <div class="mock-textarea">$1 |&gt; string.upper</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:8px;color:var(--fg4);font-family:var(--mono);margin-bottom:2px;text-align:center">focus</div>
+            <div class="mock-textarea focus">$1 |&gt; string.upper<span style="color:var(--primary)">_</span></div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:8px;color:var(--fg4);font-family:var(--mono);margin-bottom:2px;text-align:center">invalid</div>
+            <div class="mock-textarea invalid" style="color:var(--danger)">$1 |&gt; unkn(</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:8px;color:var(--fg4);font-family:var(--mono);margin-bottom:2px;text-align:center">valid-applied</div>
+            <div class="mock-textarea valid">$1 |&gt; string.upper</div>
+          </div>
+        </div>
+        <div class="inline-msg-demo err" style="margin-top:5px"><span>✕</span><span>期望 ')' 但得到 null</span></div>
+        <div class="inline-msg-demo ok" style="margin-top:3px"><span>✓</span><span>表达式有效，已应用 · 3s 后隐藏</span></div>
+        <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-top:5px">min-height: 52px · resize: vertical · mono 12px/500 · 300ms debounce 校验</div>
+      </div>
+
+      <!-- OpPanel -->
+      <div class="comp-box">
+        <div class="comp-label">OpPanel · 操作符 Chip 折叠面板</div>
+        <!-- Collapsed -->
+        <div style="background:var(--surf1);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:6px 10px;margin-bottom:5px">
+          <div style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <span style="font-size:9px;color:var(--fg3);font-family:var(--mono)">▶</span>
+            <span style="font-size:11px;color:var(--fg3);font-family:var(--mono)">操作符面板 · hover 签名 · 点击插入</span>
+            <span style="font-size:9px;color:var(--fg4);font-family:var(--mono);background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:3px;margin-left:auto">9 个</span>
+          </div>
+        </div>
+        <!-- Expanded -->
+        <div style="background:var(--surf1);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:6px 10px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:9px;color:var(--fg3);font-family:var(--mono)">▼</span>
+            <span style="font-size:11px;color:var(--fg3);font-family:var(--mono)">操作符面板</span>
+          </div>
+          <div style="border-top:1px dashed rgba(255,255,255,0.06);padding-top:5px;display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-bottom:4px">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--primary);flex-shrink:0"></div>
+            <span style="font-size:10px;color:var(--fg2);min-width:36px;font-family:var(--mono)">输入</span>
+            <span class="op-chip-demo">$1</span>
+            <span class="op-chip-demo">;$2</span>
+            <span class="op-chip-demo">|&gt;</span>
+          </div>
+          <div style="border-top:1px dashed rgba(255,255,255,0.06);padding-top:5px;display:flex;flex-wrap:wrap;align-items:center;gap:3px">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0"></div>
+            <span style="font-size:10px;color:var(--fg2);min-width:36px;font-family:var(--mono)">字符串</span>
+            <span class="op-chip-demo hover">string.format</span>
+            <span class="op-chip-demo">string.upper</span>
+            <span class="op-chip-demo">string.lower</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- OpChip states -->
+      <div class="comp-box">
+        <div class="comp-label">OpChip 状态 + InlineMsg 变体规格</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-bottom:4px">op-chip 状态</div>
+          <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+            <div style="text-align:center">
+              <span class="op-chip-demo" style="display:block;margin-bottom:2px">string.upper</span>
+              <span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">default</span>
+            </div>
+            <div style="text-align:center">
+              <span class="op-chip-demo hover" style="display:block;margin-bottom:2px">string.lower</span>
+              <span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">hover</span>
+            </div>
+            <div style="text-align:center">
+              <span class="op-chip-demo" style="display:block;margin-bottom:2px;border-color:rgba(67,105,239,0.42);outline:2px solid rgba(67,105,239,0.42)">expr(…)</span>
+              <span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">focus</span>
+            </div>
+          </div>
+        </div>
+        <div class="panel-spec">
+          <div class="panel-spec-row"><span class="pk">op-chip bg-default</span><span class="pv">rgba(fff,0.06)</span></div>
+          <div class="panel-spec-row"><span class="pk">op-chip bg-hover</span><span class="pv">rgba(fff,0.09)</span></div>
+          <div class="panel-spec-row"><span class="pk">hover transform</span><span class="pv">translateY(-1px)</span></div>
+          <div class="panel-spec-row"><span class="pk">click action</span><span class="pv">insertAtCursor(textarea)</span></div>
+          <div class="panel-spec-row"><span class="pk">inline-msg err bg</span><span class="pv">rgba(255,75,123,0.14)</span></div>
+          <div class="panel-spec-row"><span class="pk">inline-msg ok bg</span><span class="pv">rgba(4,215,147,0.22)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 5 — 组件规格（二）: 右栏反馈区 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s5">
+  <div class="slide-header">
+    <div class="slide-num">05 / 09</div>
+    <div class="slide-title">组件规格（二）· 右栏反馈区</div>
+  </div>
+  <div class="slide-body" style="gap:12px">
+    <!-- Left half -->
+    <div style="flex:1;display:flex;flex-direction:column;gap:10px;padding-right:12px;border-right:1px solid var(--border)">
+      <!-- ExCard -->
+      <div class="comp-box" style="flex-shrink:0">
+        <div class="comp-label">ExCard · 3 张可点击示例卡片</div>
+        <div class="ex-card-demo">
+          <div style="font-size:11px;font-weight:600;color:var(--fg)">数值格式化</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--primary);margin:2px 0">$1 |&gt; string.format("%.2f")</div>
+          <div style="font-size:10px;color:var(--fg3)">输入 <b style="color:var(--fg2)">3.14159</b> → 输出 <b style="color:var(--success)">"3.14"</b></div>
+        </div>
+        <div style="display:flex;gap:7px;font-size:9px;font-family:var(--mono);color:var(--fg4);margin-top:3px">
+          <span style="color:var(--fg3)">default: bg #161616 · border rgba(fff,0.10)</span>
+          <span style="color:var(--primary)">hover: translateY(-1px) · border-strong</span>
+        </div>
+      </div>
+
+      <!-- Stage data flow -->
+      <div class="comp-box" style="flex:1">
+        <div class="comp-label">Stage · 管道阶段数据流（flow-input + stage-io + type-chip）</div>
+        <!-- flow-input -->
+        <div style="background:var(--surf1);border:1px dashed rgba(255,255,255,0.10);border-radius:6px;padding:5px 10px;font-family:var(--mono);font-size:10px;color:var(--fg2);margin-bottom:3px">
+          <span style="color:var(--fg4)">输入：</span> "hello"
+        </div>
+        <!-- arrow -->
+        <div style="display:flex;flex-direction:column;align-items:center;margin:1px 0">
+          <div style="width:1px;height:6px;background:rgba(255,255,255,0.16)"></div>
+          <div style="font-size:7px;color:var(--fg4)">▼</div>
+        </div>
+        <!-- stage normal -->
+        <div class="stage-demo" style="margin-bottom:3px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="font-size:9px;color:var(--fg3);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:999px;padding:0px 6px">① stage</span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--fg2)">string.upper</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-family:var(--mono);font-size:10px;color:var(--fg2)">"hello"</span>
+            <span style="color:var(--fg4)">→</span>
+            <span style="font-family:var(--mono);font-size:10px;font-weight:600;color:var(--success)">"HELLO"</span>
+            <span class="type-chip string">string</span>
+          </div>
+        </div>
+        <!-- stage errored -->
+        <div class="stage-demo errored" style="margin-bottom:3px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="font-size:9px;color:var(--danger);background:rgba(255,75,123,0.10);border:1px solid rgba(255,75,123,0.3);border-radius:999px;padding:0px 6px">② stage</span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--fg2)">expr(unknownFn)</span>
+          </div>
+          <div style="font-size:10px;color:var(--danger);font-family:var(--mono)">✕ unknownFn is not defined</div>
+        </div>
+        <div style="font-size:9px;color:var(--fg4);font-family:var(--mono)">default: border-left 3px solid #4369EF · errored: border #FF4B7B · skipped: opacity 0.45</div>
+      </div>
+    </div>
+
+    <!-- Right half -->
+    <div style="flex:1;display:flex;flex-direction:column;gap:10px;padding-left:12px">
+      <!-- FinalResult -->
+      <div class="comp-box" style="flex-shrink:0">
+        <div class="comp-label">FinalResult · 最终结果区状态变体</div>
+        <div style="display:flex;gap:6px;margin-bottom:5px">
+          <div style="flex:1">
+            <div style="font-size:8px;color:var(--fg4);font-family:var(--mono);margin-bottom:2px;text-align:center">waiting</div>
+            <div class="final-result-demo waiting">等待输入…</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:8px;color:var(--fg4);font-family:var(--mono);margin-bottom:2px;text-align:center">success</div>
+            <div class="final-result-demo success">"HELLO WORLD"</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:8px;color:var(--fg4);font-family:var(--mono);margin-bottom:2px;text-align:center">error</div>
+            <div class="final-result-demo error">unknownFn is not defined</div>
+          </div>
+        </div>
+        <div class="panel-spec">
+          <div class="panel-spec-row"><span class="pk">success border</span><span class="pv">#4369EF · 600/20px</span></div>
+          <div class="panel-spec-row"><span class="pk">error border</span><span class="pv">#FF4B7B · 14px/normal</span></div>
+          <div class="panel-spec-row"><span class="pk">waiting text</span><span class="pv">rgba(fff,0.40) italic</span></div>
+        </div>
+      </div>
+
+      <!-- PassBadge + vrow -->
+      <div class="comp-box" style="flex:1">
+        <div class="comp-label">PassBadge + 批量结果行（vrow）状态</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <span class="pass-badge-demo ok">✓ 通过 18/20</span>
+          <span class="pass-badge-demo bad">✗ 有失败 2/20</span>
+        </div>
+        <!-- vrow samples -->
+        <div style="border:1px solid rgba(255,255,255,0.06);border-radius:5px;overflow:hidden">
+          <div style="display:flex;background:rgba(255,255,255,0.04);border-bottom:1px solid var(--border);height:28px;align-items:center;font-size:9px;font-family:var(--mono);color:var(--fg3)">
+            <span style="width:28px;padding:0 7px">#</span>
+            <span style="flex:1;padding:0 7px">输入</span>
+            <span style="flex:1;padding:0 7px">期望</span>
+            <span style="flex:1;padding:0 7px">实际</span>
+            <span style="width:40px;padding:0 7px;text-align:center">状态</span>
+          </div>
+          <div style="display:flex;height:26px;align-items:center;font-size:9px;font-family:var(--mono);border-bottom:1px solid var(--border)">
+            <span style="width:28px;padding:0 7px;color:var(--fg4)">1</span>
+            <span style="flex:1;padding:0 7px;color:var(--fg2)">"hello"</span>
+            <span style="flex:1;padding:0 7px;color:var(--fg2)">"HELLO"</span>
+            <span style="flex:1;padding:0 7px;color:var(--fg2)">"HELLO"</span>
+            <span style="width:40px;padding:0 4px;text-align:center"><span style="background:var(--success);color:#101010;border-radius:999px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700">✓</span></span>
+          </div>
+          <div style="display:flex;height:26px;align-items:center;font-size:9px;font-family:var(--mono);background:rgba(255,75,123,0.14)">
+            <span style="width:28px;padding:0 7px;color:var(--fg4)">2</span>
+            <span style="flex:1;padding:0 7px;color:var(--fg2)">"world"</span>
+            <span style="flex:1;padding:0 7px;color:var(--fg2)">"WORLD"</span>
+            <span style="flex:1;padding:0 7px;color:var(--danger)">"world"</span>
+            <span style="width:40px;padding:0 4px;text-align:center"><span style="background:var(--danger);color:#fff;border-radius:999px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700">✗</span></span>
+          </div>
+        </div>
+        <div style="font-size:9px;color:var(--fg4);font-family:var(--mono);margin-top:4px">row-height: 36px · vrow hover: rgba(fff,0.06) · mismatch: tone-critical-bg · errored: tone-warning-bg</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 6 — 状态矩阵 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s6">
+  <div class="slide-header">
+    <div class="slide-num">06 / 09</div>
+    <div class="slide-title">状态矩阵 · 组件 × 状态</div>
+  </div>
+  <div class="slide-body" style="padding-top:14px">
+    <div class="matrix-wrap" style="flex:1;overflow:hidden">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:110px">组件</th>
+            <th>default</th>
+            <th>hover</th>
+            <th>focus</th>
+            <th>active</th>
+            <th>disabled</th>
+            <th>error</th>
+            <th>empty</th>
+            <th>loading</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong style="font-size:10px">ExprTextarea</strong><br/><span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">.expr-textarea</span></td>
+            <td><span class="st-cell st-default">border rgba(fff,0.10)</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-focus">border #4369EF ring 3px</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-invalid">border #FF4B7B ring</span></td>
+            <td><span class="st-cell st-empty">允许空值</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:10px">OpChip</strong><br/><span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">.op-chip</span></td>
+            <td><span class="st-cell st-default">rgba(fff,0.06) bg</span></td>
+            <td><span class="st-cell st-hover">rgba(fff,0.09) translateY(-1)</span></td>
+            <td><span class="st-cell st-focus">focus-ring 2px</span></td>
+            <td><span class="st-cell st-active">insertAtCursor 触发</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:10px">ExCard</strong><br/><span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">.ex-card</span></td>
+            <td><span class="st-cell st-default">bg #161616 border 0.10</span></td>
+            <td><span class="st-cell st-hover">translateY(-1) border-strong</span></td>
+            <td><span class="st-cell st-focus">outline 2px primary</span></td>
+            <td><span class="st-cell st-active">useExample(i) 触发</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:10px">Stage</strong><br/><span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">.stage</span></td>
+            <td><span class="st-cell st-default">border-left 3px #4369EF</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-active">waiting io-out italic</span></td>
+            <td><span class="st-cell st-disabled">skipped opacity 0.45</span></td>
+            <td><span class="st-cell st-invalid">errored border #FF4B7B</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:10px">FinalResult</strong><br/><span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">.final-result</span></td>
+            <td><span class="st-cell st-default">waiting 态</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-valid">success 600/20px</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-invalid">error border #FF4B7B</span></td>
+            <td><span class="st-cell st-empty">等待输入 italic</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:10px">PassBadge</strong><br/><span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">.pass-badge</span></td>
+            <td><span class="st-cell st-default">隐藏（执行前）</span></td>
+            <td><span class="st-cell st-hover">系统 cursor pointer</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-valid">ok bg #04D793</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-invalid">bad bg #FF4B7B</span></td>
+            <td><span class="st-cell st-empty">隐藏</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:10px">InputRow</strong><br/><span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">.input-row</span></td>
+            <td><span class="st-cell st-default">border rgba(fff,0.10)</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-focus">border #4369EF ring</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-invalid">warn border #FFAA3B</span></td>
+            <td><span class="st-cell st-empty">param-msg 显示警告</span></td>
+            <td><span class="st-na">—</span></td>
+          </tr>
+          <tr>
+            <td><strong style="font-size:10px">VRow（批量行）</strong><br/><span style="font-size:8px;color:var(--fg4);font-family:var(--mono)">.vrow</span></td>
+            <td><span class="st-cell st-default">transparent match态</span></td>
+            <td><span class="st-cell st-hover">rgba(fff,0.06)</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-invalid">mismatch tone-critical</span></td>
+            <td><span class="st-na">—</span></td>
+            <td><span class="st-cell st-loading">errored tone-warning</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 7 — 交互序列 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s7">
+  <div class="slide-header">
+    <div class="slide-num">07 / 09</div>
+    <div class="slide-title">交互序列 · 数据流</div>
+  </div>
+  <div class="slide-body" style="padding-top:12px">
+    <div class="flow-cols">
+      <!-- Flow 1: 应用表达式 -->
+      <div class="flow-col">
+        <div class="flow-title">① 应用表达式流程</div>
+        <div class="step-box trigger">
+          <div class="step-label">USER INPUT</div>
+          <div class="step-text">输入表达式<br/><strong>Ctrl+Enter / 点击「应用」</strong></div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">PARSE</div>
+          <div class="step-text">parsePipeExpr(raw) &lt; 1ms<br/>→ {ok, inputs, stages}</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">RENDER FIELDS</div>
+          <div class="step-text">renderInputFields()<br/>→ input-row × N<br/>renderPipelineSlots()</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">HISTORY</div>
+          <div class="step-text">saveHistory(expr)<br/>→ localStorage 去重写入</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box output">
+          <div class="step-label">SUCCESS PATH</div>
+          <div class="step-text">inline-msg ok 3s<br/>右栏管道骨架更新</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box error-path">
+          <div class="step-label">FAIL PATH</div>
+          <div class="step-text">inline-msg err 显示<br/>textarea border #FF4B7B</div>
+        </div>
+      </div>
+
+      <!-- Flow 2: 实时参数计算 -->
+      <div class="flow-col">
+        <div class="flow-title">② 实时参数计算流程</div>
+        <div class="step-box trigger">
+          <div class="step-label">INPUT EVENT</div>
+          <div class="step-text">input-field 输入值<br/>300ms debounce</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">EVALUATE</div>
+          <div class="step-text">evaluator.evaluate(<br/>parsedExpr, inputValues,<br/>templateVarsMap)</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">STAGE EVAL</div>
+          <div class="step-text">_evalStage() × N<br/>→ intermediates[]</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">UPDATE DOM</div>
+          <div class="step-text">updateFlowInput()<br/>updateStageIO(intermediates)</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box output">
+          <div class="step-label">SUCCESS</div>
+          <div class="step-text">final-result success态<br/>type-chip 显示</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box error-path">
+          <div class="step-label">FAIL</div>
+          <div class="step-text">stage.errored 红框<br/>后续 stage.skipped 灰</div>
+        </div>
+      </div>
+
+      <!-- Flow 3: 批量用例执行 -->
+      <div class="flow-col">
+        <div class="flow-title">③ 批量用例执行流程</div>
+        <div class="step-box trigger">
+          <div class="step-label">PASTE + LOAD</div>
+          <div class="step-text">粘贴文本 → 「加载用例」<br/>或 F5 快捷键</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">PARSE</div>
+          <div class="step-text">parseTestCaseText(text)<br/>→ {cases, errors}</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">BATCH EXEC</div>
+          <div class="step-text">executeBatch()<br/>forEach → evaluate()<br/>compare actual vs expected</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box process">
+          <div class="step-label">STATS</div>
+          <div class="step-text">renderBatchStats()<br/>total/matched/mismatched</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box output">
+          <div class="step-label">RENDER</div>
+          <div class="step-text">pass-badge + filter-bar<br/>虚拟滚动 renderVirtualRows()</div>
+        </div>
+        <div class="step-spacer"><div class="step-arrow-line"></div><div class="step-arrow-head">▼</div></div>
+        <div class="step-box error-path">
+          <div class="step-label">PARSE FAIL</div>
+          <div class="step-text">tc-load-err errbox 显示<br/>行号 + 错误文案</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 8 — 可访问性 & 设计审查 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s8">
+  <div class="slide-header">
+    <div class="slide-num">08 / 09</div>
+    <div class="slide-title">可访问性 & 设计审查</div>
+  </div>
+  <div class="slide-body" style="gap:0">
+    <!-- Left: A11y -->
+    <div class="review-col" style="padding-right:14px">
+      <div class="review-title">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#04D793" stroke-width="1.3"/><text x="3.5" y="10.5" font-size="8" fill="#04D793" font-weight="700">A</text></svg>
+        可访问性审查 WCAG 2.1 AA · A1–A12
+      </div>
+      <table style="font-size:9px">
+        <thead>
+          <tr>
+            <th style="padding:4px 5px">#</th>
+            <th style="padding:4px 5px">位置</th>
+            <th style="padding:4px 5px">问题</th>
+            <th style="padding:4px 5px">严重度</th>
+            <th style="padding:4px 5px">修复</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A1</td><td style="padding:3px 5px;color:var(--fg3)">vrow.mismatch</td><td style="padding:3px 5px;color:var(--fg)">行无 role/aria-label</td><td style="padding:3px 5px"><span style="color:var(--danger);font-size:8px;font-weight:700">Critical</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A2</td><td style="padding:3px 5px;color:var(--fg3)">inline-msg</td><td style="padding:3px 5px;color:var(--fg)">无 aria-live/role=alert</td><td style="padding:3px 5px"><span style="color:var(--warning);font-size:8px;font-weight:700">Major</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A3</td><td style="padding:3px 5px;color:var(--fg3)">op-head</td><td style="padding:3px 5px;color:var(--fg)">div 而非 button，无键盘</td><td style="padding:3px 5px"><span style="color:var(--warning);font-size:8px;font-weight:700">Major</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A4</td><td style="padding:3px 5px;color:var(--fg3)">tpl-head</td><td style="padding:3px 5px;color:var(--fg)">同 A3，div onclick</td><td style="padding:3px 5px"><span style="color:var(--warning);font-size:8px;font-weight:700">Major</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A5</td><td style="padding:3px 5px;color:var(--fg3)">badge-select</td><td style="padding:3px 5px;color:var(--fg)">select 无关联 label</td><td style="padding:3px 5px"><span style="color:var(--warning);font-size:8px;font-weight:700">Major</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A6</td><td style="padding:3px 5px;color:var(--fg3)">input-field</td><td style="padding:3px 5px;color:var(--fg)">无 label 或 aria-label</td><td style="padding:3px 5px"><span style="color:var(--warning);font-size:8px;font-weight:700">Major</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A7</td><td style="padding:3px 5px;color:var(--fg3)">tc-load-err</td><td style="padding:3px 5px;color:var(--fg)">无 role=alert 通告</td><td style="padding:3px 5px"><span style="color:var(--fg3);font-size:8px">Minor</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A8</td><td style="padding:3px 5px;color:var(--fg3)">pass-badge</td><td style="padding:3px 5px;color:var(--fg)">无 aria-label 描述行为</td><td style="padding:3px 5px"><span style="color:var(--fg3);font-size:8px">Minor</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A9</td><td style="padding:3px 5px;color:var(--fg3)">theme-seg</td><td style="padding:3px 5px;color:var(--fg)">class=active 无 aria-pressed</td><td style="padding:3px 5px"><span style="color:var(--fg3);font-size:8px">Minor</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A10</td><td style="padding:3px 5px;color:var(--fg3)">virtual table</td><td style="padding:3px 5px;color:var(--fg)">无 role=table/row/cell</td><td style="padding:3px 5px"><span style="color:var(--warning);font-size:8px;font-weight:700">Major</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A11</td><td style="padding:3px 5px;color:var(--fg3)">op-chip hint</td><td style="padding:3px 5px;color:var(--fg)">对比度 ~3.2:1 不足</td><td style="padding:3px 5px"><span style="color:var(--fg3);font-size:8px">Minor</span></td><td style="padding:3px 5px"><span class="find-status status-warn">待修</span></td></tr>
+          <tr><td style="padding:3px 5px;font-family:var(--mono);color:var(--fg4)">A12</td><td style="padding:3px 5px;color:var(--fg3)">浮层菜单</td><td style="padding:3px 5px;color:var(--fg)">Esc 无法关闭</td><td style="padding:3px 5px"><span style="color:var(--fg3);font-size:8px">Minor</span></td><td style="padding:3px 5px"><span class="find-status status-eng">工程版</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Right: Design review -->
+    <div class="review-col">
+      <div class="review-title">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#4369EF" stroke-width="1.3"/><path d="M3.5 7l2 2 5-5" stroke="#4369EF" stroke-width="1.3" stroke-linecap="round"/></svg>
+        设计审查 · D1–D5 主要问题
+      </div>
+      <div class="finding">
+        <div class="find-id">D1</div>
+        <div class="find-body">
+          <div class="find-text">op-panel 折叠后操作指引消失，用户不知面板内容</div>
+          <div class="find-status status-eng">工程版：折叠态常驻数量 badge "9 个操作符"</div>
+        </div>
+      </div>
+      <div class="finding">
+        <div class="find-id">D2</div>
+        <div class="find-body">
+          <div class="find-text">表达式修改后「已应用」vs「未应用」视觉无区别</div>
+          <div class="find-status status-eng">工程版：改动后立即切回未应用态 + action-bar 提示</div>
+        </div>
+      </div>
+      <div class="finding">
+        <div class="find-id">D3</div>
+        <div class="find-body">
+          <div class="find-text">输入参数全空时呈现 3 种空态并存，信息优先级模糊</div>
+          <div class="find-status status-eng">工程版：参数全空时隐藏管道轨迹区</div>
+        </div>
+      </div>
+      <div class="finding">
+        <div class="find-id">D4</div>
+        <div class="find-body">
+          <div class="find-text">用例模式步骤编号跨栏跳转，违反左操作右反馈叙事</div>
+          <div class="find-status status-warn">待确认：改为 ①加载→②执行→③结果 独立编号</div>
+        </div>
+      </div>
+      <div class="finding">
+        <div class="find-id">D5</div>
+        <div class="find-body">
+          <div class="find-text">参数类型 SYNC/REF/CONST 界面内无 tooltip 解释</div>
+          <div class="find-status status-eng">工程版：option title tooltip 说明</div>
+        </div>
+      </div>
+
+      <!-- Strengths -->
+      <div style="margin-top:8px">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--success);margin-bottom:5px;font-weight:600">设计亮点</div>
+        <div class="strength-item"><span class="strength-num">①</span><span>双栏空间叙事完整：左 55% 操作 + 右 45% 反馈，宽屏无孤岛感</span></div>
+        <div class="strength-item"><span class="strength-num">②</span><span>首用 30s 引导有效：3 张示例卡一键填入，覆盖数值/字符串/条件三类场景</span></div>
+        <div class="strength-item"><span class="strength-num">③</span><span>管道数据流可视化：入→操作→出 + 类型 chip + 出错红框 + 跳过灰化</span></div>
+        <div class="strength-item"><span class="strength-num">④</span><span>批量结果可读性强：pass-badge + vrow 行级状态色 + mic 图标双重编码</span></div>
+      </div>
+
+      <!-- WCAG summary -->
+      <div style="margin-top:6px;background:rgba(4,215,147,0.07);border:1px solid rgba(4,215,147,0.22);border-radius:var(--r);padding:7px 10px">
+        <div style="font-size:10px;color:var(--success);font-weight:600;margin-bottom:3px">已符合 WCAG 2.1 AA 项目 (10/21)</div>
+        <div style="font-size:9px;color:var(--fg3);line-height:1.6;font-family:var(--mono)">
+          ✓ Focus 可见环 · ✓ kbd 语义标签 · ✓ role=tablist<br/>
+          ✓ 状态颜色+图标双编码 · ✓ spellcheck=false · ✓ aria-hidden 装饰图
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SLIDE 9 — 机会点落地对照 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s9" style="flex-direction:column">
+  <div class="slide-header">
+    <div class="slide-num">09 / 09</div>
+    <div class="slide-title">机会点落地对照 · Phase 1 → Phase 2</div>
+  </div>
+  <div class="slide-body" style="flex-direction:column;gap:0;padding-bottom:14px">
+    <div style="flex:1;overflow:hidden">
+      <table class="opp-table">
+        <thead>
+          <tr>
+            <th style="min-width:28px">#</th>
+            <th>机会点 / 原始问题</th>
+            <th style="min-width:40px">优先级</th>
+            <th style="min-width:44px">落地状态</th>
+            <th>在 uxspec 的落点</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">B11</td><td style="color:var(--fg)">首屏 ~50% 空白 → 3 张可点击示例卡片</td><td><span style="color:var(--danger);font-family:var(--mono);font-size:9px;font-weight:700">P0</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 2.7 示例卡片 + §九 9.4</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">B12</td><td style="color:var(--fg)">20+ 操作符一行挤压 → 分类 Chip 组（输入/字符串/自定义）</td><td><span style="color:var(--danger);font-family:var(--mono);font-size:9px;font-weight:700">P0</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 2.6 op-panel + 操作符分组</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">B13</td><td style="color:var(--fg)">宽屏内容孤岛 → 双栏布局（55/45）</td><td><span style="color:var(--danger);font-family:var(--mono);font-size:9px;font-weight:700">P0</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§一 1.1 ASCII 树 + §七 布局策略</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">B1/F2</td><td style="color:var(--fg)">alert() → inline 实时校验（300ms debounce）</td><td><span style="color:var(--danger);font-family:var(--mono);font-size:9px;font-weight:700">P0</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 2.5 inline-msg + §九 9.1</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">B2</td><td style="color:var(--fg)">参数为空 alert → 行内 warning badge</td><td><span style="color:var(--danger);font-family:var(--mono);font-size:9px;font-weight:700">P0</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 2.11 input-row warn 态</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">C1</td><td style="color:var(--fg)">Ctrl+Enter / F5 快捷键</td><td><span style="color:var(--danger);font-family:var(--mono);font-size:9px;font-weight:700">P0</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§八 8.2 快捷键表</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">C5/B3</td><td style="color:var(--fg)">模板变量折叠面板 + postMessage 通道</td><td><span style="color:var(--danger);font-family:var(--mono);font-size:9px;font-weight:700">P0</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§九 9.5 postMessage 序列</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">B14</td><td style="color:var(--fg)">管道阶段纯文本 → 箭头 + in→op→out + 类型 chip</td><td><span style="color:var(--warning);font-family:var(--mono);font-size:9px;font-weight:700">P1</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 2.8 stage + §二 2.9 type-chip</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">B15</td><td style="color:var(--fg)">无通过率摘要 → pass-badge + 行级状态色</td><td><span style="color:var(--warning);font-family:var(--mono);font-size:9px;font-weight:700">P1</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 2.12 pass-badge + §二 2.14 vrow</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">C2</td><td style="color:var(--fg)">表达式历史 localStorage</td><td><span style="color:var(--warning);font-family:var(--mono);font-size:9px;font-weight:700">P1</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 2.13 + §六 HistoryItem schema</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">C3</td><td style="color:var(--fg)">批量结果筛选 chip（全部/通过/不匹配/错误）</td><td><span style="color:var(--warning);font-family:var(--mono);font-size:9px;font-weight:700">P1</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§八 8.3 filter-chip 状态枚举</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">F4/B10</td><td style="color:var(--fg)">全面 token 化（零硬编码颜色）</td><td><span style="color:var(--warning);font-family:var(--mono);font-size:9px;font-weight:700">P1</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§三 色彩 Token 表（全 PTO 语义 token）</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">F5/B5</td><td style="color:var(--fg)">参数徽章动态类型 badge-select</td><td><span style="color:var(--warning);font-family:var(--mono);font-size:9px;font-weight:700">P1</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 2.11 badge-select 状态枚举</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">F3/B8</td><td style="color:var(--fg)">顶栏 56px → 44px 紧凑 toolbar</td><td><span style="color:var(--warning);font-family:var(--mono);font-size:9px;font-weight:700">P1</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 2.1 topbar</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">F6/B9</td><td style="color:var(--fg)">章节标题 Emoji → SVG 图标</td><td><span style="color:var(--fg3);font-family:var(--mono);font-size:9px">P2</span></td><td><span class="landed">✅ 已落地</span></td><td style="color:var(--fg3)">§二 panel-title（各 SVG）</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">A1–A12</td><td style="color:var(--fg)">可访问性修复（12 项）</td><td><span style="color:var(--accent);font-family:var(--mono);font-size:9px">工程必修</span></td><td><span class="partial">⛔ Demo 未修</span></td><td style="color:var(--fg3)">accessibility-audit.md · 工程版 Step 5</td></tr>
+          <tr><td style="font-family:var(--mono);color:var(--fg4)">D1–D5</td><td style="color:var(--fg)">设计改进点（5 项主要）</td><td><span style="color:var(--accent);font-family:var(--mono);font-size:9px">迭代</span></td><td><span class="partial">◑ 部分规划</span></td><td style="color:var(--fg3)">design-review.md · D1-D5 工程版</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Summary badges -->
+    <div class="opp-summary">
+      <div class="opp-badge">
+        <div class="ob-label">P0 落地</div>
+        <div class="ob-val">✅ 全部落地</div>
+      </div>
+      <div class="opp-badge">
+        <div class="ob-label">P1 落地</div>
+        <div class="ob-val">✅ 全部落地</div>
+      </div>
+      <div class="opp-badge">
+        <div class="ob-label">P2 落地</div>
+        <div class="ob-val">✅ 全部落地</div>
+      </div>
+      <div class="opp-badge">
+        <div class="ob-label">可访问性</div>
+        <div class="ob-val" style="color:var(--primary)">工程版修复 12 项</div>
+      </div>
+      <div class="opp-badge">
+        <div class="ob-label">设计改进 D1–D5</div>
+        <div class="ob-val" style="color:var(--warning)">部分规划入工程版</div>
+      </div>
+      <div class="opp-badge">
+        <div class="ob-label">单元测试</div>
+        <div class="ob-val">34 / 34 通过</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="del-footer">
+    <span class="del-badge">34/34 单元测试通过</span>
+    <span class="del-badge">P0/P1/P2 机会点全部落地</span>
+    <span class="del-badge">WCAG 2.1 AA 工程版 12 项修复</span>
+    <span style="margin-left:auto;color:var(--fg4);font-size:10px;font-family:var(--mono)">管道表达式批量评估器 · UX 规格报告 · 2026-06-12</span>
+  </div>
+</div>
+
+</div><!-- #canvas -->
+</div><!-- #stage -->
+
+<!-- Navigation -->
+<div id="nav">
+  <button id="btnPrev" onclick="prevSlide()" disabled title="上一页 (←)">&#8592;</button>
+  <span id="counter">1 / 9</span>
+  <button id="btnNext" onclick="nextSlide()" title="下一页 (→)">&#8594;</button>
+</div>
+
+<script>
+(function(){
+  var TOTAL = 9;
+  var current = 1;
+
+  function scaleCanvas(){
+    var canvas = document.getElementById('canvas');
+    var sw = window.innerWidth;
+    var sh = window.innerHeight;
+    var scaleX = sw / 1280;
+    var scaleY = sh / 720;
+    var scale = Math.min(scaleX, scaleY) * 0.97;
+    canvas.style.transform = 'scale(' + scale + ')';
+  }
+
+  function showSlide(n){
+    document.querySelectorAll('.slide').forEach(function(s){ s.classList.remove('active'); });
+    var target = document.getElementById('s' + n);
+    if(target) target.classList.add('active');
+    document.getElementById('counter').textContent = n + ' / ' + TOTAL;
+    document.getElementById('btnPrev').disabled = (n <= 1);
+    document.getElementById('btnNext').disabled = (n >= TOTAL);
+  }
+
+  window.prevSlide = function(){
+    if(current > 1){ current--; showSlide(current); }
+  };
+  window.nextSlide = function(){
+    if(current < TOTAL){ current++; showSlide(current); }
+  };
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight' || e.key === 'ArrowDown') window.nextSlide();
+    if(e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   window.prevSlide();
+  });
+
+  window.addEventListener('resize', scaleCanvas);
+  scaleCanvas();
+  showSlide(1);
+})();
+</script>
+</body>
+</html>
