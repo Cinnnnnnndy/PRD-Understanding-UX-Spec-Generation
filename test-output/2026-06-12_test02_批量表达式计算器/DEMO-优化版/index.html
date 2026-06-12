@@ -395,12 +395,117 @@ code, .mono { font: var(--text-mono); }
 
 /* ── App shell ────────────────────────────────────────────────────────────── */
 .app-shell {
-  max-width: 1040px;
+  max-width: 1440px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
+
+/* ── 双栏骨架（B13：左=操作，右=反馈）─────────────────────────────────────── */
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.main-col { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+@media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
+
+/* 步骤编号 chip（①②③④ 空间叙事） */
+.num-chip {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1.5px solid var(--primary); color: var(--primary);
+  font: var(--text-label);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+
+/* ── 操作符 Chip 面板（B12：分类分组 + hover 签名 + 点击插入）──────────────── */
+.op-panel { margin-top: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-1); }
+.op-head {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer; user-select: none;
+  color: var(--foreground-muted); font: var(--text-body-sm);
+}
+.op-head .caret { display: flex; }
+.op-head .caret svg { transition: transform var(--duration-fast) var(--easing-default); }
+.op-panel.open .op-head .caret svg { transform: rotate(90deg); }
+.op-body { display: none; padding: 0 var(--space-3) var(--space-3); flex-direction: column; gap: var(--space-2); }
+.op-panel.open .op-body { display: flex; }
+.op-group { display: flex; align-items: flex-start; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px dashed var(--border-subtle); }
+.op-group:first-child { border-top: none; padding-top: 0; }
+.op-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 8px; flex: none; }
+.op-gname { font: var(--text-label); letter-spacing: var(--letter-spacing-label); color: var(--foreground-secondary); width: 44px; flex: none; margin-top: 5px; }
+.op-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.op-chip {
+  font: var(--text-mono); font-size: 11px;
+  color: var(--foreground-secondary);
+  background: var(--comp-tag-bg); border: 1px solid var(--comp-tag-border);
+  border-radius: var(--radius-sm); padding: 3px 8px; cursor: pointer;
+  transition: all var(--duration-fast) var(--easing-default);
+}
+.op-chip:hover { color: var(--foreground); border-color: var(--border-strong); background: var(--state-hover); transform: translateY(-1px); }
+.op-chip .hint { color: var(--foreground-muted); font-family: var(--font-sans); }
+
+/* ── 空态示例卡片（B11：可操作的引导，一键填入演示）────────────────────────── */
+.ex-cards { display: flex; flex-direction: column; gap: var(--space-2); }
+.ex-card {
+  text-align: left; width: 100%;
+  background: var(--card-bg); border: 1px solid var(--card-border);
+  border-radius: var(--card-radius); padding: var(--space-3);
+  cursor: pointer; display: flex; flex-direction: column; gap: 6px;
+  transition: all var(--duration-fast) var(--easing-default);
+  font-family: var(--font-sans);
+}
+.ex-card:hover { border-color: var(--card-hover-border); background: var(--state-hover); transform: translateY(-1px); }
+.ex-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.ex-title { font: var(--text-body-sm); font-weight: 600; color: var(--foreground); }
+.ex-expr { font: var(--text-mono); font-size: 11px; color: var(--primary); word-break: break-all; }
+.ex-io { font: var(--text-body-sm); color: var(--foreground-muted); }
+.ex-io b { color: var(--success); font-weight: 600; }
+
+/* ── 数据流轨迹（B14：阶段间箭头 + 入→出 + 类型标注）──────────────────────── */
+.flow-input {
+  font: var(--text-mono); font-size: 12px;
+  color: var(--foreground-secondary);
+  background: var(--surface-1);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  word-break: break-all;
+}
+.flow-arrow { display: flex; flex-direction: column; align-items: center; margin: 2px 0; color: var(--foreground-muted); }
+.flow-arrow .bar { width: 2px; height: 10px; background: var(--border-strong); }
+.flow-arrow .tip { font-size: 9px; line-height: 1; margin-top: -1px; }
+.stage-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: 6px; min-width: 0; }
+.stage-idx {
+  font: var(--text-label); color: var(--foreground-muted);
+  background: var(--comp-tag-bg); border: 1px solid var(--comp-tag-border);
+  border-radius: var(--tag-radius); padding: 1px 8px; flex: none;
+}
+.stage-io { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font: var(--text-body); }
+.io-in { color: var(--foreground-secondary); font: var(--text-mono); font-size: 12px; word-break: break-all; }
+.io-arr { color: var(--foreground-muted); flex: none; }
+.io-out { font: var(--text-mono); font-size: 12px; font-weight: 600; word-break: break-all; }
+.io-out.waiting { color: var(--foreground-muted); font-style: italic; font-weight: 400; }
+.type-chip { font: var(--text-label); border-radius: var(--tag-radius); padding: 1px 7px; flex: none; background: var(--comp-tag-bg); color: var(--foreground-muted); }
+.type-num { background: var(--tone-info-bg); color: var(--primary); }
+.type-str { background: var(--tone-green-strong); color: var(--success); }
+.type-bool { background: var(--tone-warning-bg); color: var(--warning); }
+.stage.skipped { opacity: .45; }
+.stage.errored { border-color: var(--danger); }
+
+/* ── 通过率摘要 badge（B15）────────────────────────────────────────────────── */
+.pass-badge {
+  font: var(--text-label); letter-spacing: .3px;
+  border-radius: var(--tag-radius); padding: 3px 10px;
+  cursor: pointer; border: none; margin-left: auto; flex: none;
+  font-weight: 700;
+}
+.pass-badge.ok  { background: var(--success); color: #08111f; }
+.pass-badge.bad { background: var(--danger);  color: #ffffff; }
 
 /* ── Top bar（替换原 56px 蓝色横幅 → 紧凑 toolbar）──────────────────────────── */
 .topbar {
@@ -792,14 +897,55 @@ kbd {
     </div>
   </div>
 
+  <!-- ── 双栏骨架：左=操作（表达式/参数），右=反馈（管道轨迹/结果）─────────── -->
+  <div class="main-grid">
+  <div class="main-col" id="col-left">
+
   <!-- ── Expression editor ────────────────────────────────────────────────── -->
   <div class="panel">
     <div class="panel-title">
+      <span class="num-chip">1</span>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M4 2v12M12 2v12M2 5h2M2 11h2M12 5h2M12 11h2"/></svg>
-      表达式
+      管道表达式
     </div>
     <textarea id="expr-input" class="expr-textarea" spellcheck="false">$1;$2 |> expr($1 + $2) |> expr($1 * 2)</textarea>
     <div id="expr-msg" class="inline-msg"></div>
+
+    <!-- 操作符 Chip 面板（B12：分类分组 · hover 签名 · 点击插入光标处）-->
+    <div class="op-panel open" id="op-panel">
+      <div class="op-head" onclick="toggleOpPanel()">
+        <span class="caret"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" width="12" height="12"><path d="M6 4l4 4-4 4"/></svg></span>
+        操作符面板 · 悬停看签名说明 · 点击插入到光标处
+      </div>
+      <div class="op-body">
+        <div class="op-group">
+          <span class="op-dot" style="background:var(--primary);"></span><span class="op-gname">输入</span>
+          <div class="op-chips">
+            <button class="op-chip" onclick="insertOp('$1')" title="$N · 引用第 N 个输入参数；首段用 ; 分隔多个输入">$1 <span class="hint">· 引用第 1 个输入参数</span></button>
+            <button class="op-chip" onclick="insertOp(';$2')" title="; · 在首段追加声明一个输入参数">;$2</button>
+            <button class="op-chip" onclick="insertOp(' |> ')" title="|> · 管道连接符，左侧输出作为右侧 $1（两侧必须有空格）">|&gt;</button>
+          </div>
+        </div>
+        <div class="op-group">
+          <span class="op-dot" style="background:var(--success);"></span><span class="op-gname">字符串</span>
+          <div class="op-chips">
+            <button class="op-chip" onclick="insertOp('string.format(&quot;%.2f&quot;, $1)')" title="string.format(fmt, …) · Lua 风格格式化：%d %f %s %x %b 等">string.format <span class="hint">"F"</span></button>
+            <button class="op-chip" onclick="insertOp('string.upper($1)')" title="string.upper(s) · 转大写">string.upper</button>
+            <button class="op-chip" onclick="insertOp('string.lower($1)')" title="string.lower(s) · 转小写">string.lower</button>
+            <button class="op-chip" onclick="insertOp('string.sub($1, 1, 3)')" title="string.sub(s, start, end) · 1 基截取，支持负索引">string.sub <span class="hint">S [L]</span></button>
+            <button class="op-chip" onclick="insertOp('string.gsub($1, &quot;a&quot;, &quot;b&quot;)')" title="string.gsub(s, pat, repl) · Lua pattern 全局替换（%d %a %s 等字符类）">string.gsub <span class="hint">"F" "T"</span></button>
+            <button class="op-chip" onclick="insertOp('string.cmp($1, &quot;expected&quot;)')" title="string.cmp(a, b) · 字符串相等比较，返回 true/false">string.cmp <span class="hint">"S"</span></button>
+          </div>
+        </div>
+        <div class="op-group">
+          <span class="op-dot" style="background:var(--warning);"></span><span class="op-gname">自定义</span>
+          <div class="op-chips">
+            <button class="op-chip" onclick="insertOp('expr($1 + $2)')" title="expr(<表达式>) · 算术/逻辑/位运算；? : 为 Lua 风格条件（0 和 &quot;&quot; 为真值）">expr <span class="hint">( &lt;JS&gt; )</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="expr-actions">
       <span class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> 应用</span>
       <button class="btn btn-secondary" onclick="resetExpr()">
@@ -828,6 +974,7 @@ kbd {
   <!-- ── Debug mode ───────────────────────────────────────────────────────── -->
   <div id="dbg-inputs" class="panel">
     <div class="panel-title">
+      <span class="num-chip">2</span>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
       输入参数
     </div>
@@ -853,31 +1000,7 @@ kbd {
     </div>
   </div>
 
-  <!-- ── Pipeline ─────────────────────────────────────────────────────────── -->
-  <div id="dbg-pipeline" class="panel">
-    <div class="panel-title">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 5h5l2 6h5M2 11h3"/><circle cx="14" cy="5" r="1.5"/></svg>
-      管道处理
-    </div>
-    <div id="pipeline-container"></div>
-  </div>
-
-  <!-- ── Final result ─────────────────────────────────────────────────────── -->
-  <div id="dbg-result" class="panel">
-    <div class="panel-title">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2l1.8 3.8L14 6.4l-3 2.9.7 4.2L8 11.5 4.3 13.5 5 9.3 2 6.4l4.2-.6z"/></svg>
-      最终结果
-    </div>
-    <div class="final-result waiting" id="final-result">等待输入…</div>
-    <div class="result-actions">
-      <button class="btn btn-secondary hidden" id="copy-btn" onclick="copyResult()">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h7"/></svg>
-        复制结果
-      </button>
-    </div>
-  </div>
-
-  <!-- ── History panel ────────────────────────────────────────────────────── -->
+  <!-- ── History panel（左栏：操作侧）────────────────────────────────────── -->
   <div id="dbg-history" class="panel">
     <div class="panel-title">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>
@@ -887,11 +1010,11 @@ kbd {
     <div id="history-list" class="history-list"></div>
   </div>
 
-  <!-- ── Test-case mode ───────────────────────────────────────────────────── -->
-  <div id="tc-container" class="hidden">
-
-    <div class="panel" style="margin-bottom:var(--space-4);">
+  <!-- ── Test-case mode · 左栏（加载用例）──────────────────────────────────── -->
+  <div id="tc-left" class="hidden">
+    <div class="panel">
       <div class="panel-title">
+        <span class="num-chip">2</span>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
         加载测试用例
       </div>
@@ -909,9 +1032,53 @@ kbd {
       </div>
       <div id="tc-load-err" class="errbox" style="margin-top:var(--space-3);"></div>
     </div>
+  </div>
+
+  </div><!-- /col-left -->
+  <div class="main-col" id="col-right">
+
+  <!-- ── 空态示例卡片（B11：右栏空白变成可操作引导）──────────────────────────── -->
+  <div id="dbg-empty" class="panel">
+    <div class="panel-title">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 1.5l2 4 4.5.5-3.3 3.1.9 4.4L8 11.3l-4.1 2.2.9-4.4L1.5 6l4.5-.5z"/></svg>
+      还没有数据？点一张示例立即看运行轨迹
+    </div>
+    <div class="ex-cards" id="ex-cards"></div>
+  </div>
+
+  <!-- ── Pipeline（B14：数据流轨迹）──────────────────────────────────────────── -->
+  <div id="dbg-pipeline" class="panel">
+    <div class="panel-title">
+      <span class="num-chip">3</span>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 5h5l2 6h5M2 11h3"/><circle cx="14" cy="5" r="1.5"/></svg>
+      管道处理
+      <span class="pt-hint">每阶段：入 → 操作 → 出</span>
+    </div>
+    <div id="pipeline-container"></div>
+  </div>
+
+  <!-- ── Final result ─────────────────────────────────────────────────────── -->
+  <div id="dbg-result" class="panel">
+    <div class="panel-title">
+      <span class="num-chip">4</span>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2l1.8 3.8L14 6.4l-3 2.9.7 4.2L8 11.5 4.3 13.5 5 9.3 2 6.4l4.2-.6z"/></svg>
+      最终结果
+    </div>
+    <div class="final-result waiting" id="final-result">等待输入…</div>
+    <div class="result-actions">
+      <button class="btn btn-secondary hidden" id="copy-btn" onclick="copyResult()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h7"/></svg>
+        复制结果
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Test-case mode · 右栏（执行 + 结果）───────────────────────────────── -->
+  <div id="tc-right" class="hidden">
 
     <div class="panel hidden" id="tc-exec-section" style="margin-bottom:var(--space-4);">
       <div class="panel-title">
+        <span class="num-chip">3</span>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 2L3 9h4l-1 5 6-7H8z"/></svg>
         批量执行
         <span class="pt-hint"><kbd>F5</kbd> 执行</span>
@@ -931,8 +1098,10 @@ kbd {
 
     <div class="panel hidden" id="tc-results-section">
       <div class="panel-title">
+        <span class="num-chip">4</span>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 14V9M6 14V4M10 14V7M14 14V2"/></svg>
         执行结果
+        <button class="pass-badge hidden" id="pass-badge" onclick="setFilter('mismatch')" title="点击筛选不匹配项"></button>
       </div>
       <div class="stats" id="tc-stats"></div>
       <div class="filter-bar" id="tc-filter"></div>
@@ -954,7 +1123,10 @@ kbd {
       </div>
     </div>
 
-  </div><!-- /tc-container -->
+  </div><!-- /tc-right -->
+
+  </div><!-- /col-right -->
+  </div><!-- /main-grid -->
 
 </div><!-- /app-shell -->
 
@@ -1351,14 +1523,24 @@ function onBadgeChange(idx, val) {
   b.textContent = BADGE_LABEL[val];
 }
 
+/* B14：数据流轨迹 —— 输入行 + 阶段间箭头 + 每阶段「入 → 操作 → 出」 */
 function renderPipelineSlots() {
   const c = document.getElementById('pipeline-container');
   if (!parsedExpr.ok || !parsedExpr.stages.length) { c.innerHTML = '<p class="muted-note">无管道处理阶段</p>'; return; }
-  c.innerHTML = parsedExpr.stages.map((s, i) => `
+  const arrow = '<div class="flow-arrow" aria-hidden="true"><span class="bar"></span><span class="tip">▼</span></div>';
+  c.innerHTML = '<div class="flow-input" id="flow-input">输入：等待参数…</div>' +
+    parsedExpr.stages.map((s, i) => arrow + `
     <div class="stage" id="stage-${i}">
-      <div class="stage-expr">${esc(s.raw)}</div>
-      <div class="stage-out waiting" id="sout-${i}">→ 等待输入…</div>
+      <div class="stage-head"><span class="stage-idx">阶段 ${i+1}</span><div class="stage-expr" style="margin-bottom:0;">${esc(s.raw)}</div></div>
+      <div class="stage-io" id="sio-${i}"><span class="io-out waiting">等待输入…</span></div>
     </div>`).join('');
+}
+
+/* 数据类型标注 chip */
+function typeChip(v) {
+  const t = v === null ? 'null' : typeof v;
+  const cls = t === 'number' ? 'type-num' : t === 'string' ? 'type-str' : t === 'boolean' ? 'type-bool' : '';
+  return `<span class="type-chip ${cls}">${t}</span>`;
 }
 
 function collectTplVars() {
@@ -1384,18 +1566,62 @@ function updateDebugResults() {
     }
   });
 
+  // B11：空态示例卡片 —— 参数未填齐时显示，填齐后隐藏
+  const emp = document.getElementById('dbg-empty');
+  if (emp && currentMode === 'debug') emp.classList.toggle('hidden', all && parsedExpr.ok);
+
+  const fin = document.getElementById('flow-input');
+
   if (!all || !parsedExpr.ok) {
     fr.className = 'final-result waiting'; fr.textContent = '等待输入…';
     cb.classList.add('hidden');
-    parsedExpr.stages && parsedExpr.stages.forEach((_, i) => { const el = document.getElementById('sout-' + i); if (el) { el.textContent = '→ 等待输入…'; el.className = 'stage-out waiting'; } });
+    if (fin) fin.textContent = '输入：等待参数…';
+    parsedExpr.stages && parsedExpr.stages.forEach((_, i) => {
+      const sio = document.getElementById('sio-' + i);
+      if (sio) sio.innerHTML = '<span class="io-out waiting">等待输入…</span>';
+      const st = document.getElementById('stage-' + i);
+      if (st) st.classList.remove('skipped', 'errored');
+    });
     return;
   }
   const res = evaluator.evaluate(parsedExpr, inputValues, collectTplVars());
+  const parsedIn = inputValues.map(v => evaluator._parseVal(v));
+  if (fin) fin.textContent = '输入：' + parsedIn.map((v, i) => `$${i+1} = ${fmtVal(v)}`).join('   ');
+
   if (!res.success) {
+    // 逐段重放定位出错阶段（只读复用 _evalStage，不改求值核心）
+    let failIdx = -1;
+    try {
+      evaluator.templateVars = collectTplVars();
+      let cur = parsedIn;
+      for (let i = 0; i < parsedExpr.stages.length; i++) {
+        try { cur = evaluator._evalStage(parsedExpr.stages[i], cur); }
+        catch (e) { failIdx = i; break; }
+      }
+    } catch (e) { failIdx = -1; }
+    parsedExpr.stages.forEach((_, i) => {
+      const st = document.getElementById('stage-' + i);
+      const sio = document.getElementById('sio-' + i);
+      if (!st || !sio) return;
+      st.classList.toggle('errored', i === failIdx);
+      st.classList.toggle('skipped', failIdx >= 0 && i > failIdx);
+      sio.innerHTML = i === failIdx
+        ? `<span class="io-out" style="color:var(--danger);">✗ ${esc(res.error)}</span>`
+        : (failIdx >= 0 && i > failIdx
+            ? '<span class="io-out waiting">未执行</span>'
+            : '<span class="io-out waiting">—</span>');
+    });
     fr.className = 'final-result error'; fr.textContent = res.error;
     cb.classList.add('hidden');
   } else {
-    res.intermediates.forEach((v, i) => { const el = document.getElementById('sout-' + i); if (el) { el.textContent = '→ ' + fmtVal(v); el.className = 'stage-out'; } });
+    res.intermediates.forEach((v, i) => {
+      const sio = document.getElementById('sio-' + i);
+      const st = document.getElementById('stage-' + i);
+      if (st) st.classList.remove('skipped', 'errored');
+      if (!sio) return;
+      const inV = i === 0 ? parsedIn.map(fmtVal).join(', ') : fmtVal(res.intermediates[i - 1]);
+      sio.innerHTML = `<span class="io-in">入 ${esc(inV)}</span><span class="io-arr">→</span><span class="io-out">出 ${esc(fmtVal(v))}</span>${typeChip(v)}`;
+    });
     fr.className = 'final-result'; fr.textContent = fmtVal(res.result);
     cb.classList.remove('hidden');
   }
@@ -1474,7 +1700,61 @@ function switchMode(mode) {
   document.getElementById('btn-debug').classList.toggle('active', mode === 'debug');
   document.getElementById('btn-testcase').classList.toggle('active', mode === 'testcase');
   ['dbg-inputs','dbg-tpl','dbg-pipeline','dbg-result','dbg-history'].forEach(id => document.getElementById(id).classList.toggle('hidden', mode !== 'debug'));
-  document.getElementById('tc-container').classList.toggle('hidden', mode !== 'testcase');
+  ['tc-left','tc-right'].forEach(id => document.getElementById(id).classList.toggle('hidden', mode !== 'testcase'));
+  if (mode === 'debug') updateDebugResults();
+  else document.getElementById('dbg-empty').classList.add('hidden');
+}
+
+/* ── B11：空态示例卡片（一键填入演示）────────────────────────────────────── */
+const EXAMPLES = [
+  { title: '两数求和并格式化',
+    expr: '$1;$2 |> expr($1 + $2) |> string.format("%.2f", $1)',
+    vals: ['3', '4'], out: '"7.00"' },
+  { title: '去空格并转大写',
+    expr: '$1 |> string.gsub($1, " ", "") |> string.upper($1)',
+    vals: ['bmc studio'], out: '"BMCSTUDIO"' },
+  { title: '条件判断（Lua 风格 ?:）',
+    expr: '$1 |> expr($1 > 0 ? "正数" : "非正数")',
+    vals: ['5'], out: '"正数"' },
+];
+function renderExamples() {
+  document.getElementById('ex-cards').innerHTML = EXAMPLES.map((ex, i) => `
+    <button class="ex-card" onclick="useExample(${i})">
+      <span class="ex-title">${esc(ex.title)}</span>
+      <span class="ex-expr">${esc(ex.expr)}</span>
+      <span class="ex-io">预填 ${ex.vals.map(esc).join(' , ')} → 预期 <b>${esc(ex.out)}</b></span>
+    </button>`).join('');
+}
+function useExample(i) {
+  const ex = EXAMPLES[i];
+  document.getElementById('expr-input').value = ex.expr;
+  applyExpr();
+  ex.vals.forEach((v, idx) => {
+    inputValues[idx] = v;
+    const f = document.querySelector(`#irow-${idx} .input-field`);
+    if (f) f.value = v;
+  });
+  _touched = true;
+  updateDebugResults();
+  showToast('示例已填入，轨迹见右侧');
+}
+
+/* ── B12：操作符 Chip 面板 ───────────────────────────────────────────────── */
+const OP_OPEN_KEY = 'pipe-eval-op-open';
+function insertOp(text) {
+  const ta = document.getElementById('expr-input');
+  const s = ta.selectionStart ?? ta.value.length;
+  const e = ta.selectionEnd ?? s;
+  ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
+  ta.focus();
+  const pos = s + text.length;
+  ta.setSelectionRange(pos, pos);
+  onExprInput();
+}
+function toggleOpPanel() {
+  const p = document.getElementById('op-panel');
+  p.classList.toggle('open');
+  try { localStorage.setItem(OP_OPEN_KEY, p.classList.contains('open') ? '1' : '0'); } catch(e){}
 }
 
 /* ── Template variable panel ──────────────────────────────────────────────── */
@@ -1549,6 +1829,7 @@ function clearTestCases() {
   document.getElementById('tc-results-section').classList.add('hidden');
   document.getElementById('tc-load-err').classList.remove('show');
   document.getElementById('tc-exec-info').textContent = '';
+  document.getElementById('pass-badge').classList.add('hidden');
 }
 async function executeBatch() {
   if (!testCases.length) return;
@@ -1610,6 +1891,12 @@ function renderBatchResults() {
   const s = execResults.summary;
   document.getElementById('tc-results-section').classList.remove('hidden');
   document.getElementById('tc-export-btn').classList.remove('hidden');
+  // B15：通过率摘要 badge（全过=绿，有失败/不匹配=红；点击筛选不匹配）
+  const pb = document.getElementById('pass-badge');
+  const allPass = s.matched === s.total;
+  pb.classList.remove('hidden');
+  pb.className = 'pass-badge ' + (allPass ? 'ok' : 'bad');
+  pb.textContent = (allPass ? '✓' : '✗') + ' 通过 ' + s.matched + '/' + s.total;
   document.getElementById('tc-stats').innerHTML = [
     ['合计', s.total, ''], ['成功', s.success, 's-ok'], ['失败', s.failed, 's-fail'],
     ['匹配', s.matched, 's-ok'], ['不匹配', s.mismatched, 's-warn']
@@ -1712,11 +1999,13 @@ window.addEventListener('message', (event) => {
 (function init() {
   try { const t = localStorage.getItem('pipe-eval-theme'); if (t) setTheme(t); } catch(e){}
   try { if (localStorage.getItem(TPL_OPEN_KEY) === '1') document.getElementById('dbg-tpl').classList.add('open'); } catch(e){}
+  try { if (localStorage.getItem(OP_OPEN_KEY) === '0') document.getElementById('op-panel').classList.remove('open'); } catch(e){}
   parsedExpr = parsePipeExpr(originalExprText);
   renderInputFields();
   renderTplRows();
   renderPipelineSlots();
   renderHistory();
+  renderExamples();
   updateDebugResults();
   document.getElementById('expr-input').addEventListener('input', onExprInput);
 })();
