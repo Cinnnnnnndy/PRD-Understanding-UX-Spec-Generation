@@ -8,13 +8,15 @@
 
 ```
 optimized-demo/
-├── index.html                    优化版 Demo（求值核心逐字移植，UI/UX 层重构）
-├── design-system/
+├── index.html                    优化版 Demo（CSS 全内联·单文件自包含·求值核心逐字移植）
+├── design-system/                ← 仅工程参考快照，不被 index.html 引用
 │   ├── foundation.css            原子 token（颜色/字体/间距/圆角/阴影/动效）
 │   ├── semantic.css              语义 token（background/surface/foreground/primary…，三主题）
 │   └── components.css            组件 token（button/input/card/table/badge/segmented…）
 └── README.md
 ```
+
+> **⚠ 自包含说明**：`index.html` 已把 PTO 三层 token CSS **全部内联进 `<style>` 块**，零外链、可独立双击/预览打开。早期版本曾用 `<link href="design-system/*.css">` 外链，导致文件被单独预览时 CSS 404、整页裸奔——现已修复。`design-system/` 目录仅保留作为工程接入时的 token 源参考。
 
 ## 求值核心：逐字移植，零行为改动
 
@@ -47,9 +49,13 @@ S01 空态 · S02 语法错误 inline · S03 已应用 · S04 实时计算 · S0
 ## 验证方式
 
 ```bash
-# 1) 静态检查：零硬编码颜色、零英文残留、结构完整
-# 2) 运行验证门：node 复算求值核心 10 组用例（GATE: PASS）
-# 浏览器中打开 index.html 即可交互；design-system/*.css 为相对引用
+# 1) 自包含门禁：零外链 + token 闭环（必过）
+grep -c 'rel="stylesheet"' index.html                      # → 0
+comm -23 <(grep -oE 'var\(--[a-z0-9-]+' index.html | sed 's/var(//' | sort -u) \
+         <(grep -oE '^\s*--[a-z0-9-]+' index.html | sed 's/[: ]//g' | sort -u)  # → 空
+# 2) 静态检查：零硬编码颜色、零英文残留、结构完整
+# 3) 运行验证门：node 复算求值核心 10 组用例（GATE: PASS）
+# 浏览器中直接双击 index.html 即可交互（CSS 已内联，无需 server）
 ```
 
-> 注：`design-system/*.css` 取自 PTO Design System 仓库 main 分支快照，作为离线引用基线。
+> 注：`design-system/*.css` 取自 PTO Design System 仓库 main 分支快照，仅作工程接入参考；index.html 本身不依赖它们。

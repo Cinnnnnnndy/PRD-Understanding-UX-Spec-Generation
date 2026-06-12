@@ -5,10 +5,376 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>管道表达式批量评估器 · PTO Design System</title>
 
-<!-- ── PTO Design System tokens (foundation → semantic → components) ─────────── -->
-<link rel="stylesheet" href="design-system/foundation.css">
-<link rel="stylesheet" href="design-system/semantic.css">
-<link rel="stylesheet" href="design-system/components.css">
+<!-- ── PTO Design System tokens (foundation → semantic → components) ───────────
+     注意：以下三层 token 已内联，确保单文件自包含、任意预览方式均能正常渲染。
+     原始三层 CSS 快照仍保留在同级 design-system/ 目录，供工程接入参考。 -->
+<style>
+/* ===== PTO Design System · foundation.css ===== */
+:root {
+  /* Neutral Gray Ramp — pure neutral, no blue tint */
+  --ark-neutral-0: #0b0b0b;
+  --ark-neutral-1: #101010;
+  --ark-neutral-2: #141414;
+  --ark-neutral-3: #1a1a1a;
+  --ark-neutral-4: #343434;
+
+  /* Accent Palette */
+  --ark-blue-500: #4369efff;
+  --ark-blue-600: #5a92e6;
+  --ark-domain-aux: #7c8db8;
+  --ark-green-500: #04d793ff;
+  --ark-orange-500: #ffaa3bff;
+  --ark-red-500: #ff4b7bff;
+  --highlight-l0a-violet-source: #A855F7;
+
+  /* Typography Scale */
+  --font-size-display-lg: 28px;
+  --font-size-title-md:   20px;
+  --font-size-title-sm:   16px;
+  --font-size-body-md:    14px;
+  --font-size-body-sm:    12px;
+  --font-size-label-xs:   11px;
+
+  --font-weight-bold:     700;
+  --font-weight-semibold: 600;
+  --font-weight-medium:   500;
+
+  --line-height-display:  1.25;
+  --line-height-body:     1.5;
+  --line-height-label:    1.2;
+
+  --letter-spacing-body:  0;
+  --letter-spacing-label: 0.5px;
+
+  /* Font Family */
+  --font-sans: 'Inter', 'Source Han Sans SC', 'PingFang SC', 'Noto Sans SC', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* Spacing Scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Radius Scale */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* Shadow Scale */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.42);
+
+  /* Z-index Scale */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+
+  /* Motion */
+  --duration-fast: 100ms;
+  --duration-base: 200ms;
+  --duration-slow: 350ms;
+  --easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-out: cubic-bezier(0, 0, 0.2, 1);
+}
+
+:root[data-theme='light'] {
+  --ark-neutral-0: #FFFFFF;
+  --ark-neutral-1: #F5F5F5;
+  --ark-neutral-2: #FFFFFF;
+  --ark-neutral-3: #F2F2F2;
+  --ark-neutral-4: #E6E6E6;
+}
+
+/* ===== PTO Design System · semantic.css ===== */
+:root[data-theme='dark'],
+:root {
+  --background: var(--ark-neutral-1);
+  --background-elevated: var(--ark-neutral-2);
+  --surface-1: #161616;
+  --surface-2: #1c1c1c;
+  --surface-3: #262626;
+  --surface-4: #313131;
+
+  --foreground:           rgba(255, 255, 255, 0.90);
+  --foreground-secondary: rgba(255, 255, 255, 0.60);
+  --foreground-muted:     rgba(255, 255, 255, 0.40);
+  --foreground-disabled:  rgba(255, 255, 255, 0.25);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --primary: var(--ark-blue-500);
+  --primary-hover: var(--ark-blue-600);
+  --primary-foreground: #ffffff;
+
+  --accent: var(--ark-domain-aux);
+  --success: var(--ark-green-500);
+  --warning: var(--ark-orange-500);
+  --danger: var(--ark-red-500);
+
+  --tone-critical-bg: color-mix(in srgb, var(--danger) 14%, transparent);
+  --tone-warning-bg: color-mix(in srgb, var(--warning) 16%, transparent);
+  --tone-info-bg: color-mix(in srgb, var(--primary) 16%, transparent);
+  --tone-blue-strong: color-mix(in srgb, var(--primary) 28%, transparent);
+  --tone-green-strong: color-mix(in srgb, var(--success) 22%, transparent);
+  --tone-warning-strong: color-mix(in srgb, var(--warning) 22%, transparent);
+
+  --focus-ring: rgba(67, 105, 239, 0.42);
+
+  --state-hover:    rgba(255, 255, 255, 0.06);
+  --state-press:    rgba(255, 255, 255, 0.10);
+  --state-muted:    rgba(255, 255, 255, 0.06);
+  --state-selected: rgba(67, 105, 239, 0.14);
+  --state-focus:    rgba(67, 105, 239, 0.20);
+
+  --surface-disabled: rgba(255, 255, 255, 0.04);
+  --border-disabled:  rgba(255, 255, 255, 0.06);
+
+  --app-background: var(--background);
+  --surface-backdrop-filter: none;
+  --surface-backdrop-filter-soft: none;
+  --surface-backdrop-filter-strong: none;
+  --glass-surface-bg: var(--surface-1);
+  --glass-surface-bg-soft: var(--surface-2);
+  --glass-surface-bg-strong: var(--background-elevated);
+  --glass-surface-border: var(--border-default);
+  --glass-surface-highlight: none;
+  --glass-surface-shadow: none;
+}
+
+:root[data-theme='glass'] {
+  --background: #080a0f;
+  --background-elevated: rgba(18, 25, 38, 0.62);
+  --surface-1: rgba(255, 255, 255, 0.075);
+  --surface-2: rgba(255, 255, 255, 0.095);
+  --surface-3: rgba(255, 255, 255, 0.13);
+  --surface-4: rgba(255, 255, 255, 0.18);
+
+  --foreground:           rgba(255, 255, 255, 0.92);
+  --foreground-secondary: rgba(255, 255, 255, 0.66);
+  --foreground-muted:     rgba(255, 255, 255, 0.46);
+  --foreground-disabled:  rgba(255, 255, 255, 0.28);
+
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-default: rgba(255, 255, 255, 0.16);
+  --border-strong: rgba(255, 255, 255, 0.24);
+
+  --primary: #6fa1ff;
+  --primary-hover: #8bb5ff;
+  --primary-foreground: #08111f;
+  --accent: #90a4d4;
+
+  --focus-ring: rgba(111, 161, 255, 0.44);
+
+  --state-hover:    rgba(255, 255, 255, 0.09);
+  --state-press:    rgba(255, 255, 255, 0.14);
+  --state-muted:    rgba(255, 255, 255, 0.07);
+  --state-selected: rgba(111, 161, 255, 0.18);
+  --state-focus:    rgba(111, 161, 255, 0.24);
+
+  --surface-disabled: rgba(255, 255, 255, 0.055);
+  --border-disabled:  rgba(255, 255, 255, 0.08);
+
+  --app-background:
+    radial-gradient(circle at 0% 0%, rgba(91, 140, 255, 0.20) 0%, rgba(91, 140, 255, 0.10) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.14) 0%, rgba(20, 184, 166, 0.07) 16%, transparent 34%),
+    radial-gradient(circle at 100% 100%, rgba(234, 179, 8, 0.10) 0%, transparent 30%),
+    linear-gradient(180deg, #080a0f 0%, #0f1623 48%, #080a0f 100%);
+  --surface-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
+  --surface-backdrop-filter-soft: blur(16px) saturate(150%) brightness(1.03);
+  --surface-backdrop-filter-strong: blur(32px) saturate(180%) brightness(1.06);
+  --glass-surface-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.052) 48%, rgba(255, 255, 255, 0.09));
+  --glass-surface-bg-soft: linear-gradient(145deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.038) 48%, rgba(255, 255, 255, 0.065));
+  --glass-surface-bg-strong: linear-gradient(145deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.064) 46%, rgba(255, 255, 255, 0.115));
+  --glass-surface-border: rgba(255, 255, 255, 0.13);
+  --glass-surface-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 1px 0 0 rgba(139, 181, 255, 0.10), inset -1px 0 0 rgba(255, 255, 255, 0.08), inset 0 -14px 30px rgba(0, 0, 0, 0.16);
+  --glass-surface-shadow: 0 18px 56px rgba(0, 0, 0, 0.30), 0 3px 18px rgba(0, 0, 0, 0.20);
+}
+
+:root[data-theme='light'] {
+  --background: var(--ark-neutral-1);
+  --background-elevated: var(--ark-neutral-2);
+  --surface-1: #FFFFFF;
+  --surface-2: #F2F2F2;
+  --surface-3: #E6E6E6;
+  --surface-4: #CCCCCC;
+
+  --foreground:           rgba(0, 0, 0, 0.90);
+  --foreground-secondary: rgba(0, 0, 0, 0.55);
+  --foreground-muted:     rgba(0, 0, 0, 0.42);
+  --foreground-disabled:  rgba(0, 0, 0, 0.25);
+
+  --border-subtle: rgba(0, 0, 0, 0.07);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.18);
+
+  --focus-ring: rgba(67, 105, 239, 0.36);
+
+  --state-hover:    rgba(0, 0, 0, 0.05);
+  --state-press:    rgba(0, 0, 0, 0.09);
+  --state-muted:    rgba(0, 0, 0, 0.05);
+  --state-selected: rgba(67, 105, 239, 0.10);
+  --state-focus:    rgba(67, 105, 239, 0.16);
+
+  --surface-disabled: rgba(0, 0, 0, 0.04);
+  --border-disabled:  rgba(0, 0, 0, 0.07);
+}
+
+/* ===== PTO Design System · components.css ===== */
+:root {
+  /* Toolbar */
+  --comp-toolbar-height: 44px;
+  --comp-toolbar-bg: color-mix(in srgb, var(--background) 92%, black);
+  --comp-toolbar-border: var(--border-subtle);
+
+  /* Button */
+  --button-height-sm: 30px;
+  --button-height-md: 36px;
+  --button-height-lg: 42px;
+  --button-radius: var(--radius-lg);
+  --button-padding-x-sm: var(--space-2);
+  --button-padding-x-md: var(--space-3);
+  --button-padding-x-lg: var(--space-4);
+  --button-gap: 6px;
+  --button-font: 500 12px / 1 var(--font-sans);
+  --button-solid-bg:       var(--foreground);
+  --button-solid-bg-hover: color-mix(in srgb, var(--foreground) 88%, transparent);
+  --button-solid-bg-press: color-mix(in srgb, var(--foreground) 80%, transparent);
+  --button-solid-fg:       var(--background);
+  --button-solid-shadow:   none;
+  --button-secondary-bg: color-mix(in srgb, var(--surface-2) 92%, white 3%);
+  --button-secondary-bg-hover: var(--surface-3);
+  --button-secondary-bg-press: color-mix(in srgb, var(--surface-3) 84%, black);
+  --button-secondary-border: var(--border-subtle);
+  --button-secondary-fg: var(--foreground);
+  --button-secondary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 8px rgba(0, 0, 0, 0.16);
+  --button-ghost-bg-hover: var(--state-hover);
+  --button-ghost-bg-press: var(--state-press);
+  --button-ghost-fg: var(--foreground-secondary);
+  --button-ghost-fg-hover: var(--foreground);
+  --button-focus-ring: var(--focus-ring);
+  --button-disabled-opacity: 0.42;
+
+  /* Input */
+  --input-height-md: 34px;
+  --input-radius: var(--radius-md);
+  --input-border: var(--border-default);
+  --input-bg: var(--surface-1);
+
+  /* Panel */
+  --panel-radius: var(--radius-lg);
+  --panel-padding: var(--space-4);
+  --panel-padding-lg: var(--space-5);
+  --panel-bg: var(--surface-2);
+  --panel-border: var(--border-subtle);
+
+  /* Card */
+  --card-radius: var(--radius-lg);
+  --card-padding: var(--space-4);
+  --card-bg: var(--surface-1);
+  --card-border: var(--border-default);
+  --card-shadow: none;
+  --card-hover-border: var(--border-strong);
+  --card-hover-bg: var(--state-hover);
+  --card-selected-border: var(--primary);
+  --card-selected-bg: var(--state-selected);
+
+  /* Table */
+  --table-row-height: 36px;
+  --table-header-height: 36px;
+  --table-border: var(--border-subtle);
+
+  /* Typography Composites */
+  --text-display:  700 28px / 1.25 var(--font-sans);
+  --text-title-1:  600 20px / 1.30 var(--font-sans);
+  --text-title-2:  600 16px / 1.30 var(--font-sans);
+  --text-body:     400 14px / 1.50 var(--font-sans);
+  --text-body-sm:  400 12px / 1.50 var(--font-sans);
+  --text-label:    500 11px / 1.20 var(--font-sans);
+  --text-mono:     500 12px / 1.40 var(--font-mono);
+
+  /* Badge / Tag */
+  --tag-radius: var(--radius-pill);
+  --tag-padding-x: var(--space-2);
+  --tag-height: 20px;
+  --comp-tag-bg: var(--state-muted);
+  --comp-tag-border: var(--border-default);
+  --comp-tag-fg: var(--foreground-muted);
+
+  /* Stat Chip */
+  --stat-chip-height: 22px;
+  --stat-chip-padding-x: 8px;
+  --stat-chip-radius: var(--radius-pill);
+  --stat-chip-bg: var(--surface-2);
+  --stat-chip-border: var(--border-subtle);
+  --stat-chip-fg: color-mix(in srgb, var(--foreground) 88%, var(--background));
+
+  /* Segmented Control */
+  --segmented-control-gap: 3px;
+  --segmented-control-padding: 3px;
+  --segmented-control-radius: 10px;
+  --segmented-control-bg: var(--surface-disabled);
+  --segmented-control-border: var(--border-subtle);
+
+  /* Inspector Rail soft card */
+  --inspector-soft-card-bg: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  --inspector-soft-card-bg-hover: color-mix(in srgb, var(--surface-3) 62%, transparent);
+  --inspector-soft-card-radius: var(--radius-md);
+}
+
+:root[data-theme='light'] {
+  --button-secondary-bg: color-mix(in srgb, var(--surface-1) 92%, var(--surface-2));
+  --button-secondary-bg-hover: color-mix(in srgb, var(--surface-1) 28%, var(--surface-2));
+  --button-secondary-bg-press: color-mix(in srgb, var(--surface-2) 84%, var(--surface-3));
+  --button-secondary-border: var(--border-default);
+  --button-secondary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme='glass'] {
+  --comp-toolbar-bg: var(--glass-surface-bg-strong);
+  --comp-toolbar-border: var(--glass-surface-border);
+  --button-solid-bg: rgba(255, 255, 255, 0.88);
+  --button-solid-bg-hover: rgba(255, 255, 255, 0.96);
+  --button-solid-bg-press: rgba(255, 255, 255, 0.78);
+  --button-solid-fg: #08111f;
+  --button-solid-shadow: var(--glass-surface-highlight), 0 8px 20px rgba(0, 0, 0, 0.18);
+  --button-secondary-bg: rgba(255, 255, 255, 0.105);
+  --button-secondary-bg-hover: rgba(255, 255, 255, 0.16);
+  --button-secondary-bg-press: rgba(255, 255, 255, 0.08);
+  --button-secondary-border: rgba(255, 255, 255, 0.12);
+  --button-secondary-shadow: var(--glass-surface-highlight), 0 8px 24px rgba(0, 0, 0, 0.14);
+  --button-ghost-bg-hover: rgba(255, 255, 255, 0.10);
+  --button-ghost-bg-press: rgba(255, 255, 255, 0.15);
+  --input-bg: rgba(255, 255, 255, 0.08);
+  --input-border: rgba(255, 255, 255, 0.12);
+  --panel-bg: color-mix(in srgb, var(--background-elevated) 88%, black 12%);
+  --panel-border: var(--border-subtle);
+  --card-bg: color-mix(in srgb, var(--background-elevated) 84%, black 16%);
+  --card-border: var(--border-subtle);
+  --card-hover-border: var(--border-strong);
+  --card-hover-bg: rgba(255, 255, 255, 0.08);
+  --card-selected-bg: rgba(111, 161, 255, 0.18);
+  --comp-tag-bg: rgba(255, 255, 255, 0.075);
+  --comp-tag-border: rgba(255, 255, 255, 0.16);
+  --comp-tag-fg: var(--foreground-secondary);
+  --stat-chip-bg: rgba(255, 255, 255, 0.09);
+  --stat-chip-border: rgba(255, 255, 255, 0.14);
+  --segmented-control-bg: rgba(255, 255, 255, 0.065);
+  --segmented-control-border: rgba(255, 255, 255, 0.14);
+  --inspector-soft-card-bg: rgba(255, 255, 255, 0.075);
+  --inspector-soft-card-bg-hover: rgba(255, 255, 255, 0.115);
+}
+</style>
 
 <style>
 /* ════════════════════════════════════════════════════════════════════════════
