@@ -165,7 +165,7 @@ description: |
 
 无论输入是什么，都要先做 **BUTP 四维研究**定方向，再产出 A–H 八项展开分析，全部写入 `product-doc.md`，并作为可视化报告和 Demo 提示词的素材来源。
 
-#### BUTP 四维需求挖掘（先行框架，给 A–G 定方向）
+#### BUTP 四维需求挖掘（⛔ 门禁：四维表填满后方可进入 A–H）
 
 > 在逐项展开之前，先用 **商业（Business）· 用户（User）· 趋势（Trend）· 痛点（Pain-point）** 四个维度过一遍输入，目的是把「这个需求值不值得做、为什么是现在做、为谁做、解决什么」想清楚——这是挖掘和提炼需求、落到**商业价值**的总框架。**BUTP 不是与 A–G 并列的另一套分析，而是 A–G 的上层定调**：先用四维把方向和优先级定下来，A–G 再把每一维展开成可落地的细节。
 
@@ -176,7 +176,16 @@ description: |
 | **T 趋势** | 行业/技术/竞品正在往哪走？哪些做法正在成为标配、哪些在被淘汰？现在做这个的时间窗口依据？ | 竞品公开文档与发布日志、行业报告、标准规范（如 WCAG/协议规范）、技术社区动向 | **F 竞品分析 + 专利潜力** |
 | **P 痛点** | 现有方案（含「没有方案」）让用户付出了什么具体代价？频率 × 成本量化后哪个最疼？ | 输入材料中的代码注释/TODO、用户原话、issue 列表、操作步骤数实测 | **痛点清单**（C/E 内）+ **E 机会点**的因果起点 |
 
-> **执行顺序**：先填这张四维表定调 → 再走 A–H 展开，A–H 每节顶部标注它承接哪个维度（如「C 用户画像〔承接 U〕」），避免 BUTP 与 A–G 各写一遍互不引用。**四维里凡是「展开到」列为空的维度（这里没有），说明该维在下游断了，必须补章节**——这正是过去 B 商业维丢失的根因，故新增 H 节专门承接。
+**每维必答题（每维至少 3 条结论，B 维和 P 维至少各 1 条【输入】，T 维离线时必须显式标注；不达标不进 A–H）：**
+
+| 维度 | 必须回答的具体问题 | 全为【推断】时的处理 |
+|------|-----------------|------------------|
+| **B 商业** | ①为谁（哪个角色/团队/业务线）创造什么价值（降本/增收/留存/效率/合规）？②量化或半量化：不做的代价——时间/步骤/成本差值？③谁是投资方/决策方（PM/团队/业务部门）？④技术或预算约束（技术栈/平台/不可绕过的限制）？ | 全为推断时，进待确认清单并注明「需与产品/业务方核实商业价值量化」 |
+| **U 用户** | ①核心用户：职业 + 技术背景（能否看懂十六进制/代码/专业术语）？②使用频率（高频/中频/低频 + 什么场景触发）+ 物理环境（机房/办公室/大屏/移动端）？③决策链：使用者与投资/决策方是否同一人？④次要用户（旁观者/审批者/对接系统）有哪些？ | 技术背景不明时，从输入的 UI/代码复杂度推断并标【推断·待确认】 |
+| **T 趋势** | ①行业/工具链正在往哪走（标准化/新范式/被淘汰的做法）？②竞品或同类工具有什么值得参考的动向（先填这里，F 节展开）？③现在做这个的时间窗口依据（是赶上窗口还是补历史缺口）？ | 离线环境：按「受限环境退路」降级处理，标【推断·待确认（因无外部访问）】，报告里显式标注 |
+| **P 痛点** | ①现有方案（含「完全没有工具」时的手工做法）的具体操作成本（步骤数/耗时/错误率）？②最高频的痛点（用户反复遇到）是什么？③最痛的痛点（单次成本最高）是什么？④每条痛点至少有一个可追溯来源（代码注释/TODO/用户原话/输入材料的隐含逻辑）？ | 无用户访谈时从代码中的 TODO/workaround/注释找证据；找不到的标【推断·待确认】并进清单 |
+
+> **执行顺序**：先按上表把四维填满 → 再走 A–H 展开。A–H 每节顶部标注它承接哪个维度（如「C 用户画像〔承接 U〕」），避免 BUTP 与 A–G 各写一遍互不引用。**四维里凡是「展开到」列为空的维度（这里没有），说明该维在下游断了，必须补章节**——这正是过去 B 商业维丢失的根因，故新增 H 节专门承接。
 
 **每条结论必须标注来源等级（可信度规则，适用于 BUTP 与 A–G 全部分析结论）：**
 
@@ -194,12 +203,24 @@ description: |
 > 2. 确实只能凭经验判断的，标 **【推断·待确认（因无外部访问）】**，并在待确认清单里写清「需联网后核实的具体问题」（如「确认竞品 A 是否已支持位级可视化」），交给有外网的同事或下一轮补。
 > 3. **报告里显式标注「本次趋势/竞品分析在离线环境完成，外部依据待补」**，让决策者知道这部分置信度，而不是误当已核实。
 
-#### A. 功能定义
+---
+
+> **⛔ BUTP 门禁：进入 A–H 之前，逐条核查以下四项。任意一项未达标，停下来补完，再继续。**
+> - [ ] **B 商业**：已填至少 3 条结论，且其中至少 1 条标注为【输入】或【用户】？
+> - [ ] **U 用户**：核心用户的职业/技术背景/使用频率/物理环境均已有结论？
+> - [ ] **T 趋势**：已填至少 1 条结论；若离线，已在产品文档和报告中显式标注「趋势分析在离线环境完成，外部依据待补」？
+> - [ ] **P 痛点**：已填至少 3 条痛点，每条有可追溯来源，且已量化或说明操作成本？
+>
+> 以上全部勾选后，继续向下展开 A–H。未完成 BUTP 直接写 A–H = 没有地基盖楼；机会点缺商业权重、用户画像缺分层证据、机会点排序凭直觉——后续所有产出质量打折。
+
+---
+
+#### A. 功能定义〔综合 B·U：用商业锚点 + 用户身份定义「是什么/给谁/解决什么」〕
 
 一句话说清「这是什么、给谁、解决什么」，再展开核心功能清单。
 代码输入时，从入口文件 + 数据模型 + 关键流程反推；文字/草图输入时，从描述与视觉意图提取。
 
-#### B. 场景分析
+#### B. 场景分析〔承接 U 用户·P 痛点：用用户画像描述「谁在什么场景下遇到了什么痛」〕
 
 2–4 个具体场景，用叙事描述：用户在做什么 → 遇到什么 → 怎么用 → 得到什么。
 > 场景描述用完整叙事：「工程师正在排查……他打开……他看到……他点击……结果……」
@@ -214,7 +235,7 @@ description: |
 | 核心诉求 | 用户真正想达成的目标 |
 | 典型触发点 | 什么事件让用户打开这个功能 |
 
-#### D. 核心流程
+#### D. 核心流程〔承接 P 痛点 → 操作顺序约束与高频操作步骤直接从 P 维痛点提炼〕
 
 还原用户完成一个完整任务的操作顺序，标注：
 - 必须按顺序完成的步骤（先定义实体，再建立引用）
@@ -277,7 +298,7 @@ description: |
 ✓ 正确描述：「用户完成计算后，历史记录自动出现在下次打开时，无需手动保存」
 ```
 
-#### G. 注意事项洞察
+#### G. 注意事项洞察〔汇合 B·P 的约束面：B 维预算/技术约束 + P 维「踩坑风险」→ 设计红线〕
 
 约束条件、边界情况、被移除或未实现功能对设计的技术约束、魔法值陷阱、动态字段陷阱等。
 
@@ -682,7 +703,47 @@ A=10  B=11  C=12  D=13  E=14  F=15
 ## [功能模块名称]
 
 ### 需求背景
-### BUTP 四维分析    （商业/用户/趋势/痛点，每条结论带来源标注【输入/外部/用户/推断】；【外部】给链接，【推断】进待确认清单）
+
+### BUTP 四维分析（⛔ 门禁：此节必须在 A–H 之前完成，每维 ≥3 条结论）
+
+#### B — 商业〔承接 H 商业价值与优先级〕
+
+| 问题 | 结论 | 来源 |
+|------|------|------|
+| 为谁（哪个角色/团队/业务线）创造什么价值（降本/增收/留存/效率/合规）？ | [具体结论] | 【输入/用户/推断·待确认】 |
+| 不做的代价——量化或定性描述：时间/步骤/成本差值是什么？ | [具体结论] | 【输入/推断·待确认】 |
+| 谁是投资方/决策方（PM/团队/业务部门）？ | [具体结论] | 【输入/用户/推断·待确认】 |
+| 商业模式/技术/预算约束？ | [具体结论] | 【输入/推断·待确认】 |
+
+#### U — 用户〔承接 C 用户画像 / B 场景分析〕
+
+| 问题 | 结论 | 来源 |
+|------|------|------|
+| 核心用户：职业 + 技术背景（能否看懂十六进制/代码/专业术语）？ | [具体结论] | 【输入/推断·待确认】 |
+| 使用频率（高频/中频/低频 + 典型触发场景）+ 物理环境？ | [具体结论] | 【推断·待确认】 |
+| 决策链：使用者与投资/决策方是否同一人？ | [具体结论] | 【输入/推断·待确认】 |
+| 次要用户/旁观者（QA/PM/审批者/宿主系统）有哪些？ | [具体结论] | 【推断·待确认】 |
+
+#### T — 趋势〔承接 F 竞品分析〕
+
+| 结论 | 来源 |
+|------|------|
+| [行业/工具链正在往哪走，哪些正在成为标配] | 【外部/推断·待确认】 |
+| [竞品或同类工具有什么值得参考的动向] | 【外部/推断·待确认】 |
+| [现在做这个的时机依据：赶上窗口 or 补历史缺口] | 【推断·待确认】 |
+
+> 若离线环境：在此处注明「趋势分析在离线环境完成，外部依据待补；上述结论为合理推断，不构成商业决策依据」。
+
+#### P — 痛点〔承接 D 核心流程 + E 设计机会点 + G 注意事项〕
+
+| 痛点（最频·最痛优先排列） | 量化操作成本（步骤数/耗时/错误率） | 来源 |
+|--------------------------|--------------------------------|------|
+| [最高频痛点] | [量化] | 【输入/推断·待确认】 |
+| [最痛痛点（单次代价最高）] | [量化] | 【输入/推断·待确认】 |
+| [其他痛点] | [量化] | 【输入/推断·待确认】 |
+
+---
+
 ### 功能定义
 ### 使用场景         （2–4 个叙事场景）
 ### 目标用户         （角色、频率、环境、核心诉求）
@@ -1096,6 +1157,89 @@ document.getElementById('deck').addEventListener('click', e=>{
 
 > 内容多时把一个主题拆成多张 slide（如 6 张场景）。**一张 slide 的内容必须在 1280×720 内装得下、不溢出**——`.slide{overflow:hidden}`，超出就拆页，绝不靠滚动。
 
+**`butp` slide 内容格式**（第 2 张，必须存在；四象限卡片，每卡内列 3–5 条带来源标注的结论，末行写「落点→」指向下游节）：
+
+```html
+<section class="slide" id="butp">
+  <div class="tag">BUTP · 四维需求挖掘</div>
+  <h2>[产品名称] · 商业 / 用户 / 趋势 / 痛点</h2>
+  <!-- 若含离线推断，在 h2 下加提示条 -->
+  <!-- <div class="butp-offline">⚠ T/F 维含【推断·待确认（离线）】，外部依据待补</div> -->
+  <div class="butp-grid">
+
+    <div class="butp-card card-b">
+      <div class="bc-header">
+        <div class="bc-letter">B</div>
+        <div>
+          <div class="bc-name">商业价值 Business</div>
+          <div class="bc-sub">为谁创造什么价值 · 不做的代价</div>
+        </div>
+      </div>
+      <ul class="bc-items">
+        <li>[为哪个团队/角色/业务线创造什么商业价值（降本/增收/效率/合规）]<span class="src">【输入/用户】</span></li>
+        <li>[不做的代价：量化或定性描述操作成本差值]<span class="src">【推断·待确认】</span></li>
+        <li>[商业模式或预算/技术约束]<span class="src">【输入】</span></li>
+        <!-- 至少 3 条，其中至少 1 条为【输入】或【用户】 -->
+      </ul>
+      <div class="bc-link">落点 → <span>H 商业价值（P0/P1/P2）</span> · E 机会点排序权重</div>
+    </div>
+
+    <div class="butp-card card-u">
+      <div class="bc-header">
+        <div class="bc-letter">U</div>
+        <div>
+          <div class="bc-name">用户需求 User</div>
+          <div class="bc-sub">核心/次要用户 · 频率 · 环境 · 决策链</div>
+        </div>
+      </div>
+      <ul class="bc-items">
+        <li>主用户：[职业 + 技术背景（能否看懂十六进制/代码/领域术语）]<span class="src">【输入】</span></li>
+        <li>使用频率：[高/中/低频 + 典型触发场景] · 环境：[机房/办公室/大屏/VS Code 侧边栏]<span class="src">【推断·待确认】</span></li>
+        <li>次要用户/旁观者：[QA/PM/审批者/宿主系统]<span class="src">【推断·待确认】</span></li>
+        <li>决策链：[使用者与投资方是否同一人；谁批准做这个功能]<span class="src">【输入/推断】</span></li>
+      </ul>
+      <div class="bc-link">落点 → <span>C 用户画像</span> · B 场景分析</div>
+    </div>
+
+    <div class="butp-card card-t">
+      <div class="bc-header">
+        <div class="bc-letter">T</div>
+        <div>
+          <div class="bc-name">趋势洞察 Trend</div>
+          <div class="bc-sub">行业走向 · 竞品动向 · 时间窗口</div>
+        </div>
+      </div>
+      <ul class="bc-items">
+        <li>[行业/工具链正在往哪走，哪些正在成为标配]<span class="src">【外部/推断·待确认】</span></li>
+        <li>[竞品或同类工具的最新动向（F 节展开）]<span class="src">【外部/推断·待确认】</span></li>
+        <li>[现在做这个的时机依据：赶窗口 or 补历史缺口]<span class="src">【推断·待确认】</span></li>
+      </ul>
+      <div class="bc-link">落点 → <span>F 竞品分析 + 专利潜力</span></div>
+    </div>
+
+    <div class="butp-card card-p">
+      <div class="bc-header">
+        <div class="bc-letter">P</div>
+        <div>
+          <div class="bc-name">痛点挖掘 Pain-point</div>
+          <div class="bc-sub">现有方案的操作成本 · 最频 × 最痛</div>
+        </div>
+      </div>
+      <ul class="bc-items">
+        <li>[最高频痛点：用户反复遇到的操作摩擦，量化步骤数/耗时]<span class="src">【输入/推断】</span></li>
+        <li>[最痛痛点：单次代价最高的环节]<span class="src">【输入/推断·待确认】</span></li>
+        <li>[现有方案（含「无工具」时的手工流程）的具体成本]<span class="src">【输入】</span></li>
+        <li>[其他痛点，每条带来源]<span class="src">【输入/推断·待确认】</span></li>
+      </ul>
+      <div class="bc-link">落点 → <span>E 机会点因果起点</span> · G 注意事项</div>
+    </div>
+
+  </div>
+</section>
+```
+
+> 每张 butp-card 必须有 3–5 条 `bc-items li`，含来源 chip；最后一行 `bc-link` 写「落点→」链接到下游节，让评审者一眼看到 BUTP 如何流向设计决策。
+
 **`design-system` slide 内容格式**（有现存 UI 时必须生成；这是后续所有设计改进的视觉锚点）：
 
 ```html
@@ -1280,6 +1424,25 @@ ul.list li::before{content:'›';color:#0071e3;flex-shrink:0}
 table{border-collapse:collapse;width:100%}
 th{background:#ebebed;color:#86868b;font-size:10px;font-weight:700;text-transform:uppercase;padding:6px 10px;text-align:left;border-bottom:1px solid #d2d2d7}
 td{padding:6px 10px;border-bottom:1px solid #d2d2d7;color:#4a4a52;font-size:11px;vertical-align:top}
+/* BUTP slide */
+.butp-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;height:100%}
+.butp-card{border-radius:8px;padding:14px 16px;border:1px solid #d2d2d7;position:relative;overflow:hidden;background:#fff}
+.butp-card::before{content:'';position:absolute;inset:0;opacity:.05;border-radius:8px}
+.butp-card.card-b::before{background:#0071e3}.butp-card.card-u::before{background:#5e5ce6}
+.butp-card.card-t::before{background:#1a7f42}.butp-card.card-p::before{background:#d70015}
+.bc-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bc-letter{font-size:26px;font-weight:800;line-height:1}
+.card-b .bc-letter{color:#0071e3}.card-u .bc-letter{color:#5e5ce6}
+.card-t .bc-letter{color:#1a7f42}.card-p .bc-letter{color:#d70015}
+.bc-name{font-size:12px;font-weight:700;color:#1d1d1f;line-height:1.2}
+.bc-sub{font-size:9.5px;color:#86868b;margin-top:2px}
+.bc-items{list-style:none;display:flex;flex-direction:column;gap:4px}
+.bc-items li{font-size:10.5px;color:#4a4a52;padding-left:12px;position:relative;line-height:1.45}
+.bc-items li::before{content:'›';position:absolute;left:0;opacity:.6}
+.bc-items li .src{font-size:8.5px;color:#86868b;margin-left:3px;opacity:.85}
+.bc-link{margin-top:7px;font-size:9.5px;color:#86868b;border-top:1px solid #ebebed;padding-top:5px}
+.bc-link span{color:#0071e3;font-weight:600}
+.butp-offline{font-size:9px;color:#b06000;background:rgba(176,96,0,.08);border:1px solid rgba(176,96,0,.2);border-radius:4px;padding:2px 7px;margin-bottom:8px;display:inline-block}
 ```
 
 #### 三列流视图（synthesis slide）+ SVG 连线
