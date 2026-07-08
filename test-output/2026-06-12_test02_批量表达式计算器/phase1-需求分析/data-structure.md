@@ -1,135 +1,163 @@
-# 管道表达式批量评估器 · 数据结构文档
-> 来源：`86234586-previewbatchevaluator.html` JS 层静态分析
+# 数据结构分析 · 管道表达式批量评估器
+
+> 输入来源：`previewbatchevaluator.html`（原始 VS Code Webview Demo）  
+> 分析日期：2026-07-08
 
 ---
 
-## 核心类型
+## 实体清单
 
-```typescript
-/** 解析后的管道表达式（parsePipeExpr 返回值） */
-type ParsedExpr =
-  | { ok: true;  inputs: InputDef[]; stages: Stage[] }
-  | { ok: false; error: string }
+### ParsedExpr · 解析后的管道表达式
 
-interface InputDef {
-  idx:         number;   // 0-based
-  placeholder: string;   // 原始 token，如 "$1"
-  desc:        string;   // 展示标签，如 "参数 $1"
-}
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `ok` | `boolean` | 解析是否成功 |
+| `inputs` | `InputDef[]` | 输入参数声明列表 |
+| `stages` | `StageDef[]` | 管道阶段列表 |
+| `error?` | `string` | 解析失败时的错误消息 |
 
-interface Stage {
-  fn:   string;    // 函数名，如 "expr" / "string.format" / "string.sub" …
-  args: string[];  // 字符串参数列表（未替换 $1 占位符）
-  raw:  string;    // 原始片段，如 "expr($1 + $2)"
-}
+**InputDef（输入参数定义）：**
 
-/** 单条测试用例（parseTestCaseLine 返回值） */
-interface TestCase {
-  id:              string;              // Math.random().toString(36).slice(2)
-  inputs:          (number | string)[]; // 最后一列前的所有列（自动数字化）
-  expectedOutput:  string;             // 最后一列（始终字符串）
-  actualOutput:    string | null;      // 执行后填入
-  executionStatus: 'pending' | 'success' | 'error';
-  matchStatus:     'match' | 'mismatch' | null;  // null = 尚未执行或执行出错
-  lineNumber:      number;
-  createdAt:       number;             // Date.now()
-  executedAt?:     number;
-  errorMessage?:   string;
-}
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `idx` | `number` | 参数索引（0 基） |
+| `placeholder` | `string` | 原始占位符文本（如 `$1`） |
+| `desc` | `string` | 参数描述（如 `参数 $1`） |
 
-/** evaluator.evaluate() 返回值 */
-type EvalResult =
-  | { success: true;  result: unknown; intermediates: unknown[] }
-  | { success: false; error: string;  intermediates: [] }
+**StageDef（管道阶段定义）：**
 
-/** 批量执行结果（execResults 全局变量） */
-interface ExecResults {
-  testCases: TestCase[];
-  summary: {
-    total:      number;
-    success:    number;
-    failed:     number;
-    matched:    number;
-    mismatched: number;
-  };
-}
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `fn` | `string` | 函数名（如 `expr`、`string.format`） |
+| `args` | `string[]` | 参数列表（含 `$N` 占位符，未展开） |
+| `raw` | `string` | 原始阶段文本（用于展示） |
 
-/** 应用状态（模块级变量） */
-interface AppState {
-  originalExprText: string;        // 上次成功应用的表达式原文
-  parsedExpr:       ParsedExpr;    // 解析结果
-  inputValues:      string[];      // 与 parsedExpr.inputs 同长
-  testCases:        TestCase[];
-  execResults:      ExecResults | null;
-  currentMode:      'debug' | 'testcase';
-}
+---
+
+### TestCase · 单条测试用例
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | `string` | 随机 ID（`Math.random().toString(36).slice(2)`） |
+| `inputs` | `(number\|string)[]` | 输入值列表（末列期望值不含） |
+| `expectedOutput` | `string` | 期望输出（CSV 最后一列，保持字符串形式） |
+| `actualOutput` | `string\|null` | 实际输出（执行后填入；`null` = 未执行） |
+| `executionStatus` | `'pending'\|'success'\|'error'` | 执行状态 |
+| `matchStatus` | `'match'\|'mismatch'\|null` | 与期望的比较结果（`error` 时为 `null`） |
+| `lineNumber` | `number` | 原始文本行号（用于错误定位） |
+| `createdAt` | `number` | 创建时间戳（`Date.now()`） |
+| `executedAt?` | `number` | 执行时间戳 |
+| `errorMessage?` | `string` | 执行出错时的错误消息 |
+
+---
+
+### ExecResults · 批量执行结果
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `testCases` | `TestCase[]` | 含执行结果的用例列表 |
+| `summary` | `Summary` | 汇总统计 |
+
+**Summary（统计摘要）：**
+
+| 字段 | 含义 |
+|------|------|
+| `total` | 总用例数 |
+| `success` | 执行成功数（不代表结果匹配） |
+| `failed` | 执行出错数（表达式运行时抛错） |
+| `matched` | 实际输出与期望一致数 |
+| `mismatched` | 实际输出与期望不一致数 |
+
+---
+
+## 支持的管道函数（枚举映射）
+
+| 函数名 | 签名 | 说明 |
+|--------|------|------|
+| `expr` | `expr(<表达式>)` | 算术/逻辑/位运算；Lua 风格三元 `?:` |
+| `string.format` | `string.format(fmt, args...)` | C 风格格式化：`%d %f %s %x %b` 等 |
+| `string.upper` | `string.upper(s)` | 全部转大写 |
+| `string.lower` | `string.lower(s)` | 全部转小写 |
+| `string.sub` | `string.sub(s, start, end)` | Lua 1 基截取，支持负索引 |
+| `string.gsub` | `string.gsub(s, pattern, replacement)` | Lua 字符类模式全局替换 |
+| `string.cmp` | `string.cmp(a, b)` | 字符串相等比较，返回 `true/false` |
+
+---
+
+## 魔法值标注
+
+### 参数替换哨兵值
+
+`_replParams` 在替换 `$N` 时，空/null/undefined 值被编码为哨兵字符串传给解析器：
+
+| 哨兵值 | 含义 | UI 层影响 |
+|--------|------|----------|
+| `__EMPTY_STRING__` | 参数值为 `''` | Parser 还原为空字符串 |
+| `__NULL__` | 参数值为 `null` | Parser 返回 `null` |
+| `__UNDEFINED__` | 参数值为 `undefined` | Parser 返回 `undefined` |
+
+> ⚠️ 这三个字符串是内部实现细节，**禁止出现在用户输入中**，否则被错误解析为特殊类型。
+
+### 参数类型 badge（原始 Demo 硬编码问题）
+
+原始 Demo 所有参数均硬编码为 `SYNC` badge，实际语义枚举如下：
+
+| 值 | UI 标签 | 业务语义 |
+|----|---------|---------|
+| `sync` | SYNC | 实时同步自外部数据源 |
+| `ref` | REF | 引用另一字段/计算结果 |
+| `const` | CONST | 常量，不应被用户手动修改 |
+| `literal` | LITERAL | 字面量，用户直接填写 |
+| `template` | TEMPLATE | 来自模板变量 `${VarName}` 注入 |
+
+---
+
+## 实体关系图
+
+```
+原始表达式文本（用户输入）
+  └── parsePipeExpr() → ParsedExpr
+        ├── inputs: InputDef[]     ← $1, $2 ... 参数声明
+        └── stages: StageDef[]    ← 各管道阶段，args 含 $N 占位符
+
+CSV 测试数据（粘贴文本）
+  └── parseTestCaseText()
+        └── TestCase[]
+              ├── inputs[]         ← 末列前的所有列
+              └── expectedOutput   ← 最后一列
+
+PipeEvaluator.evaluate(ParsedExpr, inputVals[])
+  └── EvalResult
+        ├── result: any            ← 最终输出
+        └── intermediates: any[]   ← 每阶段中间输出（长度 = stages.length）
+
+ExecResults（批量模式）
+  ├── testCases: TestCase[]       ← 含 actualOutput + matchStatus
+  └── summary: Summary
 ```
 
 ---
 
-## 魔法值与特殊 Token
+## 动态字段说明
 
-| 值 | 含义 | 出现位置 |
-|----|------|---------|
-| `'__EMPTY_STRING__'` | 参数值为空字符串时的内部替换 | `_replParams()` ↔ `_parsePrimary()` |
-| `'__NULL__'` | 参数值为 `null` 时的内部替换 | 同上 |
-| `'__UNDEFINED__'` | 参数值为 `undefined` 时的内部替换 | 同上 |
-
-> 这三个魔法 token 是跨 `_replParams` / `SafeExpressionParser` 边界传递特殊 JS 值的内部协议，**不是用户可见的语法**。若用户输入恰好是这三个字符串，会被误识别为特殊值——这是一个已知边界问题。
-
----
-
-## 枚举映射（UI 层转换规则）
-
-### executionStatus
-| 值 | 含义 | UI 指示图标 |
-|----|------|------------|
-| `'pending'` | 尚未执行 | `…`（灰色） |
-| `'success'` | 执行成功（matchStatus 另判） | 由 matchStatus 决定 |
-| `'error'` | 执行时抛出异常 | `⚠`（橙色，mic-err） |
-
-### matchStatus
-| 值 | 含义 | UI 指示图标 |
-|----|------|------------|
-| `'match'` | actualOutput 归一化 = expectedOutput 归一化 | `✓`（绿色，mic-ok） |
-| `'mismatch'` | 不等 | `✗`（红色，mic-fail） |
-| `null` | 未执行或执行出错 | 同 error（mic-err） |
-
-### 参数徽章（已定义但未完全使用）
-| CSS 类 | 颜色 | 语义（推测） |
-|--------|------|------------|
-| `.badge-sync` | 蓝 #007acc | 与外部数据源同步型参数 |
-| `.badge-ref` | 紫 #68217a | 引用其他变量 |
-| `.badge-const` | 绿 #388a34 | 常量型参数 |
-| `.badge-literal` | 灰 #616161 | 字面量型参数 |
-| `.badge-template` | 红 #d73a49 | 模板变量型参数 |
-
-> 当前代码中所有参数一律渲染为 `.badge-sync`（硬编码），其余徽章类型**已定义但从未使用**——这意味着参数类型区分的 UI 框架已预留，但宿主参数类型信息尚未接入。
-
----
-
-## 输出归一化规则（matchStatus 判断依据）
-
-```javascript
-function normOut(s) {
-  return String(s).trim()              // 去首尾空白
-    .replace(/^["']|["']$/g, '')       // 去首尾引号
-    .replace(/\s+/g, ' ');             // 合并内部空白
-}
-```
-
-比较：`normOut(actualOutput) === normOut(expectedOutput)`
-
----
-
-## 关系图
+### $N 参数引用的作用域规则
 
 ```
-AppState
-├── parsedExpr: ParsedExpr
-│   ├── inputs: InputDef[]    ← 决定 inputValues 的长度和标签
-│   └── stages: Stage[]       ← 决定 pipeline-container 渲染行数
-├── inputValues: string[]     ← 用户填入，驱动 updateDebugResults()
-├── testCases: TestCase[]     ← loadTestCases() 解析填入，executeBatch() 更新
-└── execResults: ExecResults  ← executeBatch() 填入，renderBatchResults() 消费
+$1;$2 |> expr($1 + $2) |> string.format("%.2f", $1)
 ```
+
+- 首段 `$1;$2` 声明两个输入参数
+- `expr($1 + $2)` 中，`$1=原始输入1`，`$2=原始输入2`
+- `string.format("%.2f", $1)` 中，`$1=上一阶段输出`（不再是原始输入）
+- `;` 分隔符仅在表达式**首段**有效
+
+> ⚠️ 已知边界：当参数数量 ≥ 10 时，`$10` 会被 `$1` 的正则先匹配导致替换歧义。实际参数数量通常 ≤ 5，暂无触发风险，但工程上应修复。
+
+### normOut 输出标准化规则
+
+比较期望值与实际值时，`normOut()` 会：
+1. 去前后空白
+2. 去除首尾单/双引号
+3. 合并连续空白为单个空格
+
+**结果**：字符串 `"7.00"` 和数字 `7.00` 被视为**匹配**——大多数场景合理，严格类型验证场景下是 bug。

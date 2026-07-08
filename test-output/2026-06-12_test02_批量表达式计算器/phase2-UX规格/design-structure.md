@@ -1,6 +1,6 @@
 # 管道表达式批量评估器 · 设计结构文档
-> 生成时间：2026-06-12 | Demo 版本：DEMO-优化版/index.html（v2，五镜走查版）  
-> 数据来源：Demo HTML/CSS 代码反推 + PTO Design System token 文件
+> 生成时间：2026-07-08 | Demo 版本：DEMO-优化版/index.html（PTO Design System 内联版）  
+> 数据来源：Demo HTML/CSS/JS 代码反推 + PTO Design System token 定义
 
 ---
 
@@ -9,757 +9,629 @@
 ### 1.1 分区结构（ASCII 树）
 
 ```
-页面（最大宽 1440px，居中，背景 #101010，padding: 16px 四边，overflow-y: auto）
-├── app-shell（flex-col，gap: 16px）
-│   ├── 顶栏（.topbar）   固定高 44px，圆角 12px，背景 ~#0e0e0e，底 border 1px solid rgba(255,255,255,0.06)
-│   │   ├── 左侧：SVG 图标（18×18，primary #4369EF）+ 产品名称 + BETA 标签
-│   │   └── 右侧：主题切换 segmented control（dark/light/glass）
-│   │
-│   ├── 主内容区（.main-grid）   grid，55fr / 45fr，gap: 16px，align-items: start
-│   │   │   ≤1024px → 单栏 1fr
-│   │   │
-│   │   ├── 左栏（.main-col #col-left）   flex-col，gap: 16px，55% 宽
-│   │   │   ├── ① 表达式 panel（.panel）
-│   │   │   │   ├── panel-title：步骤 chip ① + SVG + "管道表达式"
-│   │   │   │   ├── expr-textarea（min-height: 52px，mono font，可 resize 纵向）
-│   │   │   │   ├── #expr-msg（inline-msg，动态显示 err/ok，默认隐藏）
-│   │   │   │   ├── .op-panel（操作符 Chip 折叠面板，默认展开）
-│   │   │   │   │   ├── op-head：折叠控制（"▶ 操作符面板 · hover 签名 · 点击插入"）
-│   │   │   │   │   └── op-body（输入组/字符串组/自定义组，各含 op-chips）
-│   │   │   │   └── expr-actions（kbd-hint + 重置按钮 + 应用表达式按钮）
-│   │   │   │
-│   │   │   ├── 模式切换（.mode-toggle，role=tablist）   调试模式 / 用例模式
-│   │   │   │
-│   │   │   ├── [调试模式]
-│   │   │   │   ├── ② 输入参数 panel（#dbg-inputs）
-│   │   │   │   │   └── #inputs-container（动态渲染 input-row × N）
-│   │   │   │   ├── 模板变量 panel（#dbg-tpl，折叠面板）
-│   │   │   │   └── 历史表达式 panel（#dbg-history）
-│   │   │   │
-│   │   │   └── [用例模式]
-│   │   │       └── ② 加载测试用例 panel（#tc-left）
-│   │   │           └── load-textarea（min-height: 130px）+ action-bar
-│   │   │
-│   │   └── 右栏（.main-col #col-right）   flex-col，gap: 16px，45% 宽
-│   │       ├── [调试模式·空态] 示例卡片区（#dbg-empty，.panel）
-│   │       │   └── .ex-cards（3 个 .ex-card 按钮，flex-col，gap: 8px）
-│   │       ├── [调试模式·有数据] ③ 管道处理 panel（#dbg-pipeline）
-│   │       │   └── #pipeline-container（flow-input + flow-arrow + stage × N）
-│   │       ├── [调试模式·有数据] ④ 最终结果 panel（#dbg-result）
-│   │       │   └── .final-result + result-actions（复制按钮）
-│   │       └── [用例模式]
-│   │           ├── ③ 批量执行 panel（#tc-exec-section）
-│   │           └── ④ 执行结果 panel（#tc-results-section）
-│   │               ├── pass-badge + stats + filter-bar
-│   │               └── vtable-header + virtual-container（虚拟滚动）
-│   │
-└── #toast（fixed，right: 20px，bottom: 20px，z-index: 400）
+页面（max-width:1440px，居中，padding:16px，背景 var(--app-background)）
+├── TopBar                  高 44px，背景 var(--comp-toolbar-bg)，border-radius:12px
+│   ├── 左侧：图标 · 标题（16px/600）· Beta pill
+│   └── 右侧：主题 segmented control（3 选项）
+│
+└── main-grid               display:grid, columns: 55fr 45fr，gap:16px
+    ├── 左栏（操作区）       flex-column, gap:16px
+    │   ├── ① 管道表达式面板  textarea + 操作符 Chip 面板 + 应用按钮
+    │   ├── 模式切换          segmented control（调试/用例），高 40px
+    │   ├── [调试模式]
+    │   │   ├── ② 输入参数面板
+    │   │   ├── 模板变量面板（折叠）
+    │   │   └── 历史表达式面板
+    │   └── [用例模式]
+    │       └── ② 加载测试用例面板
+    │
+    └── 右栏（反馈区）       flex-column, gap:16px
+        ├── [调试模式 · 未填参数]
+        │   └── 空态示例卡片（3 张）
+        ├── [调试模式 · 已填参数]
+        │   ├── ③ 管道处理面板（数据流轨迹）
+        │   └── ④ 最终结果面板
+        └── [用例模式]
+            ├── ③ 批量执行面板
+            └── ④ 执行结果面板（虚拟滚动表格 + 统计）
+
+@media (max-width:1024px) → 单栏，columns:1fr
 ```
 
 ### 1.2 间距系统
 
-| 用途 | 值 |
-|------|----|
-| 页面外边距（app-shell 外层 body） | 16px 四边（`--space-4`） |
-| 主内容区各区块间距（app-shell gap） | 16px（`--space-4`） |
-| 双栏网格列间距（main-grid gap） | 16px（`--space-4`） |
-| 左/右栏内各 panel 间距（main-col gap） | 16px（`--space-4`） |
-| panel 内边距（panel-padding） | 16px（`--space-4`） |
-| panel 标题底部间距（margin-bottom） | 12px（`--space-3`） |
-| panel-title 内元素间距（gap） | 8px（`--space-2`） |
-| 操作符 chip 间距（op-chips gap） | 6px |
-| 示例卡片间距（ex-cards gap） | 8px（`--space-2`） |
-| input-row 垂直 padding | 8px 0（`--space-2 0`） |
-| input-row 各元素间距 | 12px（`--space-3`） |
-| 历史列表项间距 | 8px（`--space-2`） |
-| 统计格间距（stats gap） | 8px（`--space-2`） |
-| 筛选 chip 间距（filter-bar gap） | 8px（`--space-2`） |
-| 表格行高 | 36px（`--table-row-height`） |
-| 表格 header 高 | 36px（`--table-header-height`） |
+| 用途 | 值 | Token |
+|------|----|-------|
+| 页面内边距 | 16px | `--space-4` |
+| 栏间 gap | 16px | `--space-4` |
+| 面板内边距 | 16px / 20px | `--panel-padding` / `--panel-padding-lg` |
+| 组件间 gap | 16px | `--space-4` |
+| 面板标题底部间距 | 12px | `--space-3` |
+| 操作符 chip 间距 | 6px | 内联 |
+| 历史记录行间距 | 8px | `--space-2` |
+| 输入行行高 | 34px | `--input-height-md` |
+| 表格行高 | 36px | `--table-row-height` |
 
 ---
 
 ## 二、组件清单
 
-### 2.1 顶栏（.topbar）
-
+### TopBar（工具栏）
 ```
-尺寸：宽 100%，高 44px（comp-toolbar-height）
-背景：~#0e0e0e（color-mix(in srgb, #101010 92%, black)）
-边框：1px solid rgba(255,255,255,0.06)，圆角 12px（radius-lg）
-内边距：0 16px
+尺寸：100%宽，高 44px（--comp-toolbar-height）
+背景：--comp-toolbar-bg（= color-mix(background 92%, black)）
+边框：1px solid --comp-toolbar-border（= --border-subtle）
+圆角：12px（--radius-lg）
+布局：flex, align-items:center, gap:12px, padding: 0 16px
 ```
+**内部结构（左→右）：**
+1. **图标** 18×18px SVG，`color:var(--primary)`（蓝色）
+2. **标题** font: 600 16px var(--font-sans)，color: var(--foreground)
+3. **Beta pill** `height:20px`，背景 `--comp-tag-bg`，边框 `--comp-tag-border`，font: 11px 500，color: `--foreground-muted`，radius: pill
+4. **弹性空间** `flex:1`
+5. **主题 segmented control** 见下方组件
 
-**内部结构（从左到右）：**
-1. **品牌图标**（tb-icon，18×18 SVG，颜色 #4369EF）— `aria-hidden="true"`
-2. **产品名称**（tb-title）：16px / 600 / rgba(255,255,255,0.90)，`var(--text-title-2)`
-3. **BETA 标签**（tb-beta）：11px / uppercase / rgba(255,255,255,0.40)，背景 rgba(255,255,255,0.06)，边框 rgba(255,255,255,0.10)，圆角 999px，padding 2px 8px
-4. **弹性空间**（tb-spacer，flex:1）
-5. **主题切换**（theme-seg，segmented control）：见 2.2
-
-**交互热点：**
-- 主题切换按钮：click → `setTheme(val)` → `document.documentElement.setAttribute('data-theme', val)`
+**变体：** 无变体，单一形态  
+**交互热点：** 无（工具栏本身不可点击）
 
 ---
 
-### 2.2 主题切换 Segmented Control（.theme-seg）
-
+### Panel（通用面板容器）
 ```
-尺寸：自适应宽，高 ~28px
-背景：rgba(255,255,255,0.065)（segmented-control-bg）
-边框：1px solid rgba(255,255,255,0.14)，圆角 10px（segmented-control-radius）
-内边距：3px（segmented-control-padding）
-按钮间距：3px（segmented-control-gap）
+背景：--panel-bg（= --surface-2: #1c1c1c dark / #F2F2F2 light）
+边框：1px solid --panel-border（= --border-subtle）
+圆角：12px（--panel-radius）
+内边距：16px（--panel-padding）
+```
+**面板标题行：** `display:flex; align-items:center; gap:8px; margin-bottom:12px`
+- 步骤编号 chip：20×20px，圆形，边框 `1.5px solid --primary`，color: `--primary`，font: 11px 500
+- SVG 图标：15×15px，`color: --foreground-secondary`
+- 标题文字：600 16px
+- `.pt-hint`：12px 400，`--foreground-muted`，`margin-left:auto`
+
+---
+
+### ExpressionEditor（管道表达式编辑器）
+```
+textarea 尺寸：100%宽，最小高 52px，padding:12px，resize:vertical
+字体：var(--text-mono)（12px/500/JetBrains Mono）
+背景：--input-bg（= --surface-1: #161616 dark）
+边框：1px solid --input-border（= --border-default: rgba(255,255,255,0.10)）
+圆角：8px（--input-radius）
+```
+**状态枚举见 §八.4.1**
+
+**下方 inline 校验区（#expr-msg）：**
+```
+padding: 6px 12px，圆角 6px，font: 12px，margin-top:8px
+```
+- 成功态：背景 `--tone-green-strong`，color `--success`（#04d793），图标 ✓ SVG
+- 错误态：背景 `--tone-critical-bg`，color `--danger`（#ff4b7b），图标 ⚠ SVG
+
+**底部操作栏（expr-actions）：** `display:flex; gap:8px; justify-content:flex-end; margin-top:12px`
+- `kbd-hint`：`margin-right:auto`，font: 11px，color `--foreground-muted`
+  - `kbd` 元素：背景 `--surface-3`，边框 `--border-default`，圆角 6px，padding: 1px 5px
+- 重置按钮（btn-secondary）
+- 应用表达式按钮（btn-primary）
+
+---
+
+### OperatorChipPanel（操作符面板，折叠）
+```
+外框：1px solid --border-subtle，圆角 8px，背景 --surface-1，margin-top:12px
+折叠头：display:flex, padding: 8px 12px，font:12px，color:--foreground-muted
+  ▶ 折叠时：SVG caret 0deg；展开时：rotate(90deg)
+折叠体：padding: 0 12px 12px；display:flex，flex-direction:column，gap:8px
+```
+**三组分类：**
+
+| 组名 | 圆点颜色 | 内容 |
+|------|---------|------|
+| 输入 | `--primary`（蓝）| `$1`、`;$2`、`|>` |
+| 字符串 | `--success`（绿）| `string.format`、`string.upper`、`string.lower`、`string.sub`、`string.gsub`、`string.cmp` |
+| 自定义 | `--warning`（橙）| `expr()` |
+
+**Chip 样式：**
+```
+font: 11px/500/monospace，padding: 3px 8px，圆角 6px
+背景 --comp-tag-bg，边框 --comp-tag-border，color --foreground-secondary
+hover: translateY(-1px)，border-color --border-strong，bg --state-hover，color --foreground
+```
+**状态枚举见 §八.4.2**
+
+---
+
+### ModeToggle（模式切换 segmented control）
+```
+layout: display:flex，gap:3px，padding:3px，圆角 10px
+背景：--segmented-control-bg（= --surface-disabled）
+边框：1px solid --segmented-control-border（= --border-subtle）
+```
+每个 mode-btn：
+```
+height: ~34px（flex:1），padding: 8px 16px，圆角 6px
+font: 12px，间距: 6px（icon 14×14 + 文字）
+default: 透明背景，color --foreground-secondary
+active: 背景 --primary，color --primary-foreground（#fff）
+hover（非active）: 背景 --state-hover，color --foreground
 ```
 
-**按钮变体：**
-| 状态 | 背景 | 文字色 | 圆角 |
+---
+
+### ParameterRow（输入参数行）
+```
+layout: display:flex，align-items:center，gap:12px，padding: 8px 0，flex-wrap:wrap
+warn 态: .input-row.warn .input-field { border-color: --warning }
+```
+**内部结构（左→右）：**
+1. **标签区** `min-width:220px，display:flex，gap:8px`
+   - **Badge chip**：高 20px，padding 0 8px，pill 圆角，font: 11px 500，uppercase
+   - **Badge select**：`appearance:none`，透明背景，边框 `--border-default`，font: 11px，圆角 6px
+   - `$N` 名称：mono 14px，`--foreground`
+   - 描述：12px，`--foreground-muted`
+2. **输入框** `flex:1，min-width:200px`，高 34px，mono 字体
+3. **参数警告** `flex-basis:100%`，font: 11px，color `--warning`，`padding-left:232px`
+
+**Badge 类型色系：**
+
+| 类型 | 背景 | 文字色 | 边框 |
 |------|------|--------|------|
-| default | transparent | rgba(255,255,255,0.60) | 6px（radius-sm） |
-| hover | rgba(255,255,255,0.06) | rgba(255,255,255,0.90) | 6px |
-| active | #4369EF（primary） | #ffffff（primary-foreground） | 6px |
-
-**状态枚举：** 见 §八 2.2 状态表
-
----
-
-### 2.3 主按钮变体（.btn）
-
-```
-高度：30px（button-height-sm）
-圆角：12px（button-radius = radius-lg）
-字体：500 12px / 1 var(--font-sans)（button-font）
-内边距：0 12px（button-padding-x-md）
-图标：13×13，gap 6px
-```
-
-| 变体 | 背景 | 文字色 | 边框 | hover 背景 |
-|------|------|--------|------|-----------|
-| btn-solid | rgba(255,255,255,0.90) | #101010 | transparent | rgba(255,255,255,0.79) |
-| btn-secondary | ~#1a1a1a | rgba(255,255,255,0.90) | rgba(255,255,255,0.06) | #262626 |
-| btn-primary | #4369EF | #ffffff | transparent | #5a92e6 |
-| btn-ghost | transparent | rgba(255,255,255,0.60) | — | rgba(255,255,255,0.06) |
-
-**共有状态：**
-- focus-visible：`box-shadow: 0 0 0 3px rgba(67,105,239,0.42)`
-- disabled：`opacity: 0.42; cursor: not-allowed`
-- active（btn-primary）：background `#5a92e6`，transform 无
+| SYNC | `--tone-info-bg` | `--primary` | primary 40% |
+| REF | violet 16% | `#A855F7` | violet 40% |
+| CONST | `--tone-green-strong` | `--success` | success 40% |
+| LITERAL | `--state-muted` | `--foreground-secondary` | `--border-default` |
+| TEMPLATE | `--tone-warning-bg` | `--warning` | warning 40% |
 
 ---
 
-### 2.4 表达式输入区（.expr-textarea）
-
+### TemplatVariablePanel（模板变量，折叠）
+折叠头同操作符面板；折叠体为键值对行列表：
 ```
-尺寸：宽 100%，min-height 52px，resize: vertical
-字体：500 12px / 1.40 var(--font-mono)（text-mono）
-背景：#161616（input-bg = surface-1）
-边框：1px solid rgba(255,255,255,0.10)，圆角 8px（input-radius = radius-md）
-内边距：12px（space-3）
+tpl-row: display:flex，gap:8px
+  tpl-key: width:200px，height:34px，mono，bg --input-bg，border --input-border
+  tpl-val: flex:1，height:34px，mono
+  icon-btn（删除）: 28×28px，border 1px solid --border-default，圆角 6px
 ```
-
-| 状态 | 触发条件 | 视觉变化（精确 hex/px） | 行为约束 |
-|------|---------|----------------------|---------|
-| default | 页面加载 | 边框 rgba(255,255,255,0.10) | — |
-| focus | 点击 / Tab | border-color #4369EF；box-shadow 0 0 0 3px rgba(67,105,239,0.42) | — |
-| invalid | 300ms debounce 解析失败 | border-color #FF4B7B；box-shadow 0 0 0 3px rgba(255,75,123,0.14)（tone-critical-bg） | inline-msg err 同时显示 |
-| valid-applied | applyExpr() 成功 | 边框恢复默认；inline-msg ok 显示 3s 后自动隐藏 | — |
-| hover | 不适用 | — | — |
-| disabled | 不适用 | — | — |
-| loading | 不适用 | — | — |
-| empty | 不适用 | — | 允许空值（表示无表达式） |
 
 ---
 
-### 2.5 内联消息（.inline-msg）
-
+### ExampleCards（空态示例卡片）
 ```
-尺寸：宽 100%，高 auto
-字体：12px（text-body-sm）
-内边距：6px 12px（6px space-3）
-圆角：6px（radius-sm）
-图标：14×14 SVG，flex-shrink 0，margin-top 2px
+ex-card: display:flex，flex-direction:column，gap:6px，padding:12px
+  背景 --card-bg（= --surface-1），边框 --card-border，圆角 12px
+  hover: translateY(-1px)，border-color --card-hover-border，bg --state-hover
+  focus-visible: outline 2px solid --focus-ring，offset 1px
+内部（上→下）：
+  ex-title: 12px/600，--foreground
+  ex-expr: 11px mono，color --primary（蓝）
+  ex-io: 12px，--foreground-muted，期望输出 b 标签用 --success
 ```
-
-| 变体 | 背景 | 文字色 | 触发 |
-|------|------|--------|------|
-| err | rgba(255,75,123,0.14) | #FF4B7B | 解析失败 / 参数空 |
-| ok | rgba(4,215,147,0.22) | #04D793 | 应用成功 |
 
 ---
 
-### 2.6 操作符 Chip 面板（.op-panel）
-
+### PipelineStage（管道阶段轨迹）
 ```
-背景：#161616（surface-1）
-边框：1px solid rgba(255,255,255,0.06)，圆角 8px（radius-md）
-margin-top：12px（space-3）
+stage: padding:12px，bg --surface-2，边框 1px solid --border-subtle
+  border-left: 3px solid --primary，圆角 8px，margin-bottom:8px
+stage.errored: border-color --danger
+stage.skipped: opacity:0.45
 ```
+**阶段标题行：** `stage-head`：stage-idx chip + 阶段表达式（mono 12px，`--foreground-secondary`）
 
-**内部结构：**
-1. **op-head**（折叠控制）：flex，gap 8px，padding 8px 12px，cursor pointer
-   - caret SVG（12×12，rotate(90deg) when open）
-   - 文案：12px / rgba(255,255,255,0.40)
-2. **op-body**（展开内容）：flex-col，gap 8px，padding 0 12px 12px
-   - 每个 op-group：flex，gap 8px，padding-top 8px，border-top 1px dashed rgba(255,255,255,0.06)
-   - 组色点（op-dot）：6px × 6px 圆，各组不同颜色
-   - 组名（op-gname）：11px / 500 / rgba(255,255,255,0.60)，宽 44px，letter-spacing 0.5px
-   - op-chips（flex-wrap，gap 6px）
+**I/O 行（stage-io）：**
+- `io-in`：12px mono，`--foreground-secondary`，前缀「入」
+- `io-arr`：`→`，`--foreground-muted`
+- `io-out`：12px mono bold
+  - waiting：`--foreground-muted`，italic
+  - error：`color:--danger`，前缀 `✗`
+- `type-chip`：11px，pill 圆角，padding 1px 7px
+  - number：`--tone-info-bg` / `--primary`
+  - string：`--tone-green-strong` / `--success`
+  - boolean：`--tone-warning-bg` / `--warning`
 
-**op-chip 状态枚举：**
-
-| 状态 | 背景 | 文字色 | 边框 | transform |
-|------|------|--------|------|-----------|
-| default | rgba(255,255,255,0.06) | rgba(255,255,255,0.60) | rgba(255,255,255,0.10) | — |
-| hover | rgba(255,255,255,0.09) | rgba(255,255,255,0.90) | rgba(255,255,255,0.16) | translateY(-1px) |
-| active（click） | — | — | — | 插入到 textarea 光标位置 |
-| focus-visible | 继承 hover | 同上 | 2px solid rgba(67,105,239,0.42) | — |
-| disabled | 不适用 | — | — | — |
-
-**操作符分组：**
-| 组 | 色点颜色 | 操作符 |
-|----|---------|--------|
-| 输入 | #4369EF | `$1`，`;$2`，`\|>` |
-| 字符串 | #04D793 | `string.format`，`string.upper`，`string.lower`，`string.sub`，`string.gsub`，`string.cmp` |
-| 自定义 | #FFAA3B | `expr(…)` |
+**阶段间箭头（flow-arrow）：**
+- `bar`：2px 宽，10px 高，背景 `--border-strong`
+- `tip`：▼，9px，`--foreground-muted`
 
 ---
 
-### 2.7 示例卡片（.ex-card）
-
+### FinalResult（最终结果区）
 ```
-背景：#161616（card-bg = surface-1）
-边框：1px solid rgba(255,255,255,0.10)（card-border = border-default）
-圆角：12px（card-radius = radius-lg）
-内边距：12px（space-3）
-布局：flex-col，gap 6px，text-align left，宽 100%
+padding:16px，bg --surface-2，边框 1px solid --primary，圆角 8px
+font: 600 20px，text-align:center，word-break:break-all
 ```
-
-**内部结构：**
-1. **ex-title**：12px / 600 / rgba(255,255,255,0.90)（示例名称）
-2. **ex-expr**：11px / mono / #4369EF（primary，表达式文本，word-break: break-all）
-3. **ex-io**：12px / rgba(255,255,255,0.40)；预期输出用 `<b>` 颜色 #04D793 / 600
-
-**状态枚举：**
-| 状态 | 背景 | 边框 | transform |
-|------|------|------|-----------|
-| default | #161616 | rgba(255,255,255,0.10) | — |
-| hover | rgba(255,255,255,0.06) 叠加 | rgba(255,255,255,0.16)（card-hover-border = border-strong） | translateY(-1px) |
-| focus-visible | 同 default | 2px solid rgba(67,105,239,0.42)，offset 1px | — |
-| active（点击） | 按钮 pressed | — | 触发 `useExample(i)` → 填入 textarea + 输入值 + applyExpr + updateDebugResults |
-| loading | 不适用 | — | — |
-| empty | 不适用 | — | — |
+- waiting：`--foreground-muted`，italic，12px 400
+- error：`border-color:--danger`，`color:--danger`，12px 400
 
 ---
 
-### 2.8 管道阶段（.stage）数据流组件
-
+### VirtualScrollTable（虚拟滚动结果表格）
 ```
-布局：flex-col，margin-bottom 8px；最后一个 stage margin-bottom 0
-背景：#1c1c1c（surface-2）
-边框：1px solid rgba(255,255,255,0.06)（border-subtle），左侧 3px solid #4369EF（primary accent）
-圆角：8px（radius-md）
-内边距：12px（space-3）
+表头：高 36px，bg color-mix(--surface-2 80%, transparent)
+  边框 --table-border，圆角 top 8px
+  列标签：11px uppercase，letter-spacing 0.5px，--foreground-muted
+虚拟容器：max-height calc(100vh - 420px)，min-height 160px
+  position:relative，overflow:auto
+每行（vrow）：高 36px，display:flex，border-bottom 1px solid --border-subtle
+  hover：bg --state-hover
+  mismatch：bg --tone-critical-bg（淡红）
+  errored：bg --tone-warning-bg（淡橙）
+状态图标（mic）：20×20px，圆形，font 11px bold
+  mic-ok：bg --success，color --background（深色文字）
+  mic-fail：bg --danger，color --primary-foreground（白）
+  mic-err：bg --warning，color --background
 ```
-
-**子元素：**
-- **.flow-input**（输入行）：mono 12px / rgba(255,255,255,0.60)；background #161616（surface-1）；border 1px dashed rgba(255,255,255,0.10)；圆角 8px；padding 8px 12px
-- **.flow-arrow**：flex-col，align-items center，margin 2px 0；color rgba(255,255,255,0.40)
-  - `.bar`：宽 2px，高 10px，background rgba(255,255,255,0.16)（border-strong）
-  - `.tip`：9px，line-height 1，下箭头 ▼
-- **.stage-head**：flex，gap 8px，margin-bottom 6px
-  - `.stage-idx` badge：11px / rgba(255,255,255,0.40)；background rgba(255,255,255,0.06)；边框 rgba(255,255,255,0.10)；圆角 999px；padding 1px 8px
-  - 阶段表达式文本：`.stage-expr`，mono，rgba(255,255,255,0.60)，word-break break-all
-- **.stage-io**：flex，align-items center，gap 8px，flex-wrap wrap
-  - `.io-in`：mono 12px / rgba(255,255,255,0.60)（入值）
-  - `.io-arr`：rgba(255,255,255,0.40)，`→`
-  - `.io-out`：mono 12px / 600（出值，颜色随类型 chip 类型）
-  - `.type-chip`：11px，圆角 999px，padding 1px 7px（见 2.9）
-  - `.io-out.waiting`：rgba(255,255,255,0.40) / italic / 400
-
-**阶段状态枚举：**
-| 状态 | 触发条件 | 视觉变化（精确 hex/px） | 行为约束 |
-|------|---------|----------------------|---------|
-| default | 正常计算 | 左边框 3px solid #4369EF；opacity 1 | — |
-| waiting | 参数未输入 | io-out 显示「等待输入…」italic | — |
-| errored | 该阶段计算失败 | border-color #FF4B7B（border-left + border） | 后续阶段进入 skipped 态 |
-| skipped | 前置阶段失败 | opacity 0.45 | 不展示 io-in/io-out 真实值 |
-| hover | 不适用 | — | — |
-| loading | 不适用 | — | — |
-| empty | 不适用 | — | — |
-| disabled | 不适用 | — | — |
+列宽：`#`列52px fixed；输入/期望/实际各 `flex:1 min-width:120px`；状态列 64px fixed
 
 ---
 
-### 2.9 类型 Chip（.type-chip）
-
+### PassRateBadge（通过率徽章）
 ```
-字体：11px / 1.20（text-label）
-圆角：999px（tag-radius）
-内边距：1px 7px
+高 ~24px，padding: 3px 10px，pill 圆角
+font: 11px/700，letter-spacing 0.3px
+ok：bg --success（#04d793），color #08111f
+bad：bg --danger（#ff4b7b），color #ffffff
 ```
-
-| 类型 | 背景 | 文字色 |
-|------|------|--------|
-| number | rgba(67,105,239,0.16)（tone-info-bg） | #4369EF（primary） |
-| string | rgba(4,215,147,0.22)（tone-green-strong） | #04D793（success） |
-| boolean | rgba(255,170,59,0.16)（tone-warning-bg） | #FFAA3B（warning） |
-| null / other | rgba(255,255,255,0.06) | rgba(255,255,255,0.40) |
+文字格式：`✓/✗ 通过 N/M`
 
 ---
 
-### 2.10 最终结果区（.final-result）
-
+### StatCards（统计卡片组）
 ```
-背景：#1c1c1c（surface-2）
-边框：1px solid #4369EF（primary，成功态）/ 1px solid #FF4B7B（danger，错误态）
-圆角：8px（radius-md）
-内边距：16px（space-4）
-字体：600 20px / 1.30（text-title-1），text-align center，word-break break-all
+grid: auto-fit, min-width 96px
+每格：padding 12px 8px，bg --surface-2，边框 --border-subtle，圆角 8px，text-align:center
+stat-v：600 20px
+  s-ok：--success；s-fail：--danger；s-warn：--warning
+stat-l：11px uppercase，letter-spacing 0.5px，--foreground-muted
 ```
-
-| 状态 | 边框颜色 | 文字颜色 | 字体 |
-|------|---------|---------|------|
-| waiting | `#4369EF` | rgba(255,255,255,0.40) | 14px italic |
-| success | `#4369EF` | rgba(255,255,255,0.90) | 600 20px |
-| error | `#FF4B7B` | #FF4B7B | 14px normal |
 
 ---
 
-### 2.11 参数输入行（.input-row）
-
+### FilterChips（结果筛选 chip 组）
 ```
-布局：flex，align-items center，gap 12px，padding 8px 0，flex-wrap wrap
+display:flex，gap:8px，flex-wrap:wrap
+每个 filter-chip：
+  高 22px，padding 0 8px，pill 圆角
+  bg --stat-chip-bg，border --stat-chip-border
+  color --foreground-secondary，font 11px
+  active：bg --state-selected，border --primary，color --foreground
+  数字 .fc-count：--foreground-muted
 ```
-
-**子元素：**
-- **.input-label**（min-width 220px，flex，gap 8px，12px）
-  - `.pname`：mono / rgba(255,255,255,0.90)（如 `$1`）
-  - `.phint`：rgba(255,255,255,0.40)（描述文字）
-  - badge-select 下拉（类型选择器）
-- **.input-field**（flex:1，min-width 200px，height 34px，mono font，surface-1 background）
-- **.param-msg**（flex-basis 100%，11px，warning 色 #FFAA3B，显示空值警告）
-
-**input-row warn 态：**
-- `.input-row.warn .input-field`：border-color #FFAA3B（warning）
-- `.param-msg`：display block
 
 ---
 
-### 2.12 通过率 Badge（.pass-badge）
-
+### HistoryItem（历史记录条目）
 ```
-字体：11px / 700 / letter-spacing 0.3px（text-label + bold）
-圆角：999px（tag-radius）
-内边距：3px 10px
-cursor：pointer，border none，margin-left auto
+display:flex，gap:8px，padding: 8px 12px
+bg --inspector-soft-card-bg，border --border-subtle，圆角 8px
+hover：bg --inspector-soft-card-bg-hover，border --border-default
+hi-expr：mono flex:1，overflow:hidden，ellipsis，--foreground-secondary
+hi-time：11px，--foreground-muted，flex-shrink:0
 ```
-
-| 变体 | 背景 | 文字色 | 触发条件 |
-|------|------|--------|---------|
-| ok（全部通过） | #04D793（success） | #08111f（近黑，高对比） | matched === total |
-| bad（有失败） | #FF4B7B（danger） | #ffffff | matched < total |
-
-点击行为：`setFilter('mismatch')` → 筛选显示不匹配行
 
 ---
 
-### 2.13 历史记录项（.history-item）
-
+### Toast（通知浮层）
 ```
-布局：flex，align-items center，gap 8px，padding 8px 12px
-背景：~rgba(28,28,28,0.80)（inspector-soft-card-bg）
-边框：1px solid rgba(255,255,255,0.06)（border-subtle）
-圆角：8px（inspector-soft-card-radius = radius-md）
+position:fixed，bottom:20px，right:20px
+bg --surface-4，color --foreground
+边框 --border-strong，padding: 8px 16px，圆角 8px
+font: 12px，box-shadow --shadow-md，z-index --z-toast（400）
+show：opacity:1，translateY(0)；hide：opacity:0，translateY(8px)
+duration：200ms，easing: cubic-bezier(0.4,0,0.2,1)
+自动消失：1800ms
 ```
-
-| 状态 | 背景 | 边框 | 行为 |
-|------|------|------|------|
-| default | ~rgba(28,28,28,0.80) | rgba(255,255,255,0.06) | — |
-| hover | ~rgba(38,38,38,0.62) | rgba(255,255,255,0.10) | — |
-| click | — | — | `restoreHistory(i)` → 恢复表达式 + applyExpr |
-
-**子元素：**
-- `.hi-expr`：mono / flex:1 / overflow ellipsis / rgba(255,255,255,0.60)
-- `.hi-time`：11px / rgba(255,255,255,0.40) / flex-shrink 0（格式：HH:MM）
 
 ---
 
-### 2.14 批量结果虚拟表格
+## 三、色彩 Token
 
-**容器（.virtual-container）：**
-```
-max-height：calc(100vh - 420px)，min-height：160px
-overflow：auto；position：relative
-边框：1px solid rgba(255,255,255,0.06)（border-subtle），border-top none
-```
-
-**行（.vrow）：**
-```
-height：36px（table-row-height）
-display：flex；min-width fit-content；align-items center
-border-bottom：1px solid rgba(255,255,255,0.06)
-```
-
-| 状态 | 背景 | 触发条件 |
-|------|------|---------|
-| default（match） | transparent | 实际 = 期望 |
-| hover | rgba(255,255,255,0.06) | 鼠标悬停 |
-| mismatch | rgba(255,75,123,0.14)（tone-critical-bg） | 实际 ≠ 期望 |
-| errored | rgba(255,170,59,0.16)（tone-warning-bg） | 求值抛异常 |
-
-**状态圆圈（.mic）：**
-```
-宽高：20×20，圆角 999px，font-size 11px / 700，text-align center
-```
-| 变体 | 背景 | 文字色 | 含义 |
-|------|------|--------|------|
-| mic-ok | #04D793（success） | #101010（background） | 匹配 |
-| mic-fail | #FF4B7B（danger） | #ffffff | 不匹配 |
-| mic-err | #FFAA3B（warning） | #101010 | 执行错误 |
-
----
-
-## 三、色彩 Token（来自 PTO Design System，dark 主题下的 hex 值）
-
-| Token 名 | hex / 值 | 用途 |
-|---------|---------|------|
+| Token 名 | Dark hex（近似） | 用途 |
+|---------|----------------|------|
 | `--background` | `#101010` | 页面背景 |
-| `--surface-1` | `#161616` | 输入框、示例卡背景 |
-| `--surface-2` | `#1c1c1c` | panel、stage、stats 背景 |
-| `--surface-3` | `#262626` | hover 态叠加 |
+| `--surface-1` | `#161616` | input/card 背景 |
+| `--surface-2` | `#1c1c1c` | panel/stage 背景 |
+| `--surface-3` | `#262626` | surface-3 / kbd 背景 |
 | `--surface-4` | `#313131` | toast 背景 |
 | `--foreground` | `rgba(255,255,255,0.90)` | 主文字 |
-| `--foreground-secondary` | `rgba(255,255,255,0.60)` | 次级文字、表达式 |
-| `--foreground-muted` | `rgba(255,255,255,0.40)` | 辅助说明、占位 |
-| `--foreground-disabled` | `rgba(255,255,255,0.25)` | 禁用态 |
-| `--primary` | `#4369EF` | 品牌蓝，主按钮、激活态、步骤 chip |
-| `--primary-hover` | `#5a92e6` | 蓝色 hover |
-| `--success` | `#04D793` | 绿色，匹配/成功/string 类型 |
-| `--warning` | `#FFAA3B` | 橙色，警告/boolean 类型 |
-| `--danger` | `#FF4B7B` | 红色，错误/不匹配 |
-| `--accent` | `#7c8db8` | 辅助蓝灰 |
-| `--highlight-l0a-violet-source` | `#A855F7` | REF 徽章 violet |
-| `--border-subtle` | `rgba(255,255,255,0.06)` | 默认边框 |
-| `--border-default` | `rgba(255,255,255,0.10)` | 次级边框 |
-| `--border-strong` | `rgba(255,255,255,0.16)` | hover 边框 |
-| `--focus-ring` | `rgba(67,105,239,0.42)` | 焦点轮廓 |
-| `--tone-critical-bg` | `rgba(255,75,123,0.14)` | 错误行背景 |
-| `--tone-warning-bg` | `rgba(255,170,59,0.16)` | 警告行背景 |
-| `--tone-info-bg` | `rgba(67,105,239,0.16)` | number 类型 chip 背景 |
-| `--tone-green-strong` | `rgba(4,215,147,0.22)` | string 类型 chip 背景 |
+| `--foreground-secondary` | `rgba(255,255,255,0.60)` | 次级文字 |
+| `--foreground-muted` | `rgba(255,255,255,0.40)` | 辅助文字（⚠️ 对比度偏低，见 A2） |
+| `--border-subtle` | `rgba(255,255,255,0.06)` | 分隔线 / panel border |
+| `--border-default` | `rgba(255,255,255,0.10)` | input 边框 |
+| `--border-strong` | `rgba(255,255,255,0.16)` | 强调边框 |
+| `--primary` | `#4369ef` | 主色（蓝）|
+| `--primary-hover` | `#5a92e6` | hover 蓝 |
+| `--success` | `#04d793` | 绿色（匹配/成功/string 类型）|
+| `--warning` | `#ffaa3b` | 橙色（警告/boolean 类型）|
+| `--danger` | `#ff4b7b` | 红色（错误/不匹配）|
+| `--highlight-l0a-violet-source` | `#A855F7` | REF badge 紫色 |
+| `--tone-info-bg` | primary 16% mix | SYNC badge 背景 |
+| `--tone-green-strong` | success 22% mix | CONST badge 背景 / 成功消息背景 |
+| `--tone-warning-bg` | warning 16% mix | TEMPLATE badge 背景 |
+| `--tone-critical-bg` | danger 14% mix | 错误行背景 / 参数 invalid 背景 |
+| `--state-hover` | `rgba(255,255,255,0.06)` | hover 态背景 |
+| `--state-selected` | `rgba(67,105,239,0.14)` | 选中态背景（active filter chip）|
+| `--focus-ring` | `rgba(67,105,239,0.42)` | 聚焦环颜色 |
 
 ---
 
 ## 四、字体规格
 
-| 用途 | 字号 | 字重 | 颜色 | 行高 |
-|------|------|------|------|------|
-| 产品标题（tb-title） | 16px | 600 | rgba(255,255,255,0.90) | 1.30 |
-| panel 标题（panel-title） | 16px | 600 | rgba(255,255,255,0.90) | 1.30 |
-| 最终结果值（final-result） | 20px | 600 | rgba(255,255,255,0.90) | 1.30 |
-| 正文（body-md） | 14px | 400 | rgba(255,255,255,0.90) | 1.50 |
-| 次级文字（body-sm） | 12px | 400 | rgba(255,255,255,0.60) | 1.50 |
-| 标签 / badge（label-xs） | 11px | 500 | rgba(255,255,255,0.40) | 1.20 |
-| 代码 / 表达式（mono） | 12px | 500 | rgba(255,255,255,0.60) | 1.40 |
-| 参数名（.pname mono） | 12px | 500 | rgba(255,255,255,0.90) | 1.40 |
-| 统计数字（stat-v） | 20px | 600 | 随状态（green/red/orange） | 1.30 |
-| BETA 标签（tb-beta） | 11px | 500 | rgba(255,255,255,0.40) | — |
-
-字体族：
-- 默认 sans：Inter / Source Han Sans SC / PingFang SC / Noto Sans SC
-- 等宽 mono：JetBrains Mono / Fira Code / Consolas
+| 用途 | Token | 字号 | 字重 | 字体族 |
+|------|-------|------|------|-------|
+| 面板标题 | `--text-title-2` | 16px | 600 | sans |
+| 正文 | `--text-body` | 14px | 400 | sans |
+| 正文小 | `--text-body-sm` | 12px | 400 | sans |
+| 标签 / Badge | `--text-label` | 11px | 500 | sans |
+| 代码 / 表达式 | `--text-mono` | 12px | 500 | mono |
+| 最终结果 | `--text-title-1` | 20px | 600 | sans |
 
 ---
 
-## 五、非静态区域
-
-| 区域 | 组件 | 类型 | 空状态处理 |
-|------|------|------|----------|
-| `#inputs-container` | input-row 列表 | 动态渲染（依据表达式参数数量） | 显示「此表达式无需输入参数」muted note |
-| `#pipeline-container` | flow-input + stage 列表 | 动态渲染（依据 stages 数量） | waiting 占位 |
-| `#ex-cards` | ex-card × 3 | 静态渲染（3 张固定示例） | — |
-| `#history-list` | history-item 列表 | localStorage 读取 | 显示「暂无历史」空态文案 |
-| `#tpl-rows` | tpl-row 列表 | 用户手动增删 | 空时无行，添加按钮可见 |
-| `#vc / #vcon` | vrow 虚拟滚动 | JS 滚动监听 + 窗口渲染 | 加载用例前区域隐藏 |
-| `#tc-stats` | stat 格 × 4 | 批量执行后渲染 | 执行前隐藏 |
-| `#tc-filter` | filter-chip 行 | 动态渲染（4 种筛选项） | 执行前隐藏 |
-
----
-
-## 六、数据 Schema
-
-```typescript
-// 管道表达式（解析结果）— 来源：parsePipeExpr() 本地解析
-interface ParsedPipeExpr {
-  ok: boolean
-  error?: string
-  inputs: Array<{
-    idx: number
-    placeholder: string   // e.g., "$1"
-    desc: string          // e.g., "参数 $1"
-  }>
-  stages: Array<{
-    fn: string            // e.g., "expr", "string.format", "string.upper"
-    args: string[]        // 参数列表（含 $N 占位符）
-    raw: string           // 原始阶段字符串
-  }>
-}
-
-// 单条测试用例 — 来源：parseTestCaseLine() 解析用户输入文本
-interface TestCase {
-  id: string                    // Math.random 生成
-  inputs: (number | string)[]  // 除最后一列外的全部列
-  expectedOutput: string        // 最后一列
-  actualOutput: string | null
-  executionStatus: 'pending' | 'match' | 'mismatch' | 'error'
-  lineNumber: number
-  createdAt: number             // Date.now()
-}
-
-// 批量执行结果摘要 — 来源：executeBatch() 计算
-interface BatchStats {
-  total: number
-  matched: number
-  mismatched: number
-  errored: number
-}
-
-// 历史记录项 — 来源：localStorage key "pipe-eval-history"
-interface HistoryItem {
-  expr: string       // 表达式字符串
-  time: number       // Date.now() 时间戳
-}
-
-// 模板变量 — 来源：用户 UI 填写 / postMessage 注入
-interface TemplateVar {
-  key: string        // ${VarName} 中的 VarName
-  val: string
-}
-
-// 示例卡片数据 — 来源：EXAMPLES 常量
-interface Example {
-  title: string
-  expr: string
-  vals: string[]     // 对应各输入参数的预填值
-  out: string        // 预期输出（字符串形式）
-}
-```
-
-数据来源：全部为**纯本地计算**，无 HTTP 接口。宿主通过 `postMessage` 通道注入模板变量。  
-加载时机：表达式由用户手动输入或历史恢复；用例由用户粘贴文本后点击「加载用例」触发解析。  
-更新策略：用户交互驱动，无轮询，无 WebSocket。
-
----
-
-## 七、布局策略
-
-本工具为表单+列表布局，无拓扑图/流程图/树形结构。布局算法使用 CSS Grid：
-
-| 项目 | 规格 |
-|------|------|
-| 主内容区布局 | CSS Grid，双列（55fr / 45fr），gap 16px |
-| 响应式断点 | ≤1024px → 1fr（单栏堆叠） |
-| 右栏内容排列 | flex-col，gap 16px，align-items stretch |
-| 批量结果表格 | 虚拟滚动（absolute position + JS 窗口计算） |
-| 虚拟滚动算法 | 行高固定 36px；根据 `scrollTop / ROW_H` 计算 startIdx/endIdx（±10 buffer） |
-
----
-
-## 八、交互操作规格 + 状态枚举
-
-### 8.1 模式切换（调试 ↔ 用例）
-
-| 操作 | 是否支持 | 约束 |
-|------|---------|------|
-| 点击「调试模式」按钮 | ✅ | 显示 dbg-inputs/tpl/history/pipeline/result/empty；隐藏 tc-left/tc-right |
-| 点击「用例模式」按钮 | ✅ | 显示 tc-left/tc-right；隐藏 dbg-inputs/tpl/history/pipeline/result/empty |
-| 键盘 Tab 选择 | ✅ | role="tab" 原生支持 |
-
-### 8.2 快捷键
-
-| 快捷键 | 作用 | 约束 |
-|--------|------|------|
-| Ctrl/Cmd + Enter | 应用表达式（applyExpr） | 焦点在 expr-textarea 内时 |
-| F5 | 执行批量用例（executeBatch） | 用例模式下，需先加载用例 |
-
-### 8.3 逐组件状态枚举表
-
-#### 表达式输入框（expr-textarea）
-见 §二 2.4 完整状态表。
-
-#### 应用表达式按钮（.btn-primary #apply-btn）
-| 状态 | 触发条件 | 视觉变化 | 行为约束 |
-|------|---------|---------|---------|
-| default | 正常 | background #4369EF，文字 #fff | — |
-| hover | 鼠标移入 | background #5a92e6 | — |
-| focus | Tab / 点击 | box-shadow 0 0 0 3px rgba(67,105,239,0.42) | 键盘可见 |
-| active | 鼠标按下 | background #5a92e6 | 松开触发 applyExpr |
-| disabled | 不适用 | — | 未限制（可随时应用） |
-| loading | 不适用 | — | — |
-| error | 不适用 | — | — |
-| empty | 不适用 | — | — |
-
-#### 示例卡片（.ex-card）
-见 §二 2.7 状态枚举表。
-
-#### 操作符 Chip（.op-chip）
-见 §二 2.6 状态枚举表。
-
-#### 管道阶段（.stage）
-见 §二 2.8 状态枚举表。
-
-#### 参数类型选择器（.badge-select）
-| 状态 | 触发条件 | 视觉变化 | 行为约束 |
-|------|---------|---------|---------|
-| default | 加载 | 边框 rgba(255,255,255,0.10)，色 rgba(255,255,255,0.60) | 默认选中 LITERAL |
-| focus | 点击 / Tab | border-color #4369EF，outline none | 键盘可选 |
-| selected | 用户选择 | 显示所选选项文字 | 不触发重新计算（仅类型标注） |
-| disabled | 不适用 | — | — |
-| error | 不适用 | — | — |
-| loading | 不适用 | — | — |
-| empty | 不适用 | — | — |
-| hover | 不适用 | 系统原生 select hover | — |
-
-#### 历史记录项（.history-item）
-见 §二 2.13 状态枚举表。
-
-#### 通过率 Badge（.pass-badge）
-见 §二 2.12 状态枚举表。
-
-#### 筛选 Chip（.filter-chip）
-| 状态 | 触发条件 | 视觉变化 | 行为约束 |
-|------|---------|---------|---------|
-| default（inactive） | 初始 | background rgba(255,255,255,0.06)，border rgba(255,255,255,0.08)，色 rgba(255,255,255,0.60) | — |
-| active | 用户点击 | background rgba(67,105,239,0.14)（state-selected），border #4369EF，色 rgba(255,255,255,0.90) | 筛选表格行 |
-| hover | 鼠标移入 | 系统默认 | — |
-| disabled | 不适用 | — | — |
-
-#### 批量结果虚拟表格行（.vrow）
-见 §二 2.14 状态枚举表。
-
----
-
-## 九、关键交互序列 + 数据流
-
-### 9.1 应用表达式（主流程）
-
-1. **触发**：用户在 expr-textarea 输入表达式后，点击「应用表达式」按钮或按 Ctrl+Enter
-2. **即时反馈**：`parsePipeExpr(raw)` 同步解析（< 1ms）；若失败 → inline-msg 显示错误文案（err 态）；若成功 → inline-msg 显示「✓ 已应用」（ok 态，3s 后隐藏）
-3. **本地计算**：`renderInputFields()` 重新渲染参数行（依据 parsedExpr.inputs）；`renderPipelineSlots()` 渲染管道骨架
-4. **成功响应**：参数行出现，右栏管道轨迹更新占位结构；历史记录写入 localStorage（去重判断）
-5. **失败响应**：inline-msg err 显示具体错误（如「期望 ')'，但得到 null」）；textarea 边框变 #FF4B7B；pipeline 不更新
-6. **逆操作**：点击「重置」→ 恢复到 DEFAULT_EXPR，清空历史当次状态
-
-```
-用户输入 → parsePipeExpr() → {ok, inputs, stages}
-  → renderInputFields() → DOM input-row × N
-  → renderPipelineSlots() → DOM stage × N
-  → saveHistory(expr)   → localStorage
-```
-
-### 9.2 实时参数计算（输入驱动）
-
-1. **触发**：用户在 input-field 输入值（300ms debounce）
-2. **即时反馈**：无显式 loading（本地计算 < 5ms），直接更新
-3. **本地计算**：`updateDebugResults()` → 逐阶段调用 `_evalStage()` → 收集 intermediates
-4. **成功响应**：
-   - flow-input 行更新为实际输入值
-   - 各 stage-io 显示 in → out + type-chip
-   - final-result 显示最终值（success 态）
-   - 右栏空态卡片隐藏，pipeline + result 显示
-5. **失败响应**：
-   - 失败阶段 `.stage.errored`（红色左边框）
-   - 后续阶段 `.stage.skipped`（opacity 0.45）
-   - final-result 显示错误信息（error 态，红色边框）
-6. **参数为空**：input-row 进入 warn 态（边框 orange）+ param-msg 显示警告
-
-```
-inputValues 数组 → evaluator.evaluate(parsedExpr, inputValues, templateVarsMap)
-  → { success, result, intermediates }
-  → updateFlowInput(inputValues) + updateStageIO(intermediates)
-  → updateFinalResult(result)
-```
-
-### 9.3 批量用例执行
-
-1. **触发**：用例模式下，用户粘贴文本 → 点击「加载用例」或按 F5
-2. **加载阶段**：`parseTestCaseText(text)` → `{cases, errors}`；若有解析错误 → tc-load-err errbox 显示
-3. **执行**：`executeBatch()` → 遍历 testCases，每条调用 `evaluator.evaluate()`，比较 `String(result)` vs `expectedOutput`；更新 executionStatus
-4. **成功响应**：
-   - stats 格（总计/通过/不匹配/错误）渲染
-   - filter-bar 筛选 chip 渲染（含各类计数）
-   - pass-badge 显示（ok/bad）
-   - 虚拟表格渲染（默认 filter: all）
-5. **失败响应（解析错误）**：errbox 显示行号 + 错误文案；testCases 不更新
-6. **逆操作**：点击「清空」→ clearTestCases()，重置所有状态
-
-```
-文本输入 → parseTestCaseText() → testCases[]
-  → executeBatch(): testCases.forEach → evaluator.evaluate()
-  → 比对 actualOutput vs expectedOutput → executionStatus
-  → renderBatchStats() + renderFilterBar() + renderBatchResults()
-  → 虚拟滚动：scroll event → renderVirtualRows(startIdx, endIdx)
-```
-
-### 9.4 示例卡片一键填入
-
-1. **触发**：用户点击任意 `.ex-card` 按钮
-2. **即时反馈**：`useExample(i)` 同步执行（< 5ms）
-3. **处理**：填入 textarea.value = EXAMPLES[i].expr；设置 inputValues；调用 applyExpr()；调用 updateDebugResults()
-4. **结果**：右栏从空态（示例卡片）切换到有数据态（管道轨迹 + 最终结果）
-5. **失败**：不适用（示例卡片数据经 node 验证，必然求值成功）
-
-### 9.5 postMessage 模板变量注入
-
-宿主环境（如 BMC Studio Webview）通过 `postMessage` 向工具注入模板变量：
+## 五、数据 Schema
 
 ```javascript
-// 宿主发送
-window.postMessage({ type: 'TEMPLATE_VARS_UPDATE', vars: { DeviceName: 'bmc-01', Slot: '2' } }, '*')
+// ParsedExpr — parsePipeExpr() 的成功输出
+// @typedef {{ ok: true, inputs: InputDef[], stages: StageDef[] }
+//          | { ok: false, error: string }} ParsedExpr
 
-// 工具接收（src/services/pipeEvalBridge.js）
-window.addEventListener('message', evt => {
-  if (evt.data?.type === 'TEMPLATE_VARS_UPDATE') {
-    updateTemplateVars(evt.data.vars)   // 更新 templateVars state → 重新计算
-  }
-})
+// InputDef — 输入声明
+// @typedef {{ idx: number, placeholder: string, desc: string }} InputDef
+
+// StageDef — 管道阶段
+// @typedef {{ fn: string, args: string[], raw: string }} StageDef
+
+// TestCase — 单条测试用例
+// @typedef {{
+//   id: string,
+//   inputs: (string|number)[],
+//   expectedOutput: string,
+//   actualOutput: string|null,
+//   executionStatus: 'pending'|'success'|'error',
+//   matchStatus: 'match'|'mismatch'|null,
+//   lineNumber: number,
+//   errorMessage?: string
+// }} TestCase
+
+// ExecSummary — 批量执行汇总
+// @typedef {{ total:number, success:number, failed:number, matched:number, mismatched:number }} ExecSummary
+
+// HistoryItem — 历史记录条
+// @typedef {{ expr: string, ts: number }} HistoryItem
+
+// TemplateVar — 模板变量
+// @typedef {{ key: string, val: string }} TemplateVar
 ```
+
+数据来源：内存（运行时状态）| 持久化：localStorage（历史记录、面板折叠状态、主题）
+
+localStorage Keys：
+| Key | 类型 | 说明 |
+|-----|------|------|
+| `pipe-eval-history` | `HistoryItem[]` JSON | 表达式历史（最多 20 条）|
+| `pipe-eval-tpl-open` | `'0'/'1'` | 模板变量面板折叠状态 |
+| `pipe-eval-op-open` | `'0'/'1'` | 操作符面板折叠状态 |
+| `pipe-eval-theme` | `'dark'/'light'/'glass'` | 主题偏好 |
+
+---
+
+## 六、布局策略
+
+无拓扑图/流程图/树形布局。管道轨迹为线性垂直流，使用 flex-column 自然排列，无需布局引擎。
+
+虚拟滚动布局参数：
+| 参数 | 值 |
+|------|-----|
+| 行高 | 36px（`ROW_H`）|
+| 缓冲行数 | 10（`BUF`）|
+| 可见行计算 | `ceil((scrollTop + clientHeight) / ROW_H) + BUF` |
+| spacer 策略 | 绝对定位 `virtual-spacer { height: total*ROW_H }`；内容 `position:absolute; top: start*ROW_H` |
+
+---
+
+## 七、交互操作规格 + 状态枚举
+
+### 7.1 全局交互
+
+| 快捷键 | 条件 | 动作 |
+|--------|------|------|
+| `Ctrl/Cmd+Enter` | 任意模式 | `applyExpr()` |
+| `F5` | 用例模式 + 有用例 | `executeBatch()` |
+
+---
+
+### 7.2 组件状态枚举表
+
+#### 7.2.1 管道表达式 textarea
+
+| 状态 | 触发条件 | 视觉变化 | 行为约束 |
+|------|---------|---------|---------|
+| default | 页面加载 | 背景 `#161616`，边框 `rgba(255,255,255,0.10)` | — |
+| focus | 点击/Tab | `border-color: #4369ef`，`box-shadow: 0 0 0 3px rgba(67,105,239,0.42)` | 显示输入光标 |
+| invalid | 校验失败 | `border-color: #ff4b7b`，`box-shadow: 0 0 0 3px tone-critical-bg` | class `invalid` 加入 |
+| valid（debounce 后）| 校验通过 | 移除 invalid 样式，下方 inline-msg 显示绿色成功 | — |
+
+#### 7.2.2 操作符 Chip（op-chip）
+
+| 状态 | 视觉变化 |
+|------|---------|
+| default | 背景 `--comp-tag-bg`，边框 `--comp-tag-border`，color `--foreground-secondary` |
+| hover | `translateY(-1px)`，`border-color: --border-strong`，bg `--state-hover`，color `--foreground` |
+| focus-visible（需修复 A11）| 应加 `outline: 2px solid --focus-ring, offset 2px` |
+| active | — |
+| disabled | 不适用 |
+
+#### 7.2.3 应用按钮（btn-primary）
+
+| 状态 | 视觉变化 | 行为约束 |
+|------|---------|---------|
+| default | 背景 `#4369ef`，color `#ffffff` | — |
+| hover | 背景 `#5a92e6` | — |
+| focus-visible | `box-shadow: 0 0 0 3px --focus-ring` | 键盘可见 |
+| active | 背景 press 态（CSS var） | — |
+| disabled | opacity 0.42，cursor not-allowed | 校验错误时自行拦截，按钮本身不 disabled |
+| loading | 不适用 | 点击触发 `applyExpr()`，同步执行 |
+
+#### 7.2.4 参数输入框（input-field）
+
+| 状态 | 视觉变化 | 行为约束 |
+|------|---------|---------|
+| default | 背景 `#161616`，边框 `rgba(255,255,255,0.10)` | — |
+| focus | `border-color: #4369ef`，`box-shadow: 0 0 0 3px rgba(67,105,239,0.42)` | — |
+| warn（touched + empty）| 行 `.input-row.warn` → input `border-color: #ffaa3b` + 下方警告文字显示 | 仅在 `_touched=true` 后显示 |
+| disabled | 不适用（当前无禁用状态） | — |
+
+#### 7.2.5 Badge Select（badge-select）
+
+| 状态 | 视觉变化 |
+|------|---------|
+| default | 透明背景，边框 `--border-default`，color `--foreground-secondary` |
+| focus | `border-color: --primary` |
+| change | badge chip 联动更新 class 和文字 |
+
+#### 7.2.6 示例卡片（ex-card）
+
+| 状态 | 视觉变化 |
+|------|---------|
+| default | 背景 `#161616`，边框 `rgba(255,255,255,0.10)` |
+| hover | `translateY(-1px)`，border `rgba(255,255,255,0.16)`，bg `--state-hover` |
+| focus-visible | `outline: 2px solid --focus-ring，offset 1px` |
+| active | — |
+| 隐藏时机 | 所有参数均填写 + parsedExpr.ok 时，`#dbg-empty` 加 `.hidden` |
+
+#### 7.2.7 历史记录条（history-item）
+
+| 状态 | 视觉变化 | 行为约束 |
+|------|---------|---------|
+| default | 背景 `--inspector-soft-card-bg`，边框 `--border-subtle` | — |
+| hover | 背景 `--inspector-soft-card-bg-hover`，边框 `--border-default` | — |
+| 可访问性缺陷（需修复 A3）| 当前为 `div[onclick]`，Tab 无法聚焦 | 需改为 `<button>` |
+
+#### 7.2.8 通过率 Badge（pass-badge）
+
+| 状态 | 触发条件 | 视觉变化 |
+|------|---------|---------|
+| ok | matched === total | 背景 `#04d793`，color `#08111f`，文字 `✓ 通过 N/N` |
+| bad | matched < total | 背景 `#ff4b7b`，color `#ffffff`，文字 `✗ 通过 N/M` |
+| focus-visible | Tab | `box-shadow: 0 0 0 3px --focus-ring` |
+| 点击 | — | 当前仅 `setFilter('mismatch')`（需修复 R6：增加切换逻辑）|
+
+#### 7.2.9 筛选 Chip（filter-chip）
+
+| 状态 | 视觉变化 |
+|------|---------|
+| default | 背景 `--stat-chip-bg`，border `--stat-chip-border`，color `--foreground-secondary` |
+| active | 背景 `--state-selected`，border `--primary`，color `--foreground` |
+| focus-visible（需修复 A12）| 需加 `outline: 2px solid --focus-ring，offset 2px` |
+
+#### 7.2.10 模式切换按钮（mode-btn）
+
+| 状态 | 视觉变化 |
+|------|---------|
+| default | 透明背景，color `--foreground-secondary` |
+| hover（非 active）| 背景 `--state-hover`，color `--foreground` |
+| active | 背景 `--primary`，color `#ffffff` |
+| focus-visible | `box-shadow: 0 0 0 3px --focus-ring`（继承 `.btn:focus-visible`）|
+
+---
+
+## 八、关键交互序列 + 数据流
+
+### 8.1 应用表达式（applyExpr）
+
+1. **触发**：用户点击「应用表达式」按钮 或 `Ctrl+Enter`
+2. **即时反馈**：`validateExpr(raw)` 同步执行
+   - 失败：`showExprMsg('err', msg)` → inline-msg 显示红色错误，textarea 加 `.invalid`；流程终止
+   - 成功：`showExprMsg('ok', msg)` → inline-msg 显示绿色成功
+3. **状态更新**：`parsedExpr` 更新，`inputValues`/`badgeTypes`/`_touched` 重置
+4. **界面重渲染**：`renderInputFields()` → 参数行按新解析结果生成；`renderPipelineSlots()` → 管道轨迹槽位按阶段数生成
+5. **历史推送**：`pushHistory(raw)` → 去重 + 压入 localStorage，最多 20 条（当前 Bug R1：8条）
+6. **成功响应**：输入参数区等待用户填写；管道轨迹显示「等待输入…」
+
+```
+用户输入 → validateExpr() → [失败] → inline-msg 错误
+                           → [成功] → parsedExpr 更新
+                                    → renderInputFields() + renderPipelineSlots()
+                                    → pushHistory()
+                                    → updateDebugResults()（等待参数填写）
+```
+
+**逆操作：** 重置按钮（resetExpr）→ 恢复 `originalExprText` 并重新 apply
+
+### 8.2 填写参数（调试模式实时求值）
+
+1. **触发**：用户在任意参数输入框输入值（`oninput`）
+2. **即时反馈**：`_touched = true`；`inputValues[idx]` 更新
+3. **计算处理**：`updateDebugResults()` 同步执行（纯 JS，无异步）
+   - 检查所有参数是否填写：未填 → 显示「等待输入…」
+   - 全部填写 → `evaluator.evaluate(parsedExpr, inputValues, templateVars)`
+4. **成功响应**：各阶段 `sio-${i}` 更新 in/out 值；`final-result` 显示最终值
+5. **失败响应**：出错阶段 `border-color:--danger`；后续阶段 `opacity:0.45`；`final-result` 显示红色错误文字
+6. **逆操作：** 清空输入框 → 回到「等待输入…」状态
+
+### 8.3 使用示例卡片（useExample）
+
+1. **触发**：点击右栏示例卡片
+2. **处理**：填入表达式 → `applyExpr()` → 填入参数 input value → `updateDebugResults()`
+3. **反馈**：管道轨迹更新；`showToast('示例已填入，轨迹见右侧')`
+4. **示例卡片隐藏**：参数填满后 `#dbg-empty.hidden`
+
+### 8.4 批量执行（executeBatch）
+
+1. **触发**：「执行全部」按钮 或 F5（用例模式 + 有用例）
+2. **即时反馈**：按钮 disabled，文字改为「⏳ 执行中…」
+3. **处理**：`await new Promise(r => setTimeout(r, 0))` 让出一帧 → 同步遍历 testCases 执行
+4. **成功响应**：统计 summary，渲染 pass-badge、stat cards、filter chips、虚拟滚动表格
+5. **失败响应**：单条 error 不终止，executionStatus='error'，红橙行显示
+6. **导出**：结果可通过「导出结果」复制为 TSV 到剪贴板
+
+```
+数据流：testCases[i].inputs → evaluator.evaluate() → actualOutput
+       → normOut(actual) vs normOut(expected) → matchStatus
+       → summary → renderBatchResults()
+```
+
+### 8.5 postMessage 宿主注入
+
+1. **触发**：宿主（VS Code 扩展）调用 `webviewPanel.webview.postMessage({type, payload})`
+2. **setTemplateVars**：templateVars 数组更新 + 面板自动展开 + `updateDebugResults()`
+3. **setExpression**：textarea 赋值 + `applyExpr()`
+4. **setBadgeTypes**：badgeTypes 数组更新 + `renderInputFields()` + `updateDebugResults()`
 
 ---
 
 ## ⚠️ 待设计师确认
 
-1. [ ] **阶段切换动画**：调试模式下，空态 → 有数据时右栏的 opacity/transform 过渡时长与缓动（建议 200ms easing-out）
-2. [ ] **表达式应用 vs 未应用状态**：用户修改 textarea 后是否立即清除「已应用」态（当前行为：3s 自动消失）；是否需要「已修改未应用」的持续提示
-3. [ ] **历史记录条数上限**：当前实现未限制（localStorage 可无限追加）；建议设上限（如 20 条）并 FIFO 淘汰
-4. [ ] **参数类型标注的联动行为**：改变 badge-select 是否应触发重新计算（当前不触发）；SYNC/REF 类型的语义定义（需产品确认是否需要真实宿主联动）
-5. [ ] **超长表达式截断**：history-item 用 ellipsis 截断，截断前几个字符；tooltip 显示完整表达式的方案
+1. [ ] **foreground-muted 对比度提升方案**：将 `rgba(255,255,255,0.40)` 提升到 `0.52`，是否影响视觉层次感？需要视觉回归检查（含玻璃主题）
+2. [ ] **历史记录恢复交互**：点击历史记录后是否需要二次确认（会覆盖当前表达式）？还是直接恢复？当前无确认
+3. [ ] **通过率 badge 点击切换行为**：点击「不匹配」筛选后，再次点击 badge 应切回「全部」还是无操作？
+4. [ ] **批量执行卡顿阈值**：超过多少条用例显示「数据量较大」警告？产品侧确认典型用例规模
+5. [ ] **模板变量面板默认折叠**：初次使用时是否显示引导提示说明 `${VarName}` 语法？
+6. [ ] **玻璃主题下分隔线箭头**：`bar` 2px 宽度在玻璃主题几乎不可见，是否需要加宽至 3px？
 
 ---
 
-## 十、机会点 → uxspec 落地对照（产品验收视角）
+## 九、机会点 → uxspec 落地对照（产品验收视角）
 
-> 来源：阶段一 PROMPT-Demo优化提示词.md §B/§C/§E 机会点，对照本轮 Demo v2 + uxspec 兑现情况。
+> 回填阶段一 product-doc.md §E 机会点 + §H 商业价值，核对本轮 Demo 兑现情况
 
-| 机会点 / 原始问题（阶段一 §B） | 优先级 | 落地状态 | 在 uxspec 的落点 | 未落地原因 |
-|-------------------------------|--------|---------|-----------------|----------|
-| B11：首屏 ~50% 空白，无引导 → 3 张可点击示例卡片 | P0 | ✅ 已落地 | §二 2.7 示例卡片 + §九 9.4 交互序列 | — |
-| B12：20+ 操作符一行挤压 → 分类 Chip 组（输入/字符串/自定义） | P0 | ✅ 已落地 | §二 2.6 op-panel + 操作符分组表 | — |
-| B13：宽屏内容孤岛 → 双栏布局（55/45） | P0 | ✅ 已落地 | §一 1.1 ASCII 树 + §七 布局策略 | — |
-| B14：管道阶段纯文本堆叠 → 箭头 + in→op→out + 类型 chip | P1 | ✅ 已落地 | §二 2.8 stage + §二 2.9 type-chip + §九 9.2 | — |
-| B15：无通过率摘要 → pass-badge + 行级状态色 | P1 | ✅ 已落地 | §二 2.12 pass-badge + §二 2.14 vrow 状态 | — |
-| B1/F2：alert() → inline 实时校验（300ms debounce） | P0 | ✅ 已落地 | §二 2.5 inline-msg + §九 9.1 | — |
-| B2：参数为空 alert → 行内 warning | P0 | ✅ 已落地 | §二 2.11 input-row warn 态 | — |
-| C1：Ctrl+Enter / F5 快捷键 | P0 | ✅ 已落地 | §八 8.2 快捷键表 | — |
-| F1：英文字符串中文化 | P1 | ✅ 已落地 | 全文 UI 文案已中文化 | — |
-| F5/B5：参数徽章动态类型 | P1 | ✅ 已落地 | §二 2.11 badge-select | — |
-| C2：表达式历史 localStorage | P1 | ✅ 已落地 | §二 2.13 + §六 HistoryItem schema | — |
-| C3：批量结果筛选 chip | P1 | ✅ 已落地 | §八 8.3 filter-chip 状态枚举 | — |
-| F4/B10：全面 token 化（零硬编码颜色） | P1 | ✅ 已落地 | §三 色彩 Token 表（全 PTO 语义 token） | — |
-| C5/B3：模板变量折叠面板 + postMessage 通道 | P0 | ✅ 已落地 | §九 9.5 postMessage 序列 | — |
-| F3/B8：顶栏 56px → 44px 紧凑 toolbar | P1 | ✅ 已落地 | §二 2.1 topbar | — |
-| F6/B9：章节标题 Emoji → SVG 图标 | P2 | ✅ 已落地 | §二 panel-title（各 SVG） | — |
-| 可访问性修复（A1-A12） | 工程必修 | ⛔ Demo 未修 | 已列入 accessibility-audit.md；工程版 Step 5 修复 | Demo 阶段不修 a11y；工程代码需全修 |
-| D1-D8 设计改进点 | 迭代改进 | ◑ 部分规划 | 已列入 design-review.md；D1-D5 工程版修复 | D6-D8 移交下一迭代 |
+| 机会点（阶段一 §E） | 商业权重/优先级（§H） | 落地状态 | 在 uxspec 的落点 | 未落地原因 / 移交 |
+|--------------------|---------------------|---------|-----------------|-----------------|
+| E1 inline 表达式校验（替换 alert） | 高 / P0 | ✅ 已落地 | §二 ExpressionEditor；§八.1 applyExpr 序列；§七.2.1 textarea 状态枚举 | — |
+| E2 批量模式全中文化 | 高 / P0 | ✅ 已落地 | 全文无英文标签（Input/Expected/Execute All 均已中文化）| — |
+| E3 空状态示例引导卡片 | 高 / P0 | ✅ 已落地 | §二 ExampleCards；§八.3 useExample 序列 | — |
+| E4 参数 badge 动态可选 | 中 / P2 | ✅ 已落地 | §二 ParameterRow；badge 类型色系表 | — |
+| E5 gsub 量词 bug 修复 | 高 / P0 | ⛔ **未修复** | — | Demo 中 `_luaPatToRegex` magic 集仍含 `+`，bug 未解决（见 R3）。工程阶段必须修复 |
+| E6 历史记录（最多 20 条）| 高 / P1 | ◑ **部分** | §二 HistoryItem；§五 localStorage HIST_KEY | Demo 中 `h.slice(0, 8)` 最多保存 8 条，非 20 条（见 R1）。工程阶段修复 |
+| E7 模板变量注入面板 | 高 / P1 | ✅ 已落地 | §二 TemplatVariablePanel；§八.5 postMessage 序列 | postMessage 协议三通道均实现 |
+| E8 操作符快捷插入面板 | 中 / P1 | ✅ 已落地 | §二 OperatorChipPanel；三组分类 + hover 签名 + 光标插入 | — |
+| E9 键盘快捷键 | 中 / P1 | ✅ 已落地 | §七.1 全局交互；Ctrl+Enter / F5 | — |
+| E10 通过率 badge | 高 / P0 | ✅ 已落地 | §二 PassRateBadge；§七.2.8 状态枚举 | 点击切换逻辑有 Bug（R6），工程修复 |
+| E11 结果筛选 chip | 高 / P0 | ✅ 已落地 | §二 FilterChips；§七.2.9 状态枚举 | — |
+| E12 数据流可视化（箭头+类型标注）| 中 / P1 | ✅ 已落地 | §二 PipelineStage；flow-arrow；type-chip 色系 | 玻璃主题箭头可见性问题待确认（§⚠️ 6） |
+| E13 双栏布局 | 中 / P1 | ✅ 已落地 | §一 整体布局；55fr/45fr grid | — |
 
-> P0 全部已落地；P1 全部已落地；P2 全部已落地。可访问性问题为工程版必修项，已逐条列明修复方案。
+**P0 未落地说明：**
+- E5（gsub bug）：Demo 阶段未修复，属于阶段一 Prompt 明确要求的修复项。工程代码阶段必须在 `_luaPatToRegex` 中移除 `+`/`-`/`*` 出 magic 集。
+
+**总结：** 13 个机会点中，✅ 已落地 10 个，◑ 部分落地 1 个（E6 历史条数），⛔ 未落地 1 个（E5 bug 修复）。P0 级别中有 1 个未修复（E5），工程阶段为强制修复项。

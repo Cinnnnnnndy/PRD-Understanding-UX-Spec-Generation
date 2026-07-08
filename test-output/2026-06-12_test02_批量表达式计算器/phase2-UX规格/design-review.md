@@ -1,46 +1,48 @@
 # 管道表达式批量评估器 · 设计审查报告
-> 对象：`DEMO-优化版/index.html`（PTO Design System 内联版 v2，2026-06-12）  
-> 日期：2026-06-12 | 阶段二 Step 2.1
+> 对象：`DEMO-优化版/index.html`（PTO Design System 内联版，2026-07-08 重新生成）  
+> 日期：2026-07-08 | 阶段二 Step 2.1  
+> 方法：逐行读取 Demo HTML/CSS/JS，按五维检查框架审查
 
 ---
 
 ## 问题清单
 
 | # | 维度 | 位置/组件 | 问题描述 | 优先级 | 建议方案 |
-|---|------|---------|---------|--------|---------|
-| D1 | 信息架构 | 操作符 Chip 面板 · 折叠状态 | 面板初始状态为展开（`open` class），但面板标题文案"悬停看签名说明 · 点击插入到光标处"写在 `op-head` 内。折叠时操作指引完全消失，用户不确定折叠后还能找回操作符。持久化逻辑（localStorage）仅存折叠态，无首次使用提示 | 🟡 | 折叠态在 op-head 常驻"XX 个操作符"数量 badge，让用户知道面板内有多少可用项；首次访问不折叠 |
-| D2 | 反馈与状态 | 表达式输入框 · 已应用 vs 未应用歧义 | `applyExpr()` 成功后 inline-msg 显示「✓ 表达式有效，已应用」(ok 态 3 秒自动消失)；但输入框内容改动后视觉上与「已应用」无区别——只有再次触发 300ms debounce 时才出现 err/ok 提示。用户不确定编辑中的表达式是否已生效 | 🟡 | 表达式内容改动后立即切回「未应用」状态（inline-msg 隐藏 + 边框回默认色），直到用户再次 Apply；可在底部 action bar 加文字「已修改，按 Ctrl+Enter 重新应用」 |
-| D3 | 反馈与状态 | 调试模式 · 输入参数为空时序 | 用户填入表达式后，输入参数区域渲染出参数行，但所有输入框默认为空。空态时管道轨迹仍显示「等待输入…」占位文案——首次使用 30 秒内界面同时呈现三种空态信号（右栏示例卡 + 管道占位 + 最终结果占位），信息优先级模糊 | 🟡 | 输入参数全空时隐藏管道轨迹区与最终结果区，仅保留示例卡（S01 状态）；任意一个参数有值时才显示管道轨迹 |
-| D4 | 视觉一致性 | 步骤编号 chip（num-chip）· 调试 vs 用例模式 | 调试模式：①表达式 ②输入参数 ③管道处理 ④最终结果，4 步编号清晰。用例模式：左栏②用例加载、右栏③批量执行 ④执行结果——跨栏编号需要用户在两列间来回视线跳转，违反「左操作右反馈」的空间叙事逻辑（①在左，②在左，③④在右，但②③之间需要用户跨模式触发） | 🟡 | 用例模式将 ② 改为「①加载 → ②执行 → ③结果」三步线性流，与调试模式独立编号；或在执行按钮旁显示「→」引导视线流动 |
-| D5 | 工程工具特定 | 参数徽章类型选择器（badge-select）| 每个参数旁有 SYNC/REF/CONST/LITERAL/TEMPLATE 下拉，但这些类型的含义说明只在 Demo README 和业务逻辑文档中，界面内无 tooltip 解释。固件工程师首次使用可能不清楚 SYNC 与 REF 的区别 | 🟡 | 每个下拉选项加简短 title tooltip（`<option title="…">`）；或在参数行右侧加「?」图标展开类型说明 |
-| D6 | 反馈与状态 | 批量执行 · 无 loading 态 | `executeBatch()` 同步执行所有用例（本地计算），用例量少时无感；但 > 500 条时理论上会阻塞主线程。当前无执行中 spinner/进度条，用户不知道是否在处理 | 🟢 | 用例 > 200 条时在按钮旁显示处理进度「已处理 n/total」，可用 `requestAnimationFrame` 分批处理避免主线程卡顿 |
-| D7 | 信息架构 | 历史面板 · 无时间戳 | history-item 只展示表达式文本（truncated ellipsis）和相对时间 HH:MM，无日期。跨天恢复工具时「09:30」无法判断是今天还是昨天 | 🟢 | 超过 24 小时的历史项显示「M/D HH:MM」格式；使用 `Date.prototype.toLocaleString` |
-| D8 | 视觉一致性 | 调试模式 · 右栏面板显隐切换 | 空态（`#dbg-empty` 显示）→ 有数据（`#dbg-pipeline` + `#dbg-result` 显示，`#dbg-empty` 隐藏）的切换逻辑正确，但切换时无过渡动画，右栏内容突然改变布局，感知稳定性差 | 🟢 | 使用 `opacity + transform` 过渡动画（`duration-base 200ms, easing-out`），与 PTO 设计系统 motion token 对齐 |
+|---|------|---------|---------|-------|---------|
+| R1 | 信息架构 | 历史记录面板 | `pushHistory` 最多保存 **8 条**（`h.slice(0, 8)`），与 Prompt 规格（最多 20 条）不符 | 🔴 Critical | 将 `8` 改为 `20` |
+| R2 | 信息架构 | 管道处理阶段 | 阶段间箭头仅有 `▼` 无文字标注，视觉方向感弱，在玻璃主题下 `bar` 细线 2px 几乎不可见 | 🟡 Important | 箭头加「传入下一阶段」tooltip；或加粗到 3px / 改为虚线 |
+| R3 | 功能正确性 | 字符串函数 | `_luaPatToRegex` 中 `magic = '^$()%.[]*+-?'` 仍将 `+` 列入 magic 集，导致 `%d+` 量词被转义为 `\+` 失效（原始 Bug E5，**Prompt 要求修复但 Demo 未修复**） | 🔴 Critical | 将 magic 集改为 `'^$()%.[]*?'`（移除 `+`、`-`、`*`），使 `+`/`*`/`?` 作为 regex 量词正常工作 |
+| R4 | 视觉一致性 | 操作符面板 | 三组操作符点颜色用内联 `style="background:var(--primary)..."` 硬编码，无 CSS class；玻璃主题下 primary 变为 `#6fa1ff` 但点颜色不会跟随 token 变化 | 🟡 Important | 改为 `.op-dot-input / .op-dot-string / .op-dot-custom` class，颜色跟随 token |
+| R5 | 视觉一致性 | 参数警告消息 | `.param-msg.show` 使用 `display:block`，与相邻 `.inline-msg.show` 使用 `display:flex` 不一致，导致内部 icon 对齐方式不同 | 🟢 Minor | 统一改为 `display:flex; align-items:center; gap:6px` |
+| R6 | 反馈与状态 | 通过率 badge | 点击 pass-badge 仅触发 `setFilter('mismatch')`，不能切换回「全部」视图；第二次点击无效果，行为不可预测 | 🟡 Important | 增加切换逻辑：若当前筛选已是 mismatch，则 `setFilter('all')` |
+| R7 | 反馈与状态 | Toast 通知 | Toast 用 CSS transition 显示（`opacity: 0→1`），但无持久化确认机制；错误类 Toast（如复制失败）与成功类 Toast 视觉无差异 | 🟢 Minor | 错误 toast 加 `border-color:var(--danger)`；或分 `showToast(msg, type)` |
+| R8 | 反馈与状态 | 加载历史恢复 | `restoreHistory` 内联 onclick 字符串拼接：`` onclick="restoreHistory('${esc(x.expr).replace(/'/g,"\\'")}')" ``，若表达式含 `"` 字符仍有 XSS 风险 | 🔴 Critical | 改为 data-index 模式：`onclick="restoreHistoryAt(${idx})"` 并在函数内从 `loadHistory()[idx]` 读取 expr |
+| R9 | 工程工具特定 | 批量执行数量 | 批量模式 `executeBatch` 调用 `setTimeout(r, 0)` 仅让出一帧，1000+ 用例时阻塞 UI 100-300ms；用例行数无上限提示 | 🟡 Important | 超过 500 条时显示 warning「数据量较大，执行时界面可能短暂无响应」；或分块（每 200 条一帧） |
+| R10 | 工程工具特定 | normOut 比较 | `normOut` 剥除首尾引号：`"7.00"` 和 `7.00` 均视为匹配，但用户可能期望严格字符串匹配 | 🟢 Minor | 结果表格底部加「比较规则：去首尾引号、合并空格」说明文字 |
 
 ---
 
-## 设计亮点
+## 设计亮点（已做好，勿破坏）
 
-1. **双栏空间叙事完整**：左 55% 操作列（① 表达式 → ② 输入参数 → 历史/模板）+ 右 45% 反馈列（示例卡 / 管道轨迹 / 最终结果），符合「输入在左、反馈在右」的认知自然流，宽屏无孤岛感。
-
-2. **首用 30 秒引导有效**：右栏空态的 3 张示例卡片（标题 + 表达式 + 预期输出）可点击一键填入，0 学习成本上手。3 张示例覆盖三类典型用例（数值/字符串/条件判断），代表性强。
-
-3. **管道数据流可视化清晰**：「输入行 + 阶段间竖线箭头 + 每阶段 入→操作→出 + 类型 chip（number/string/boolean）」结构直观。出错阶段红框 + 后续阶段灰化「已跳过」逻辑正确。
-
-4. **操作符 Chip 面板分组合理**：输入 / 字符串 / 自定义 三类用色点（蓝/绿/橙）区分，hover 显示 title 签名说明，点击插入光标处——符合「提示 → 确认 → 操作」的 ux 流程，比平铺纯文本易扫读。
-
-5. **PTO 设计系统零硬编码委托**：全部颜色/间距/圆角/字体通过 PTO 语义 token；三主题（dark/light/glass）切换零额外代码，整页 rerender 无闪烁。
-
-6. **批量结果可读性强**：pass-badge 通过率摘要（✓/✗ n/total），vrow 行级状态色（match：默认/mismatch：danger-bg/errored：warning-bg）+ mic 图标（✓/✗/⚠）双重编码，快速定位失败用例。虚拟滚动支持 1000+ 行不卡顿。
-
-7. **表达式历史 localStorage 持久化**：页面刷新不丢失，点击即恢复完整表达式，符合固件工程师「反复使用同一组表达式」的核心场景。
-
-8. **键盘快捷键覆盖核心操作**：`Ctrl/Cmd+Enter`（应用表达式）/ `F5`（执行批量）两个高频操作有快捷键，提升专业用户效率；提示通过 `<kbd>` 标签在 UI 内可见。
+| 亮点 | 位置 | 说明 |
+|------|------|------|
+| ✅ PTO Design System 三主题 | CSS token 层 | foundation → semantic → component 三层 token，三主题切换零硬编码，架构优雅 |
+| ✅ 操作符面板 localStorage 状态记忆 | `OP_OPEN_KEY` | 折叠状态跨会话持久化，专业用户体感一致 |
+| ✅ 示例卡片隐藏逻辑 | `updateDebugResults()` | 参数填齐后自动隐藏空态，填写过程不受干扰 |
+| ✅ 数据流轨迹 in/out 格式 | `sio-${i}` | 每阶段展示「入 {val} → 出 {val} [类型]」，配合类型 chip（number/string/bool），调试体感好 |
+| ✅ inline 校验 debounce | `onExprInput()` 300ms | 替代 alert，输入停顿后才校验，不打断思路 |
+| ✅ 全中文 UI | 全文 | 无英文标签残留，国际化一致 |
+| ✅ 键盘快捷键 | `keydown` 监听 | Ctrl+Enter / F5，专业用户友好 |
+| ✅ 参数 touched 状态 | `_touched` flag | 未触碰前不显示参数警告，避免过早报错 |
+| ✅ 虚拟滚动 | ROW_H=36, BUF=10 | 大数据集下性能稳定；行绝对定位方案正确 |
+| ✅ postMessage 桥 | `window.message` 监听 | setTemplateVars / setExpression / setBadgeTypes 三通道已实现 |
 
 ---
 
-## 版本说明
+## 需要工程阶段修复的问题（汇总）
 
-本审查基于优化版 Demo v2（五镜走查版，2026-06-12）。  
-原始问题（B1–B10，P0/P1）在此版本中全部已修复，五镜问题（B11–B15，P0/P1）全部已落地。  
-本轮新发现均为 D1–D8 改进机会点，无需推翻现有实现；前端可独立修复 D1–D5，D6–D8 为后续迭代改进。
+| # | 问题 | 在 `design-review.md` 位置 | 修复责任 |
+|---|------|--------------------------|---------|
+| R1 | 历史最多 8 条 → 应为 20 条 | 代码 `h.slice(0, 8)` | 前端 |
+| R3 | gsub 量词 bug：`+*?` 被转义 | `_luaPatToRegex` magic 集 | 前端 |
+| R8 | restoreHistory onclick XSS 风险 | renderHistory innerHTML | 前端 |

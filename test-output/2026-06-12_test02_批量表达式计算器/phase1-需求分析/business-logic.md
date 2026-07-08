@@ -1,184 +1,163 @@
-# 管道表达式批量评估器 · 业务逻辑文档
+# 业务逻辑梳理 · 管道表达式批量评估器
 
 ---
 
 ## 一、管道表达式语法规则
 
-### 1.1 格式
-```
-<输入声明> [ |> <阶段> [ |> <阶段> ... ] ]
+**格式**：`$1[;$2;...] [|> stage1 [|> stage2 ...]]`
 
-输入声明 = $1 [; $2 [; $3 ...]]
-阶段     = fnName(arg1, arg2, ...) | 裸表达式字符串
-```
-
-### 1.2 输入替换
-- `$N`（N 从 1 起）在阶段 args 中会被替换为对应的输入值。
-- 管道中前一阶段的**输出**会成为下一阶段的第一个（或唯一）参数（由具体函数决定）。
-
-### 1.3 管道阶段函数清单
-
-| 函数 | 签名 | 说明 |
-|------|------|------|
-| `expr(expression)` | → any | 求值一个算术/逻辑表达式（见 1.4） |
-| `string.format(fmt, ...)` | → string | C-style printf 格式化 |
-| `string.cmp(a, b)` | → boolean | 字符串相等比较（去引号后） |
-| `string.sub(s, start, end)` | → string | Lua 风格子串（1-based，负数从末尾计） |
-| `string.gsub(s, pattern, replacement)` | → string | Lua 模式替换（映射为 JS RegExp）|
-| `string.upper(s)` | → string | 转大写 |
-| `string.lower(s)` | → string | 转小写 |
-
-### 1.4 `expr()` 支持的运算符（SafeExpressionParser 实现）
-
-| 类别 | 运算符 |
-|------|--------|
-| 算术 | `+` `-` `*` `/` `//`（整除） `%` |
-| 位运算 | `&` `\|` `^` `~`（按位非） `<<` `>>` `>>>` |
-| 比较 | `==` `!=` `~=` `<` `>` `<=` `>=` |
-| 逻辑 | `&&`/`and`、`\|\|`/`or`、`!`（逻辑非） |
-| 分组 | `(` `)` |
-| 字面量 | 整数/浮点、`true`/`false`、`null`/`undefined`、`NaN`、`Infinity`、字符串（单/双引号）|
-
-**Lua 风格真值判断**：只有 `null`、`undefined`、`false` 为假；其余全为真（包括 `0` 和空字符串）。
-
-**`?` / `:` 映射**：`?` 被重映射为 `and`，`:` 被重映射为 `or`（当 `:` 不紧跟字母时）——实现了类三目运算符效果。
+| 规则 | 说明 |
+|------|------|
+| 首段为输入声明 | `$1;$2` 声明两个参数；首个 ` |> ` 前的所有内容均为输入段 |
+| 管道连接符必须两侧带空格 | 必须写 ` |> `（前后各一个空格），否则不识别为分隔符 |
+| 阶段为函数调用或裸表达式 | `expr($1 + $2)` 是函数调用；`$1 + $2`（无括号）自动包装为 `expr($1 + $2)` |
+| $N 在各阶段代表上一步输出 | 首阶段 `$1/$2` 指原始输入；后续阶段 `$1` 指前阶段输出 |
+| 模板变量先于 $N 替换 | `${VarName}` 在 `_replParams` 的最末步骤替换 |
 
 ---
 
-## 二、输入值类型强制转换
-
-`PipeEvaluator._parseVal(v: string)` 在评估前对字符串输入做自动转换：
-
-| 输入字符串 | 转换后类型 |
-|----------|----------|
-| 纯整数/浮点（如 `"42"`, `"-3.14"`） | number |
-| `"true"` / `"false"`（大小写不敏感） | boolean |
-| `"null"` | null |
-| 其他 | 保持 string |
-
----
-
-## 三、模板变量替换（`${VarName}`）
-
-- 替换时机：在 `_replParams()` 内，先替换 `$N` 位置参数，再替换 `${VarName}` 模板变量。
-- 来源：`evaluator.templateVars: Map<string, unknown>`，当前 Demo 始终空。
-- 未定义变量：保持原文 `${VarName}` 不替换（不报错）。
-
----
-
-## 四、测试用例行解析规则
-
-### 4.1 列分隔符
-空格、`,`（逗号）、`\t`（Tab）均为分隔符；分隔符连续出现时合并（即不产生空列）。
-
-### 4.2 字符串引号处理
-- 单/双引号括起的值：引号内的分隔符不分割（保留原始字符串，去掉引号）。
-- 转义序列（引号内）：`\n` `\t` `\r` `\\` `\"` `\'` `\0` → 对应字符；其他 `\X` → `X`。
-
-### 4.3 列角色
-- 第 1 列 ~ 第 (N-1) 列：输入（`inputs`）
-- 最后 1 列：期望输出（`expectedOutput`，始终以字符串保留）
-- 最少需要 2 列，否则抛 `至少需要 2 列`
-
-### 4.4 注释与空行
-- 以 `#` 开头的行 → 忽略
-- 空行（或纯空白行）→ 忽略
-- 解析失败的行 → 加入 `errors[]` 数组，**不中断**整体解析
-
----
-
-## 五、输出比较与归一化
+## 二、求值顺序（核心算法）
 
 ```
-match = normOut(actualOutput) === normOut(expectedOutput)
-
-normOut(s) = s.trim()
-              .replace(/^["']|["']$/g, '')   // 去首尾一对引号
-              .replace(/\s+/g, ' ')           // 合并内部连续空白
-```
-
-**注意**：比较基于字符串，数字 `10` 与字符串 `"10"` 在此归一化后相等（因为 actualOutput 在 executeBatch 中已 `String(res.result)` 转换）。
-
----
-
-## 六、批量执行控制流
-
-```
-executeBatch()
-  │
-  ├── btn.disabled = true, btn.textContent = '⏳ 执行中...'
-  ├── await new Promise(setTimeout 0)    ← 让 UI 刷新
-  │
-  ├── 对每条 testCase：
-  │   ├── evaluator.evaluate(parsedExpr, tc.inputs.map(String))
-  │   ├── success=true  → actualOutput = String(result)
-  │   │                   matchStatus  = normOut 比较
-  │   └── success=false → executionStatus='error', errorMessage=error
-  │
-  ├── 汇总 summary (total/success/failed/matched/mismatched)
-  ├── execResults = { testCases, summary }
-  └── renderBatchResults()
+1. 收集 templateVars（Map<name, value>）
+2. inputs = inputVals.map(_parseVal)
+   — 字符串智能解析：数字字符串→number，"true"→true，"false"→false，"null"→null
+3. cur = inputs（初始值为全部输入参数数组）
+4. for each stage in stages:
+   a. args = stage.args.map(a => _replParams(a, cur))
+      — $1 替换为 cur 的对应元素
+      — ${VarName} 替换为模板变量
+   b. cur = _evalStage(stage.fn, args)
+5. return { result: cur, intermediates }
 ```
 
 ---
 
-## 七、虚拟滚动算法
+## 三、输入类型自动推断（`_parseVal`）
+
+| 输入字符串 | 解析结果 |
+|-----------|---------|
+| `"3"` / `"3.14"` | `number` |
+| `"true"` / `"false"` | `boolean`（大小写不敏感） |
+| `"null"` | `null` |
+| 其他 | `string`（原样保留） |
+
+---
+
+## 四、输出标准化（`normOut`）
+
+用于比较测试用例的实际输出与期望输出：
+
+```javascript
+normOut(s) =
+  String(s).trim()
+  .replace(/^["']|["']$/g, '')   // 去首尾引号
+  .replace(/\s+/g, ' ')           // 合并连续空白
+```
+
+**设计影响**：`"7.00"` 和 `7.00` 被视为匹配 ✅（多数场景合理）。  
+**边界风险**：严格类型验证场景（区分字符串 `"true"` 与布尔 `true`）时会误判为匹配 ⚠️。
+
+---
+
+## 五、Lua 风格三元运算（`?:`）
+
+tokenizer 将 `?` 替换为 `and`，`:` 替换为 `or`，利用 Lua 的 `and/or` 语义实现三元：
 
 ```
-ROW_H = 32px    // 每行高度（固定）
-BUF   = 10      // 上下缓冲行数
+$1 > 0 ? "正" : "负"
+→ ($1 > 0) and "正" or "负"
+```
 
-onScroll:
-  start = max(0, floor(scrollTop / ROW_H) - BUF)
-  end   = min(total, ceil((scrollTop + clientHeight) / ROW_H) + BUF)
+**真值规则**（与 JavaScript 的差异）：
 
-renderRows(start, end):
-  spacer.height = total * ROW_H           // 保持滚动条比例
-  content.top   = start * ROW_H           // 绝对定位偏移
-  渲染 [start, end) 范围内的行
+| 值 | Lua/本工具 | JavaScript |
+|----|-----------|-----------|
+| `0` | **真** | 假 |
+| `""` | **真** | 假 |
+| `null/undefined/false` | 假 | 假 |
+
+---
+
+## 六、整数除法 `//`
+
+tokenizer 使用向前看字符区分整除符和行注释：
+- `//` 后接数字/标识符/运算符开头字符 → 整除符，进入 token 流
+- `//` 后接其他 → 行注释，跳过到行尾
+
+```javascript
+3 // 2 → Math.trunc(3/2) = 1
+// 这是注释
 ```
 
 ---
 
-## 八、校验规则汇总（前端独立实现）
+## 七、状态机
 
-| 场景 | 规则 | 错误提示 |
-|------|------|---------|
-| 表达式为空 | 点击「应用」时检查 | `表达式不能为空`（alert） |
-| 参数未填 | 评估时检查 inputValues[i] === '' | `参数 $N 未提供` |
-| 未知函数 | 评估阶段 switch/default | `未知函数: X` |
-| 测试用例列不足 | 解析时每行检查 | `至少需要 2 列，得到 N 列` |
-| 用例引号未闭合 | tokenizeLine 结束检查 | `第 N 行引号未闭合` |
-| 无有效用例 | loadTestCases 检查 | `未能解析到有效的测试用例` |
+### 调试模式
+
+```
+[初始态] 表达式框有默认值，参数框空
+  ↓ 用户修改表达式
+[draft 态] 待应用
+  ↓ applyExpr() 成功
+[表达式已应用] 参数输入框按解析结果渲染
+  ↓ 所有 $N 均填写
+[实时求值] 每次输入自动触发，管道轨迹实时更新
+  ↓ 任意参数清空
+[等待输入] 显示 "等待输入..." 占位
+  ↓ applyExpr() 失败（原始 Demo 用 alert）
+[错误态] 弹出 alert，中断操作流
+```
+
+### 用例模式
+
+```
+[初始态] 文本区空
+  ↓ 粘贴 CSV + loadTestCases()
+[用例已加载] 显示加载条数，执行按钮出现
+  ↓ executeBatch()（异步，让出一帧后同步执行）
+[执行中] 按钮 disabled
+  ↓ 完成
+[结果展示] 虚拟滚动表格 + 统计摘要
+  ↓ exportResults()
+[结果已复制] clipboard + toast
+```
 
 ---
 
-## 九、验证阶段发现的缺陷（待修复）
+## 八、操作顺序约束
 
-> 以下为优化版 Demo 构建时通过运行验证门（node 复算 10 组用例）发现的真实问题。
+| 步骤 | 前置条件 | 说明 |
+|------|---------|------|
+| 填写 $N 参数 | 必须先 applyExpr | 参数输入框在 apply 后才按解析结果生成 |
+| 加载用例（用例模式） | 表达式已 apply | 用例执行需要已解析的管道结构 |
+| 执行全部 | 必须先加载用例 | 执行按钮在加载成功后才显示 |
+| 导出结果 | 必须先执行 | 导出按钮在执行完成后才出现 |
 
-### 9.1 🔴 `string.gsub` Lua 量词失效（功能性 Bug）
-`_luaPatToRegex` 的 `magic = '^$()%.[]*+-?'` 把 Lua 量词 `+ * - ?` 也纳入了转义集合，导致：
+---
 
-```
-string.gsub("a1b22", "%d+", "N")
-  → _luaPatToRegex("%d+") 生成 /[0-9]\+/g   ← '+' 被转义为字面量
-  → 实际匹配「数字后跟一个加号」，而非「一个或多个数字」
-  → 返回 "a1b22"（未替换），而非预期的 "aNbN"
-```
+## 九、三类逻辑区分
 
-**影响**：所有依赖 Lua 量词（`+`/`*`/`-`）的 gsub 模式全部失效，只有定长模式（如 `%d`、`[abc]`）能正常工作。
-**根因**：量词字符不应放进 magic 转义集；Lua 的 `magic` 字符集本应是 `^$()%.[]*+-?` 中**仅作为字面量需转义**的部分，但实现把它们一律 `\` 转义，反而破坏了量词语义。
-**建议**：将 `+ * - ?` 从 magic 集移出，改为映射到 JS 正则的同名量词（`-` 需特殊处理为非贪婪 `*?`）。
-**优先级**：P1（属功能正确性，非视觉问题）；本次优化 Demo **保持逐字移植以维持行为一致**，缺陷修复另立工单。
+| 逻辑类型 | 具体规则 | 处理方 |
+|---------|---------|-------|
+| **纯展示逻辑** | badge 颜色、阶段 border 颜色、等待状态斜体 | 前端 |
+| **前端业务逻辑** | 表达式解析/求值、类型推断、输出标准化、虚拟滚动计算 | 前端 |
+| **待联调逻辑** | postMessage 协议、badge 语义约束（CONST 禁止编辑）、宿主参数 schema | 前端 + 宿主 |
 
-### 9.2 校验门覆盖结论
-| 用例类别 | 结果 |
-|---------|------|
-| 算术 / 位运算 / 移位 | ✅ 通过 |
-| string.format 格式化 | ✅ 通过 |
-| string.sub / upper / lower | ✅ 通过 |
-| Lua 真值 `?:` 三目 | ✅ 通过 |
-| Lua 真值 `0 or X`（0 为真） | ✅ 通过 |
-| **string.gsub 量词** | ❌ 见 9.1（原 Demo 同样缺陷，移植行为一致）|
-| validateExpr 空/未知函数/合法 | ✅ 通过 |
+---
+
+## 十、已知边界与 Bug
+
+| # | 问题 | 影响范围 | 级别 |
+|---|------|---------|------|
+| B1 | `string.gsub` Lua 量词 `%d+` 无效 | `+` 在 magic 集里被转义为 `\+`，量词失效 | 🐛 Bug |
+| B2 | `$N` 替换当 N ≥ 10 时顺序歧义 | `$10` 与 `$1` 正则冲突 | ⚠️ 边界 |
+| B3 | `normOut` 模糊比较 | 字符串/数字类型区分失效 | ⚠️ 设计取舍 |
+| B4 | `executeBatch` 仅让出一帧 | 1000+ 用例阻塞主线程 | ⚠️ 性能 |
+| B5 | 原始 Demo 用 `alert()` 报错 | 打断操作流，不可 undo | 🐛 UX |
+| B6 | 原始 Demo 中英文混用 | 批量模式按钮/标签为英文 | 🐛 本地化 |
+| B7 | 所有 badge 硬编码为 SYNC | 语义误导用户 | 🐛 语义 |
+| B8 | 无 localStorage 历史 | 无法恢复历史表达式 | ⚠️ 能力缺失 |
+| B9 | 无模板变量支持 | 含 `${VarName}` 的表达式无法独立测试 | ⚠️ 能力缺失 |
+| B10 | 无键盘快捷键 | 鼠标密集操作，效率低 | ⚠️ 能力缺失 |

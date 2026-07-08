@@ -1,320 +1,273 @@
-# 管道表达式批量评估器 · 优化版 Demo Prompt（v2 · 含设计师走查）
-> 模式：**存量优化**（基于 `86234586-previewbatchevaluator.html` 改进）
-> 目标平台：VS Code WebView（Electron Chromium）
-> 实际插入设计系统：**pto-design-system**（委托式——视觉决策读其 token/class/Workflow；下方 §A 的 VS Code token 表保留作宿主环境参考与 A-2 回退基线）
->
-> **同源声明**：§B 的问题清单（B1–B15）与 `REPORT-分析报告.html` 的 critique/opp slide 是**同一张清单**（同 ID、同量化数字）——报告是评审渲染，本文件是执行渲染。§C 每条目标状态标注其服务的画像/场景（来自报告 users/scenario slide）。
->
-> **v2 修订说明**：v1 只覆盖功能缺陷与视觉违规（B1–B10），修完后的 Demo「干净但单薄」——首屏一半空白、操作符提示挤成一行、宽屏内容孤岛、管道结果无数据流感原样保留。v2 增补「首用 30 秒走查」五镜（B11–B15），易用性问题与功能问题同权重。
+# Demo 优化提示词 · 管道表达式批量评估器
+
+> 模式：**优化已有 Demo**（原始 VS Code Webview Demo → 专业级 PTO Design System 版本）  
+> 输入：`previewbatchevaluator.html`（原始版本）  
+> 产出：单文件 HTML，CSS 全内联零外链，可双击预览，可在 VS Code Webview 中运行
 
 ---
 
-## §A — VS Code 设计系统基线
+## 一、产品定位与目标用户
 
-使用以下 CSS token 替换所有硬编码颜色值；在 WebView 内 `document.documentElement` 上这些变量由 VS Code 宿主自动注入，支持亮/暗主题自动切换。
+**是什么**：管道表达式调试与批量验证工具。用户写一条管道表达式（`$1;$2 |> expr($1 + $2) |> string.format("%.2f", $1)`），填入参数值，右侧实时展示每个管道阶段的中间输出。也可切换到「用例模式」，批量粘贴 CSV 测试数据并执行，查看通过率和差异对比。
 
-### 颜色 Token（必须使用）
+**给谁用**：BMC 固件/嵌入式工程师，技术背景高（熟悉 Lua 语法、位运算、正则）。日常在 VS Code 里工作。
 
-| 语义                  | CSS 变量                                     | 亮主题参考值  | 暗主题参考值  |
-|-----------------------|----------------------------------------------|--------------|--------------|
-| 主背景                | `--vscode-editor-background`                 | `#ffffff`    | `#1e1e1e`    |
-| 侧边栏背景            | `--vscode-sideBar-background`                | `#f3f3f3`    | `#252526`    |
-| 主文字                | `--vscode-editor-foreground`                 | `#000000`    | `#d4d4d4`    |
-| 次要文字              | `--vscode-descriptionForeground`             | `#717171`    | `#8a8a8a`    |
-| 输入框背景            | `--vscode-input-background`                  | `#ffffff`    | `#3c3c3c`    |
-| 输入框边框            | `--vscode-input-border`                      | `#bebebe`    | `#3c3c3c`    |
-| 输入框聚焦边框        | `--vscode-focusBorder`                       | `#0090f1`    | `#007fd4`    |
-| 主按钮背景            | `--vscode-button-background`                 | `#0078d4`    | `#0e639c`    |
-| 主按钮文字            | `--vscode-button-foreground`                 | `#ffffff`    | `#ffffff`    |
-| 主按钮悬停            | `--vscode-button-hoverBackground`            | `#026ec1`    | `#1177bb`    |
-| 次要按钮背景          | `--vscode-button-secondaryBackground`        | `#5f6a79`    | `#3a3d41`    |
-| 列表悬停背景          | `--vscode-list-hoverBackground`              | `#e8e8e8`    | `#2a2d2e`    |
-| 列表选中背景          | `--vscode-list-activeSelectionBackground`    | `#0060c0`    | `#094771`    |
-| 成功色                | `--vscode-testing-iconPassed`                | `#388a34`    | `#73c991`    |
-| 失败色                | `--vscode-testing-iconFailed`                | `#f14c4c`    | `#f48771`    |
-| 警告色                | `--vscode-editorWarning-foreground`          | `#bf8803`    | `#cca700`    |
-| 边框（通用）          | `--vscode-panel-border`                      | `#e5e5e5`    | `#3c3c3c`    |
-| 标签激活背景          | `--vscode-tab-activeBackground`              | `#ffffff`    | `#1e1e1e`    |
-| 标签非激活背景        | `--vscode-tab-inactiveBackground`            | `#ececec`    | `#2d2d2d`    |
-| 徽章背景              | `--vscode-badge-background`                  | `#c4c4c4`    | `#4d4d4d`    |
-| 徽章前景              | `--vscode-badge-foreground`                  | `#333333`    | `#ffffff`    |
-| 滚动条滑块            | `--vscode-scrollbarSlider-background`        | `#64646464`  | `#79797966`  |
+**嵌入约束**：单文件 HTML，零外链（CSS/JS 全内联），能在 VS Code Webview 里运行，也能双击浏览器预览。
 
-### 字体 Token
+---
+
+## 二、设计系统规格（PTO Design System）
+
+用以下三层 CSS token 体系替换原始 VS Code 主题变量：
+
+### Foundation tokens（基础层）
 
 ```css
-font-family: var(--vscode-font-family, 'Segoe UI', system-ui, sans-serif);
-font-size:   var(--vscode-font-size, 13px);
-font-family: var(--vscode-editor-font-family, 'Cascadia Code', 'Consolas', monospace); /* 代码区 */
-font-size:   var(--vscode-editor-font-size, 13px);
+:root {
+  /* Neutral */
+  --ark-neutral-0: #0b0b0b; --ark-neutral-1: #101010;
+  --ark-neutral-2: #141414; --ark-neutral-3: #1a1a1a;
+  --ark-neutral-4: #343434;
+  /* Accent */
+  --ark-blue-500: #4369ef; --ark-blue-600: #5a92e6;
+  --ark-domain-aux: #7c8db8;
+  --ark-green-500: #04d793; --ark-orange-500: #ffaa3b; --ark-red-500: #ff4b7b;
+  --highlight-l0a-violet-source: #A855F7;
+  /* Typography */
+  --font-sans: 'Inter','Source Han Sans SC','PingFang SC',sans-serif;
+  --font-mono: 'JetBrains Mono','Fira Code','Consolas',monospace;
+  /* Spacing: --space-1:4px to --space-6:24px */
+  /* Radius: --radius-sm:6px --radius-md:8px --radius-lg:12px --radius-pill:999px */
+  /* Motion: --duration-fast:100ms --duration-base:200ms */
+}
 ```
 
-### 间距规范（VS Code 习惯）
+### Semantic tokens（语义层，三主题）
 
-| 用途             | 值      |
-|-----------------|---------|
-| 面板内边距       | `16px`  |
-| 行间距（列表行） | `22px`  |
-| 元素间距         | `8px`   |
-| 紧凑间距         | `4px`   |
-| 圆角（输入框）   | `2px`   |
-| 圆角（按钮）     | `2px`   |
+```css
+/* dark（默认） */
+:root, :root[data-theme='dark'] {
+  --background: var(--ark-neutral-1);
+  --surface-1: #161616; --surface-2: #1c1c1c; --surface-3: #262626; --surface-4: #313131;
+  --foreground: rgba(255,255,255,.90);
+  --foreground-secondary: rgba(255,255,255,.60);
+  --foreground-muted: rgba(255,255,255,.40);
+  --border-subtle: rgba(255,255,255,.06);
+  --border-default: rgba(255,255,255,.10);
+  --border-strong: rgba(255,255,255,.16);
+  --primary: var(--ark-blue-500); --primary-hover: var(--ark-blue-600);
+  --success: var(--ark-green-500); --warning: var(--ark-orange-500); --danger: var(--ark-red-500);
+  --tone-critical-bg: color-mix(in srgb,var(--danger) 14%,transparent);
+  --tone-warning-bg: color-mix(in srgb,var(--warning) 16%,transparent);
+  --tone-info-bg: color-mix(in srgb,var(--primary) 16%,transparent);
+  --tone-green-strong: color-mix(in srgb,var(--success) 22%,transparent);
+  --state-hover: rgba(255,255,255,.06);
+  --state-selected: rgba(67,105,239,.14);
+  --focus-ring: rgba(67,105,239,.42);
+}
+/* light */
+:root[data-theme='light'] {
+  --background: #F5F5F5; --surface-1: #FFFFFF; --surface-2: #F2F2F2; --surface-3: #E6E6E6;
+  --foreground: rgba(0,0,0,.90); --foreground-secondary: rgba(0,0,0,.55);
+  --foreground-muted: rgba(0,0,0,.42);
+  --border-subtle: rgba(0,0,0,.07); --border-default: rgba(0,0,0,.12);
+  --state-hover: rgba(0,0,0,.05); --state-selected: rgba(67,105,239,.10);
+}
+/* glass：深色背景 + backdrop-filter 毛玻璃，参考 PTO glass 主题实现 */
+```
+
+### Component tokens
+
+```css
+:root {
+  --comp-toolbar-height: 44px;
+  --comp-toolbar-bg: color-mix(in srgb,var(--background) 92%,black);
+  --button-height-sm: 30px; --button-radius: var(--radius-lg);
+  --input-height-md: 34px; --input-radius: var(--radius-md);
+  --panel-radius: var(--radius-lg); --panel-bg: var(--surface-2);
+  --table-row-height: 36px;
+  --tag-height: 20px; --tag-radius: var(--radius-pill);
+  --stat-chip-height: 22px;
+}
+```
+
+**约束**：所有颜色引用 semantic token，禁止硬编码颜色（除 SVG icon `currentColor` 外）。
 
 ---
 
-## §B — 现有 UI 问题（量化描述）
+## 三、布局规格
 
-按优先级从高到低列出，每项均有截面 + 性质标注：
+### 顶栏（替换原 56px 蓝色横幅）
 
-### B-0 首用 30 秒走查（五镜，设计师视角强制前置）
+- 高 44px，背景 `--comp-toolbar-bg`，`border-radius: var(--radius-lg)`，1px border
+- 从左到右：SVG 图标（`color:var(--primary)`）· 「管道表达式批量评估器」· Beta pill tag · 弹性空间 · 主题 segmented control（暗色/亮色/玻璃）
 
-> 假装自己是**第一次打开此页面的固件工程师**，30 秒内会经历什么：
+### 主体双栏布局
 
-| 镜 | 检查 | 本视图结论（量化） | Finding |
-|----|------|------------------|---------|
-| 镜1 首屏与空态 | 首屏空白率；空态可操作性 | 未输入表达式时，管道处理区 + 结果区 + 用例区全空，**首屏约 50% 为空白**；唯一引导是一句灰字「等待输入…」，不可操作 | **B11** 🔴 |
-| 镜2 可扫读性 | 提示/操作符是否堆挤 | 表达式说明把全部语法要素（`$N`、`;`、`\|>`、7 个函数名、参数格式）压在 1–2 行散文里，**一行 > 20 个可扫读项**，无法定位「我要的那个函数」 | **B12** 🔴 |
-| 镜3 空间叙事 | 宽屏内容孤岛 | 单栏布局 max-width 居中，1920px 宽屏下**右侧 ≥ 40% 纯空白**；「输入表达式」（操作）与「管道处理」（反馈）上下排列，视线纵向折返 | **B13** 🔴 |
-| 镜4 数据流可视化 | 管道处理是否画出流动 | 各阶段纵向堆叠为「函数名 + 结果文本」，**阶段之间无连接元素、无输入→输出方向感**，「管道」这一核心心智模型在 UI 上不可见 | **B14** 🟡 |
-| 镜5 结果状态编码 | 批量结果可扫读性 | 行级 match/mismatch 有色，但**顶部无通过率摘要 badge**，要逐行扫描或读底部统计才能得出「这次回归过没过」 | **B15** 🟡 |
+```css
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(0,55fr) minmax(0,45fr);
+  gap: var(--space-4); align-items: start;
+}
+@media (max-width:1024px){ .main-grid{ grid-template-columns:1fr; } }
+```
 
-### P0 — 阻碍核心功能
+- **左栏 55%（操作区）**：① 管道表达式（含操作符面板）· ② 输入参数 · 模板变量（折叠）· 历史记录（调试模式）；加载测试用例（用例模式）
+- **右栏 45%（反馈区）**：空态示例卡片（引导） · ③ 管道处理 · ④ 最终结果（调试模式）；③ 批量执行 · ④ 执行结果（用例模式）
 
-| # | 位置 | 问题 | 量化描述 |
-|---|------|------|---------|
-| B1 | 表达式输入区 | **无实时语法校验**：表达式错误只在点击"应用"后才通过 `alert()` 报错 | 用户需要切换焦点→等待→alert→确认→回焦点，共 5 步操作才能获得错误反馈 |
-| B2 | 调试区参数输入 | **参数未提供错误**通过 `alert()` 弹出，打断输入流 | 单次失误导致全屏焦点离开，无法就地修复 |
-| B3 | 模板变量注入 | **${VarName} 无法在 Demo 中赋值**，替换逻辑存在但不生效 | 整个 templateVars 通道为空 Map，功能对用户完全不可见 |
-| B11 | 页面初始态 | **首屏 ~50% 空白且无可操作引导**（镜1） | 新用户面对空表达式框 + 三段空区域，第一步要靠猜；唯一提示是不可点击的灰字 |
-| B12 | 表达式说明区 | **语法要素挤压成散文行，难以扫读**（镜2） | 一行 >20 个可扫读项（7 函数 + 语法符号），无分组、无 hover 说明、不可点击插入 |
-| B13 | 整体布局 | **宽屏内容孤岛：单栏纵排，操作与反馈不并排**（镜3） | 1920px 下右侧 ≥40% 空白；输入→查看结果需纵向折返视线 |
-
-### P1 — 影响专业度 / 可扩展性
-
-| # | 位置 | 问题 | 量化描述 |
-|---|------|------|---------|
-| B4 | 批量结果表格 | **表头/按钮英文**（"Input"、"Expected"、"Actual"、"Status"、"Execute All"、"Export Results"、"Total"、"Success"、"Failed"、"Matched"、"Mismatched"）与其余中文 UI 不一致 | 共 11 处英文字符串混入中文界面 |
-| B5 | 参数徽章 | **全部硬编码为 `.badge-sync`**，badge-ref/const/literal/template 已定义但从未使用 | 5 种语义徽章中仅 1 种被启用，参数类型信息无法区分 |
-| B6 | 键盘操作 | **无键盘快捷键**：Ctrl+Enter 无法提交表达式，Tab 顺序未优化，无法完全脱离鼠标 | 典型开发者操作流中需要在键盘↔鼠标间切换 3+ 次 |
-| B7 | 测试用例历史 | **无历史/收藏**：每次刷新都要重新输入表达式和测试用例 | 无持久化机制 |
-| B14 | 管道处理区 | **阶段结果无数据流视觉**（镜4）：纵向文本堆叠，无连接箭头、无输入→输出方向 | 「管道」心智模型在 UI 上不可见，调试多阶段链路时无法对照「哪一段变了什么」 |
-| B15 | 批量结果区 | **无顶部通过率摘要 badge**（镜5） | 判断「这次回归过没过」需逐行扫或读底部统计，全局结论不可一眼得出 |
-
-### P2 — 视觉/品牌一致性
-
-| # | 位置 | 问题 | 量化描述 |
-|---|------|------|---------|
-| B8 | 顶部标题区 | **全宽蓝色横幅**（`#0078d4` 背景）在 VS Code 中视觉突兀；硬编码颜色无法跟随主题切换 | 横幅高度 ~56px，占 WebView 初始可见区域约 12% |
-| B9 | 章节标题 | **Emoji 前缀**（🔬 ⚡ 📋）与 VS Code 原生 Outline 风格不符 | 4 个章节标题均含 Emoji |
-| B10 | 暗主题 | **硬编码颜色不支持 VS Code 暗主题** | 共计约 30 处 `#xxxxxx` 硬编码颜色 |
+步骤编号 chip（圆形，20×20，`border:1.5px solid var(--primary)`）用于标注每个面板的步骤序号。
 
 ---
 
-## §C — 目标状态映射
+## 四、功能规格（逐条实现要求）
 
-每个问题对应的期望改后状态；末尾〔〕标注该目标服务的画像/场景（来自报告 users/scenario slide）：
+### B1 — 内联校验（替换 alert）
 
-| 问题 | 目标状态 |
-|------|---------|
-| B11 首屏空白无引导 | 空态时右栏（结果区）展示 **3 张可点击示例卡片**，每张含：示例表达式、预填参数值、预期结果；点击后一键填入表达式 + 参数并自动应用，立即看到完整管道运行轨迹。卡片用 `--card-*` token，hover 升起 | 〔固件工程师·首次打开 30 秒上手〕 |
-| B12 语法提示挤压 | 表达式框下方改为**分类 Chip 组面板**：「输入（$1 引用第 N 个参数）/ 字符串（string.format…6 个）/ 自定义（expr(<js>)）」分组排列；每个 chip hover 显示签名说明，点击插入到光标处 | 〔QA 工程师·不记语法也能拼出表达式〕 |
-| B13 宽屏内容孤岛 | **双栏布局**：左栏（~55%）=表达式 + 操作符面板 + 输入参数 + 模板变量 + 历史；右栏（~45%）=管道阶段轨迹 + 最终结果（调试模式）/ 批量结果表（用例模式）。整体 max-width 1440px 居中；<1024px 时退化为单栏 | 〔宽屏 VS Code 用户·操作↔反馈同屏〕 |
-| B14 无数据流视觉 | 管道阶段卡片之间用**竖向连接线 + 箭头**串联；每阶段展开为「输入值 → 函数名(参数) → 输出值」三段式，输出值带数据类型标注（number/string）；最终结果行高亮（`--primary` 左边框 + 大号 mono 字） | 〔固件工程师·多阶段调试链路核对〕 |
-| B15 无通过率摘要 | 批量结果表顶部常驻**通过率 badge**：`✓ 通过 18/20`（全过=`--success` 底，有失败=`--danger` 底），点击 badge 等价于筛选「不匹配」 | 〔QA·批量回归一眼读结论〕 |
-| B1 无实时校验 | 输入框下方出现 inline 错误提示文字（红色，使用 `--vscode-inputValidation-errorBorder`），延迟 300ms debounce 触发；不使用 alert() |
-| B2 参数 alert | 参数输入框右侧/下方出现 inline 提示，参数行变 warning 样式；不弹 alert() |
-| B3 模板变量不可见 | 在调试区增加"模板变量"折叠面板，可手动添加 key-value 对；同时接受 postMessage 注入 |
-| B4 英文字符串 | 全部替换为中文：输入/期望/实际/状态/执行全部/导出结果/合计/成功/失败/匹配/不匹配 |
-| B5 徽章硬编码 | 根据参数来源类型（同步/引用/常量/字面量/模板）动态选择徽章类，默认 literal |
-| B6 无快捷键 | Ctrl+Enter 应用表达式；Tab 在参数输入框间跳转；F5 / Ctrl+R 执行批量 |
-| B8 蓝色横幅 | 改为紧凑顶栏（高度 ≤ 32px），背景使用 `--vscode-titleBar-activeBackground`；移除硬编码颜色 |
-| B9 Emoji 标题 | 移除 Emoji，改用 VS Code 原生 Codicons 图标（`$(beaker)` `$(play)` `$(list-unordered)`） |
-| B10 暗主题 | 全部替换为 `--vscode-*` token；不保留任何 `#xxxxxx` 硬编码颜色（Logo 除外） |
+textarea 下方紧跟 `.inline-msg` 区域，用户停止输入 300ms 后触发（debounce）：
+- 成功：绿色 ✓ + `解析成功 · N 个输入 · M 个阶段`
+- 失败：红色 ⚠ + 错误详情；textarea 加 `border-color:var(--danger)`
+- 点「应用」按钮再次校验，通过才更新 `parsedExpr`
+- 验证规则：①不能为空 ②至少声明 `$1` ③函数名在已知列表内
+
+### B2 — 参数警告（替换 alert 中断）
+
+参数未填时：对应行加 warning border，行下方 `.param-msg` 显示橙色小字 `参数 $N 未提供`（inline，不弹 alert）。只在用户已触碰（touched）输入框后才显示。
+
+### B3 — 模板变量面板
+
+折叠面板（默认折叠，localStorage `pipe-eval-tpl-open` 记忆）。展开显示键值对列表：
+```
+[变量名]  [值]  [× 删除]
+```
+「+ 添加变量」按钮。任意字段修改立即重新求值。
+
+监听 `window.message` 宿主桥：
+- `{type:'setTemplateVars', payload:{key:value,...}}` → 填入面板 + 自动展开 + 重算
+- `{type:'setExpression', payload:string}` → 填入表达式框 + apply
+- `{type:'setBadgeTypes', payload:string[]}` → 更新参数 badge 类型
+
+### B5 — 参数 badge 动态选择
+
+每个参数行含一个 `<select class="badge-select">`，选项：SYNC/REF/CONST/LITERAL/TEMPLATE。切换后 badge chip 颜色联动：
+- SYNC：蓝色（`--tone-info-bg`）
+- REF：紫色（`--highlight-l0a-violet-source` 系）
+- CONST：绿色（`--tone-green-strong`）
+- LITERAL：灰色（`--state-muted`，默认）
+- TEMPLATE：橙色（`--tone-warning-bg`）
+
+### B8 — 操作符 Chip 面板
+
+折叠面板（默认展开，localStorage `pipe-eval-op-open` 记忆）。三组分类：
+- **输入**（蓝色点）：`$1`、`;$2`、` |> `
+- **字符串**（绿色点）：`string.format`、`string.upper`、`string.lower`、`string.sub`、`string.gsub`、`string.cmp`
+- **自定义**（橙色点）：`expr()`
+
+chip 样式：`font-family:mono`，11px，hover 上浮 1px + border 加深。点击插入到 textarea 光标位置（`selectionStart/End`）。hover title 显示函数签名说明。
+
+### B9 — SVG 图标（替换 emoji）
+
+所有按钮/面板标题使用 `<svg>` inline 图标，`stroke:currentColor`，无 emoji。具体图标：
+- 管道（表达式面板）、下载箭头（输入参数）、闪电（管道处理）、星星（最终结果）、时钟（历史）、变量符（模板变量）、播放（执行）、重置弧线（重置）
+
+### B10 — PTO token 全面使用
+
+所有颜色引用 semantic token，零硬编码颜色（border、background、text 全部用变量）。
+
+### B11 — 空态示例卡片
+
+右栏，参数未填时显示（填满后自动隐藏）。3 张可点击卡片，每张含：标题、表达式（mono font，主色）、预填值和预期输出。
+
+点击：自动 apply 表达式 → 填入参数 → 显示管道轨迹 → showToast「示例已填入，轨迹见右侧」。
+
+```
+示例 1：两数求和并格式化
+  $1;$2 |> expr($1 + $2) |> string.format("%.2f", $1)
+  预填: 3, 4 → "7.00"
+
+示例 2：去空格并转大写
+  $1 |> string.gsub($1, " ", "") |> string.upper($1)
+  预填: bmc studio → "BMCSTUDIO"
+
+示例 3：条件判断（Lua 风格 ?:）
+  $1 |> expr($1 > 0 ? "正数" : "非正数")
+  预填: 5 → "正数"
+```
+
+### B12 — 操作符面板（同 B8，加 hover tooltip）
+
+### B13 — 双栏布局（同布局规格章节）
+
+### B14 — 管道数据流轨迹（强化原有管道视图）
+
+每个阶段区块：
+```
+[阶段 N chip]  [表达式原文]
+入 {上一输出}  →  出 {本阶段输出}  [类型 chip]
+```
+类型 chip：number=蓝、string=绿、boolean=橙。阶段间竖向箭头（bar + ▼）。
+
+出错阶段：border 变红，显示错误消息。后续阶段：`opacity:.45`，显示「未执行」。
+
+### B15 — 通过率 badge + 结果筛选
+
+执行结果标题右侧：pill 形 badge（全通过=绿 `✓ 通过 N/N`；有失败=红 `✗ 通过 N/M`）。点击 badge 筛选到不匹配视图。
+
+筛选 chip 行（表格上方）：`[全部 N]  [匹配 N]  [不匹配 N]  [错误 N]`，active chip 高亮。
+
+### C1 — 键盘快捷键
+
+- 调试模式：`Ctrl/Cmd+Enter` → applyExpr
+- 用例模式：`F5` → executeBatch（仅在有用例时）
+- 表达式框底部显示快捷键提示（muted 小字）
+
+### C2 — 历史记录
+
+左栏最下方，panel 标题「历史表达式 · 本地保存，点击恢复」。每次 apply 成功后推入（去重，最新在前，最多 20 条）。localStorage key `pipe-eval-history`。显示表达式（省略）+ 相对时间。点击恢复：填入表达式 + apply + 切换调试模式。
+
+### C3 — 结果筛选（同 B15）
+
+### C5 — postMessage 宿主桥（同 B3）
+
+### F1 — 全中文化
+
+原始 Demo 中所有英文 UI 标签替换为中文（Execute All→执行全部，Export Results→导出结果，Showing X→显示 X–Y / 共 Z，Total/Success/Failed/Matched/Mismatched→合计/成功/失败/匹配/不匹配，Input/Expected/Actual/Status→输入/期望输出/实际输出/状态）。
+
+### F3 — 紧凑 toolbar（44px）
+
+替换原 56px 蓝色大横幅，采用 `--comp-toolbar-height: 44px` 样式，视觉轻量。
+
+### F4 — PTO token 系统（同 B10）
+
+### F5 — badge 类型系统（同 B5）
+
+### F6 — SVG 图标（同 B9）
 
 ---
 
-## §D — 跨视图一致性要求
+## 五、求值核心（保持原样，零改动）
 
-1. **语言一致**：所有 UI 文本统一为中文；仅技术标识符（如函数名 `expr`、`string.format`）保持英文。
-2. **主题跟随**：所有颜色均通过 CSS token，不存在 hardcoded 颜色值（背景、边框、文字、图标色全部使用 `--vscode-*`）。
-3. **间距规范**：统一使用 §A 定义的间距值；按钮高度统一 `28px`，与 VS Code 工具栏一致。
-4. **字体规范**：UI 文本使用 `--vscode-font-family`；表达式/代码区使用 `--vscode-editor-font-family`。
-5. **聚焦状态**：所有可交互元素 `:focus-visible` 使用 `outline: 1px solid var(--vscode-focusBorder)`。
+以下从原始 Demo 逐字移植，求值逻辑零改动：
+- `SafeExpressionParser`
+- `PipeEvaluator`（含所有 `string.*` 实现）
+- `parsePipeExpr`、`splitArgs`、`parseTestCaseText`、`tokenizeLine`
 
----
-
-## §E — 各视图设计要求
-
-### E0 — 整体布局骨架（双栏，B13 的落地）
-
-```
-┌──────────────────────── 顶栏 44px ────────────────────────┐
-│ 左栏 ~55%                     │ 右栏 ~45%                  │
-│ ① 管道表达式（textarea）      │ ③ 管道处理轨迹            │
-│    操作符 Chip 面板（B12）    │    阶段1 ─→ 阶段2 ─→ 结果 │
-│ ② 输入参数 / 模板变量        │    （空态：3 张示例卡片）  │
-│    历史表达式                 │ ④ 批量结果表 + 通过率badge│
-└───────────────────────────────┴───────────────────────────┘
-```
-- 左=操作，右=反馈；任何左栏输入变化，右栏 debounce 实时刷新——视线只需横移，不折返
-- 区块标题带步骤编号 ①②③④（圆形 number chip，`--primary` 描边），布局自带叙事
-- `grid-template-columns: minmax(0,55fr) minmax(0,45fr)`，gap `--space-4`；`max-width:1440px` 居中；`@media (max-width:1024px)` 退化单栏
-
-### E1 — 顶栏（替换蓝色横幅）
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ [$(beaker)] 管道表达式批量评估器     [调试] [批量测试]   │  ← 32px
-└─────────────────────────────────────────────────────────┘
-```
-- 背景：`--vscode-titleBar-activeBackground`
-- 文字：`--vscode-titleBar-activeForeground`
-- 模式切换按钮为 `<button>` tab 样式，激活态用 `--vscode-tab-activeBackground`
-
-### E2 — 表达式输入区
-
-```
-管道表达式
-┌──────────────────────────────────────────────────────┐
-│ $1;$2 |> expr($1 + $2) |> string.format("%.2f", $1) │
-└──────────────────────────────────────────────────────┘
-  ← inline 错误区（仅在有错误时展示，不占位）
-[应用表达式]  Ctrl+Enter
-```
-- textarea 字体使用 monospace token
-- 错误提示颜色：`--vscode-inputValidation-errorForeground`，边框：`--vscode-inputValidation-errorBorder`
-- debounce: 300ms（先做语法高亮，500ms 后做完整解析校验）
-
-**操作符 Chip 面板（B12 的落地，紧贴 textarea 下方）：**
-
-```
-操作符面板 · 悬停看签名说明 · 点击插入到光标处
-● 输入    [$1 · 引用第 N 个参数]
-● 字符串  [string.format "F"] [string.upper] [string.lower] [string.sub S [L]] [string.gsub "F" "T"] [string.cmp "S"]
-● 自定义  [expr ( <JS> )]
-```
-- 每行一个语义分组（圆点 + 分组名 + chip 列）；chip 用 `--comp-tag-*` token，hover 升起并出 tooltip 签名（如 `string.sub(start[, len])`）
-- 点击 chip 把模板文本插入 textarea 光标处并保持焦点；插入后光标落在第一个待填参数位
-- 分组之间用 `--border-subtle` 虚线分隔；面板可折叠（默认展开，状态进 localStorage）
-
-### E3 — 调试模式参数区
-
-```
-参数 $1  [LITERAL ▾]  ┌──────────┐  →  结果：42
-参数 $2  [LITERAL ▾]  └──────────┘
-                       ↑ 此处出错时行变 warning 样式（不弹 alert）
-```
-- 徽章类型下拉（仅 UI 预留，值暂存本地；通过 postMessage 覆盖）
-- 实时计算结果（无需点击，输入后 debounce 200ms）
-
-### E4 — 模板变量面板（新增）
-
-```
-▶ 模板变量  [+ 添加]
-  ${ServerAddr}  ┌─────────────────┐  [×]
-                 └─────────────────┘
-```
-- 折叠/展开状态持久化（localStorage）
-- 变量值更改后自动触发 `updateDebugResults()`
-
-### E4.5 — 右栏：管道处理轨迹 + 空态示例卡片（B11/B14 的落地）
-
-**空态（未应用表达式）——示例卡片组：**
-
-```
-还没有表达式？点一张卡片立即看运行轨迹：
-┌─────────────────────┐ ┌─────────────────────┐ ┌─────────────────────┐
-│ 两数求和并格式化     │ │ 字符串清洗           │ │ 条件判断             │
-│ $1;$2 |> expr($1+$2)│ │ $1 |> string.upper… │ │ $1 |> expr($1>0 ?…) │
-│ 预填:3, 4 → "7.00"  │ │ 预填:"abc" → "ABC"  │ │ 预填:5 → "正数"     │
-└─────────────────────┘ └─────────────────────┘ └─────────────────────┘
-```
-- 每张卡片：标题（用途一句话）+ mono 表达式 + 「预填值 → 预期结果」；点击 = 填入表达式 + 参数值 + 自动应用
-- 卡片用 `--card-*` token；hover `--card-hover-border` + 升起；空态文案在卡片组上方一行
-
-**已应用——数据流轨迹：**
-
-```
-输入  $1=3 (number)   $2=4 (number)
-  │
-  ▼
-┌ 阶段1 expr($1 + $2) ──────────────┐
-│ 入: 3, 4 → 出: 7 (number)         │
-└───────────────────────────────────┘
-  │
-  ▼
-┌ 阶段2 string.format("%.2f", $1) ──┐
-│ 入: 7 → 出: "7.00" (string)       │
-└───────────────────────────────────┘
-  │
-  ▼
-★ 最终结果  "7.00"     ← --primary 左边框 + 大号 mono
-```
-- 阶段间竖向连接线（2px `--border-strong`）+ 箭头（▼，`--foreground-muted`）
-- 每阶段卡片内「入 → 出」三段式，出值带类型 chip（number=蓝 / string=绿，用 `--tone-*` token）
-- 出错阶段卡片边框变 `--danger`，后续阶段置灰显示「未执行」
-
-### E5 — 批量测试区
-
-**测试用例输入：**
-- 标签改为"测试用例输入"
-- placeholder 改为中文说明
-
-**结果表格（全中文化）：**
-
-| 列名     | 原英文       | 改后中文 |
-|----------|-------------|---------|
-| 输入     | Input       | 输入     |
-| 期望输出 | Expected    | 期望输出 |
-| 实际输出 | Actual      | 实际输出 |
-| 状态     | Status      | 状态     |
-
-**操作按钮：**
-- "Execute All" → "执行全部"（快捷键标注 F5）
-- "Export Results" → "导出结果"
-
-**统计行：**
-- Total → 合计，Success → 成功，Failed → 失败，Matched → 匹配，Mismatched → 不匹配
-
-**通过率摘要 badge（B15 的落地，表格上方常驻）：**
-- 形如 `✓ 通过 18/20`；全部通过 = `--success` 底色 + 白字，存在失败/不匹配 = `--danger` 底色
-- 点击 badge 等价于点「不匹配」筛选 chip；执行中显示 `… 执行中 12/20`（`--warning`）
+**唯一允许的求值层改动**：修复 `_luaPatToRegex` 中 `+` 被转义的 bug（`+` 在 magic 集导致 `%d+` 量词失效，改为：`+` 和 `*` 和 `?` 在不被 `%` 引导的情况下保持原 regex 量词语义而非转义）。
 
 ---
 
-## §F — 状态覆盖清单
+## 六、交付门禁
 
-优化后的 Demo 必须覆盖以下所有状态，每种状态均有对应 UI 呈现：
-
-| 状态 ID | 描述                             | 触发方式                          |
-|---------|----------------------------------|-----------------------------------|
-| S01     | 初始空态（无表达式）              | 页面加载                          |
-| S02     | 表达式输入中（语法错误，实时提示）| 输入残缺表达式                    |
-| S03     | 表达式已应用（无参数）            | 输入 `$1 |> expr($1 * 2)` 后应用  |
-| S04     | 参数输入中，结果实时更新          | 调试模式下修改参数值              |
-| S05     | 参数为空，inline 警告             | 清空某参数后触发                  |
-| S06     | 管道中间步骤展开                  | 点击展开 intermediates            |
-| S07     | 模板变量面板展开，已有变量        | 展开面板后添加变量                |
-| S08     | 批量用例加载完成（N 条，无错误）  | 粘贴合法用例文本                  |
-| S09     | 批量用例有解析错误                | 含非法行的用例文本                |
-| S10     | 批量执行中（loading）             | 点击"执行全部"后 UI 刷新前        |
-| S11     | 批量执行完成，有 match / mismatch | 执行完成                          |
-| S12     | 单条用例展开详情                  | 点击某行                          |
-| S13     | 虚拟滚动（100+ 条结果）           | 提供大量测试用例                  |
-| S14     | 暗主题下全部状态正常              | 切换 VS Code 主题                 |
-| S15     | 空态示例卡片可见、点击一键填入    | 初始打开 / 重置后                 |
-| S16     | 数据流轨迹（含类型标注与箭头）    | 应用表达式且填入参数后            |
-| S17     | 数据流中某阶段出错，后续置灰      | 中间阶段抛错（如未知函数）        |
-| S18     | 通过率 badge（全过/有失败/执行中）| 批量执行各阶段                    |
-
----
-
-## 实现优先级说明
-
-严格按照 P0 → P1 → P2 顺序实现；P2 在代码结构完整的情况下一并完成：
-
-- **必须实现（P0）**：B1（inline 语法校验）、B6（Ctrl+Enter 快捷键）、**B11（空态示例卡片）、B12（操作符 Chip 面板）、B13（双栏布局）**
-- **应当实现（P1）**：B4（中文化）、B8（顶栏重构）、B10（主题 token）、**B14（数据流轨迹）、B15（通过率 badge）**
-- **尽量实现（P2）**：B5（徽章动态）、B9（移除 Emoji）、B3（模板变量面板）、B7（历史持久化）
-
-> v2 教训：v1 把 B11–B15 这类易用性问题整体漏掉，产出「干净但单薄」的 Demo。**易用性五镜（B11–B15）与功能问题同权重**，其中镜1/镜2/镜3（空态引导、可扫读、双栏）直接决定第一印象，列 P0。
+- [ ] 单文件 HTML，零外部 `<script src>` 或 `<link>`
+- [ ] 三主题（暗色/亮色/玻璃）可切换，视觉正确
+- [ ] 调试模式：参数填写后管道轨迹实时更新，含类型 chip 和阶段间箭头
+- [ ] inline 校验：空表达式/未知函数显示 inline 错误，不使用 alert
+- [ ] 参数 badge 可选，5 种类型，颜色联动
+- [ ] 操作符面板：三组 chip，点击插入光标处
+- [ ] 示例卡片：3 张，点击一键填入并展示轨迹
+- [ ] 历史记录：apply 成功后自动保存，最多 20 条，点击恢复
+- [ ] 模板变量面板：手动添加 + postMessage 注入
+- [ ] 全部文字标签为中文（无英文混用）
+- [ ] `Ctrl+Enter` 应用，`F5` 执行批量
+- [ ] 通过率 badge + 4 个筛选 chip
+- [ ] 虚拟滚动：不匹配行淡红、错误行淡橙、状态图标圆形 badge

@@ -1,51 +1,52 @@
 # 管道表达式批量评估器 · 技术选型
-> 日期：2026-06-12 | 阶段二 Step 4
+> 生成时间：2026-07-08 | 阶段二 Step 4
 
 ---
 
-## Demo 选型（已用 / 单文件 / 零安装）
+## Demo 选型（当前实现）
 
 | 维度 | 选择 | 理由 |
 |------|------|------|
-| 框架 | 无框架（Vanilla JS） | 单文件 HTML 双击即开，无构建工具 |
-| CSS | 内联 PTO Design System CSS（3 层 token） | 零外链，自包含，文件移动不 404 |
-| 状态管理 | 全局 let 变量（parsedExpr / inputValues / testCases…） | Demo 阶段简单够用 |
-| 本地存储 | localStorage | 历史记录/折叠态持久化 |
-| 虚拟滚动 | 手写（JS 计算窗口行 + absolute position） | 零依赖，处理 1000+ 行无卡顿 |
-| 通信协议 | postMessage（宿主 ↔ 工具） | 适配 BMC Studio Webview 嵌入场景 |
+| 渲染方式 | 单文件 HTML，纯内联 CSS/JS | VS Code Webview 约束：单文件、零外链 |
+| 框架 | 无框架（原生 JS） | 零安装、双击预览、无构建工具依赖 |
+| CSS 方案 | PTO Design System 三层 token 内联 | foundation → semantic → component，三主题支持 |
+| 状态管理 | 模块级变量（`let parsedExpr`, `inputValues`, ...）| 无需响应式框架，逻辑直接 |
+| 持久化 | `localStorage`（4个 key）| VS Code Webview 支持；多窗口共享问题见 G5 |
+| 虚拟滚动 | 手写（36px ROW_H, BUF=10，绝对定位）| 零依赖，逻辑约 40 行 |
+| 事件通信 | `window.addEventListener('message')` | VS Code Webview postMessage 标准通道 |
 
 ---
 
-## 工程选型
+## 工程选型（目标工程化版本）
 
-目标场景：BMC Studio / openUBMC 工具类前端，轻量约束（无 NPM 构建工具）。
+本工具为 **纯本地计算 + Webview 宿主桥** 形态，无 HTTP 后端。
 
 | 维度 | 选择 | 理由 |
 |------|------|------|
-| 组件方案 | **原生 Web Component**（Custom Element + Shadow DOM） | 天然隔离、无构建依赖、可嵌入任意宿主 |
-| 样式方案 | Shadow DOM scoped CSS + PTO Design System CSS 变量 | token 穿透 Shadow DOM，主题切换零额外代码 |
-| 状态管理 | 组件实例内部属性（无全局 store） | 工具无跨组件共享状态，不需要 store |
-| 类型注解 | JSDoc `@typedef`（替代 TypeScript） | 零编译，IDE 类型提示，Node.js 原生支持 |
-| 测试 | `node:test`（Node.js 18+ 内置） | 零依赖，纯函数单测，CI 友好 |
-| 构建工具 | 无（ES Modules 原生 `import`） | 浏览器原生支持，无 Webpack/Vite 依赖 |
-| 代码质量 | JSDoc + ESLint（可选） | 轻量，不强制 TypeScript strict |
-
-> **openUBMC 约束**：目标宿主为嵌入式管理界面 Webview，保持轻量、无构建工具、原生 JS 优先。
+| 框架 | **无框架，原生 Web Components**（Custom Element + Shadow DOM）| 保持轻量约束；Shadow DOM 提供样式隔离；VS Code 扩展官方示例也用此方式 |
+| 模块化 | ES Modules（`.js` 文件，`<script type="module">`）| Webview 本地文件可用 ES Module（通过 `vscode.Uri.joinPath` 正确处理路径）|
+| 类型系统 | JSDoc `@typedef` + JSDoc 注释 | 零配置，VS Code IntelliSense 自动支持，不需要 TypeScript 构建步骤 |
+| CSS 方案 | Shadow DOM 内联 + PTO token 通过 CSS 变量透传（`:host` 继承）| 全局 token 通过 CSS 变量继承自动透传进 Shadow DOM |
+| 测试 | `node:test`（Node.js 内置，无额外依赖）| 对核心纯函数（pipeEngine.js）跑单元测试，零依赖 |
+| 打包 | **无打包工具**（development 直接 ES Module；production 可选简单 inline 脚本）| 保持轻量约束；开发阶段 Webview 直接引用源文件 |
+| 单文件交付 | 可选：`build.js` 简单脚本 inline 所有 `<script>` 和 `<style>` | 生成可双击的 standalone `dist/index.html` |
 
 ---
 
 ## Demo → 工程迁移路径
 
-| Demo 实现 | 工程迁移方式 |
-|-----------|------------|
-| 全局 `let` 变量（parsedExpr 等） | 移入 `PipeBatchEvaluator` 类实例属性（`this._parsedExpr`） |
-| `document.getElementById(...)` | 改为 `this._shadow.getElementById(...)` |
-| `onclick="fn()"` 行内 handler | 改为 `this.getRootNode().host._fn()` 引用组件实例 |
-| CSS 全部内联 `<style>` | 移到组件 shadow root `<link>` 或内联模板样式块 |
-| `window.addEventListener('message', ...)` | `connectedCallback` / `disconnectedCallback` 中绑定/解绑 |
-| `localStorage` 操作 | 不变（localStorage 在 Shadow DOM 内与外共享） |
-| Mock 数据（BUILTIN_EXAMPLES） | 保留为 `src/constants/enums.js`，不改变 |
-| `parsePipeExpr` / `PipeEvaluator` 等核心函数 | 提取到 `src/utils/pipeEvalLogic.js`（已完成） |
+| Demo 做法 | 工程做法 |
+|---------|---------|
+| 所有逻辑内联在 `<script>` 标签 | 拆分为 `src/utils/pipeEngine.js`（评估核心）+ `src/constants/enums.js`（常量）+ `src/utils/formatters.js` |
+| HTML 直接操作 DOM（`document.getElementById`）| Web Component 内用 Shadow DOM `this.shadowRoot.querySelector` |
+| 全局 `let` 变量管理状态 | 组件实例变量（`this._parsedExpr`, `this._inputValues`, ...），有明确作用域 |
+| `history-item` 为 `div[onclick]`（A3 可访问性 bug）| 工程版改为 `<button>` 元素 |
+| `restoreHistory` 字符串拼接 onclick（R8 XSS 风险）| 工程版改为 data-index + 事件委托，不拼接字符串 |
+| 历史最多 8 条（R1 bug）| 工程版改为 20 条（`HISTORY_MAX = 20`）|
+| `_luaPatToRegex` magic 集含 `+`（R3 bug）| 工程版修复：magic 集改为 `'^$()%.[]*?'` |
+| `aria-live` 缺失（A6/A7）| 工程版在 `#expr-msg` 和 `#toast` 加 `aria-live` |
+| 字号 11px（A1）| 工程版 label 字号升至 12px |
+| `foreground-muted` 对比度不足（A2）| 工程版 token 提升到 `rgba(255,255,255,0.52)` |
 
 ---
 
@@ -53,8 +54,8 @@
 
 | 方案 | 排除原因 |
 |------|---------|
-| React / Vue | 目标场景无构建工具约束，引入框架需配 Webpack/Vite，违背轻量原则 |
-| iframe 嵌入 | postMessage 已够用；iframe 跨域限制多 |
-| TypeScript strict | 无 Node.js 原生编译支持；JSDoc 注解满足 IDE 提示需求 |
-| Redux / Pinia | 组件无全局共享状态，store 是过度设计 |
-| CSS Modules / Tailwind | Shadow DOM 天然隔离，无需额外 CSS 作用域方案 |
+| React / Vue | 需要构建工具，违反「单文件零外链」约束；VS Code Webview 初始化时间长 |
+| Alpine.js / Petite-Vue（CDN）| 需要外链 CDN，违反约束；且功能远超需求 |
+| TypeScript（tsc 编译）| 需要 Node.js 构建步骤；JSDoc 已能满足类型提示需求 |
+| Web Worker（批量执行）| 正确方向（G6 性能优化），当前用例规模（<200 条）主线程够用；保留作后续 P2 优化项 |
+| ReactFlow / Cytoscape（图可视化）| 管道是线性流，不是拓扑图，无需图布局引擎 |
