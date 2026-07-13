@@ -53,7 +53,7 @@ description: |
 > 2. **标注「必出」的产物是强制交付项，不可省略：**  
 >    `design-review.md` / `accessibility-audit.md` / `design-structure.md` / 工程代码 / `INTEGRATION.md` / `README.md` / `CHANGELOG.md` ——缺少任意一项视为本次执行未完成。
 > 3. **唯一合法的中途暂停**：Step 1 的目标工程信息询问（目录结构、状态管理方案等），其余不得暂停。
-> 4. Step 4（tech-selection.md）是「可选」，可快速跳过；但 Step 5–7 是「必出」，不能因跳过 Step 4 而漏掉 Step 5–7。
+> 4. Step 4（tech-selection.md）是「可选」，可快速跳过；但 Step 3.5（uxspec-report.html）和 Step 5–7 是「必出」，不能省略。`uxspec-report.html` 标注「必出」，**不得以「推荐」为由跳过**。
 > 5. **案例隔离**：文中 cooling-web-config（`pid_control_mode`/`32768`/Canvas 曲线）、SMC 计算器（命令字/位布局）等具体值均为**示范素材**。执行时枚举映射、魔法值、组件命名、消息协议一律从**当前 Demo 与后端约定**重新推导，禁止照搬案例值；当前需求没有的概念（Canvas/位字段/表达式…）跳过对应示范条目。
 
 ---
@@ -114,7 +114,7 @@ description: |
 | 1 | `design-review.md` | 必出 | /design-critique 设计审查报告（信息架构·一致性·层级·反馈） |
 | 2 | `accessibility-audit.md` | 必出 | /accessibility-review 可访问性审查报告（WCAG 2.1 AA + 工程侧建议） |
 | 3 | `design-structure.md` | 必出 | 精确视觉规格 · 布局算法 · 交互规格 · 状态枚举 · 交互序列 · 待确认清单（uxspec 的**精确源**） |
-| 3.5 | `uxspec-report.html` | 推荐 | uxspec 的**可视化报告形态**（16:9 幻灯片，单文件）——把 design-structure 渲染成可评审的 deck |
+| 3.5 | `uxspec-report.html` | **必出** | uxspec 的**可视化报告形态**（16:9 幻灯片，单文件）——把 design-structure 渲染成可评审的 deck |
 | 4 | `tech-selection.md` | 可选（看复杂度） | 技术选型，Demo 与工程各一套 + 迁移路径 |
 | 5 | `src/components/...` | 必出 | 工程级前端代码，符合后端数据结构，可直接接入 |
 | 6 | `src/services/[feature]Api.ts` | 有 HTTP 后端时必出 | API 集成层，Mock 字段映射真实接口；**纯本地功能/宿主桥**则改为事件或 IPC 适配层（如 `CustomEvent`/`postMessage`），不强造空 API 层 |
@@ -304,7 +304,7 @@ description: |
 
 ---
 
-#### 3.9 uxspec 的可视化报告形态（推荐）→ `uxspec-report.html`
+#### 3.9 uxspec 的可视化报告形态（**必出**）→ `uxspec-report.html`
 
 > `design-structure.md` 是给开发看的**精确源**（hex/px/状态枚举），信息密度高但不便评审汇报。再产出一份**可视化报告**，把同一套规格渲染成 16:9 幻灯片，供设计/产品/工程对齐。
 
