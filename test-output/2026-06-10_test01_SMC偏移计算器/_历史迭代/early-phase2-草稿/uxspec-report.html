@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC 偏移量计算器 · UX Spec 可视化报告</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#e0e0e5;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans CJK SC',sans-serif}
+:root{--bg:#f5f5f7;--bg2:#fff;--border:#d2d2d7;--text:#1d1d1f;--text2:#4a4a52;--text3:#86868b;
+  --blue:#0071e3;--green:#1a7f42;--yellow:#b06000;--red:#d70015}
+.deck-wrapper{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.deck{position:absolute;width:1280px;height:720px;transform-origin:top left;background:var(--bg);overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.18)}
+.deck-header{position:absolute;top:0;left:0;right:0;height:40px;z-index:200;display:flex;align-items:center;gap:10px;
+  padding:0 20px;background:rgba(255,255,255,.94);border-bottom:1px solid var(--border)}
+.hdr-brand{font-size:12px;font-weight:700;color:var(--text)}.hdr-brand span{color:var(--blue)}
+.hdr-sub{font-size:10.5px;color:var(--text3)}.hdr-spacer{flex:1}
+.nav-btn{width:24px;height:24px;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text2);display:flex;align-items:center;justify-content:center}
+.nav-btn:hover{background:#f0f0f2}
+#counter{font-size:10.5px;color:var(--text3);min-width:42px;text-align:center;font-variant-numeric:tabular-nums}
+.slide{display:none;position:absolute;top:40px;left:0;right:0;bottom:0;padding:24px 48px 26px;overflow:hidden;flex-direction:column;color:var(--text)}
+.slide.active{display:flex}
+.tag{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--blue);margin-bottom:7px}
+h1{font-size:36px;font-weight:800;line-height:1.1;letter-spacing:-.5px}
+h2{font-size:22px;font-weight:700;margin-bottom:14px;letter-spacing:-.3px}
+h3{font-size:13px;font-weight:700;margin-bottom:7px}
+p{font-size:12px;line-height:1.6;color:var(--text2)}
+.cols{display:flex;gap:16px;flex:1;min-height:0}
+.col{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.col2{flex:2;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:11px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.card h4{font-size:12px;margin-bottom:4px}.card.mt6{margin-top:6px}.mt6{margin-top:6px}.mt10{margin-top:10px}
+ul.list{list-style:none;display:flex;flex-direction:column;gap:5px}
+ul.list li{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;color:var(--text2);line-height:1.5}
+ul.list li::before{content:'›';color:var(--blue);flex-shrink:0;font-weight:700}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:500;border:1px solid;white-space:nowrap}
+.chip-green{color:var(--green);border-color:rgba(26,127,66,.35);background:rgba(26,127,66,.08)}
+.chip-yellow{color:var(--yellow);border-color:rgba(176,96,0,.35);background:rgba(176,96,0,.08)}
+.chip-red{color:var(--red);border-color:rgba(215,0,21,.35);background:rgba(215,0,21,.08)}
+.chip-blue{color:var(--blue);border-color:rgba(0,113,227,.35);background:rgba(0,113,227,.08)}
+table{border-collapse:collapse;width:100%}
+th{background:#ebebed;color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;padding:5px 8px;text-align:left;border-bottom:1px solid var(--border)}
+td{padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text2);font-size:10.5px;vertical-align:top}
+td code,.mono{font-family:ui-monospace,'SF Mono',Consolas,monospace}
+td code{background:#ececf0;padding:1px 5px;border-radius:4px;font-size:10px;color:#1d1d1f}
+.nums{display:flex;gap:14px;margin-top:24px}
+.num{background:#fff;border:1px solid var(--border);border-radius:12px;padding:15px 18px;flex:1;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.num .v{font-size:26px;font-weight:800;color:var(--blue);font-family:ui-monospace,Consolas,monospace;line-height:1}
+.num .l{font-size:11px;color:var(--text2);margin-top:6px}
+.hook{font-size:15px;color:var(--text2);margin-top:14px;line-height:1.5;max-width:780px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.15);vertical-align:-1px;margin-right:5px}
+.pre{background:#1e1e22;color:#e6e6ea;border-radius:8px;padding:10px 13px;font-family:ui-monospace,Consolas,monospace;font-size:10px;line-height:1.5;white-space:pre;overflow:hidden}
+.bitbar{display:flex;height:54px;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:8px 0 4px}
+.bseg{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:ui-monospace,Consolas,monospace;border-right:1px solid rgba(255,255,255,.5)}
+.bseg:last-child{border-right:none}.bseg b{font-size:11px}.bseg small{font-size:8px;opacity:.9}
+.seg-fn{background:#0071e3}.seg-cmd{background:#5e5ce6}.seg-ms{background:#1a7f42}.seg-rw{background:#b06000}.seg-pm{background:#86868b}
+.mockup{background:#1e1e1e;border:1px solid #454545;border-radius:8px;padding:12px;font-size:10px}
+.mock-res{background:linear-gradient(135deg,#2a2d2e,#264f78);border:2px solid #4fc1ff;border-radius:6px;padding:10px;text-align:center;color:#4fc1ff;font-family:ui-monospace,Consolas,monospace;font-size:16px;font-weight:700}
+.mock-row{display:flex;gap:6px;margin-top:8px}
+.mock-in{flex:1;background:#3c3c3c;border:1px solid #6b6b6b;border-radius:4px;color:#ccc;padding:5px 7px;font-family:ui-monospace,Consolas,monospace;font-size:9px}
+.mock-seg{flex:1;display:flex;border:1px solid #6b6b6b;border-radius:4px;overflow:hidden}
+.mock-seg span{flex:1;text-align:center;padding:5px 2px;color:#9d9d9d;font-size:9px}
+.mock-seg span.on{background:#0e639c;color:#fff}
+.flowstep{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fstep{background:#fff;border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:10px;color:var(--text2);box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.fstep b{color:var(--text);font-size:10.5px}
+.farrow{color:var(--text3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="deck-wrapper">
+  <div class="deck" id="deck">
+    <div class="deck-header">
+      <div class="hdr-brand">SMC <span>偏移量计算器</span></div>
+      <div class="hdr-sub">UX Spec · 设计规格可视化报告（阶段二）</div>
+      <div class="hdr-spacer"></div>
+      <button class="nav-btn" onclick="go(-1)">‹</button>
+      <span id="counter">1 / 8</span>
+      <button class="nav-btn" onclick="go(1)">›</button>
+    </div>
+
+    <!-- 1 COVER -->
+    <section class="slide active" id="cover">
+      <div style="margin:auto 0">
+        <div class="tag">UX SPECIFICATION · 优化后 Demo 反推</div>
+        <h1>SMC 偏移量计算器 · UX Spec</h1>
+        <p class="hook">从优化后 Demo 反推的精确设计规格：视觉 Token、布局、逐组件状态枚举、交互序列。配套 <code class="mono">design-structure.md</code> 为精确源，本报告用于评审与对齐。</p>
+        <div class="nums">
+          <div class="num"><div class="v">5</div><div class="l">可交互组件（含状态枚举）</div></div>
+          <div class="num"><div class="v">3</div><div class="l">关键交互序列</div></div>
+          <div class="num"><div class="v">16</div><div class="l">色彩 Token</div></div>
+          <div class="num"><div class="v">3 态</div><div class="l">空 / 零 / 错 分色</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 LAYOUT -->
+    <section class="slide" id="layout">
+      <div class="tag">LAYOUT · 整体布局</div>
+      <h2>分区结构与间距</h2>
+      <div class="cols">
+        <div class="col2">
+          <div class="pre">计算器面板（max-width 650px 居中，背景 #1e1e1e，padding 16px）
+├── 标题区     18px/600 #4fc1ff
+├── 说明条     info，左 4px #4fc1ff 边
+├── 结果区 ★   渐变 #2a2d2e→#264f78，2px #4fc1ff，圆角 8px
+│   ├── hex 行   大字 24px + 复制
+│   ├── dec 行   中字 15px + 复制
+│   ├── 位布局条 高 46px，5 段按位宽 flex
+│   └── 提示行   空/警告/错误三态
+├── 字段 Section  grid 2 列 gap 12px
+│   功能码(wide)/命令码(wide)/MS · RW/参数(wide)
+├── 反解 Section  偏移量输入 + 解析
+└── 操作行     应用(主)+取消(次)+toast
+窄屏 ≤380px → 网格降级单列</div>
+        </div>
+        <div class="col">
+          <h3>间距系统</h3>
+          <table>
+            <thead><tr><th>用途</th><th>值</th></tr></thead>
+            <tbody>
+              <tr><td>Section 间距</td><td><code>14px</code></td></tr>
+              <tr><td>Section 内边距</td><td><code>16px</code></td></tr>
+              <tr><td>字段网格 gap</td><td><code>12px</code></td></tr>
+              <tr><td>label↔控件</td><td><code>5px</code></td></tr>
+              <tr><td>结果行 gap</td><td><code>8px</code></td></tr>
+            </tbody>
+          </table>
+          <div class="card mt6"><h4>★ 视觉重心</h4><p>结果区置顶、2px 强调边 + 大字，是工程师"真正要的东西"的落点。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 TOKENS -->
+    <section class="slide" id="tokens">
+      <div class="tag">DESIGN TOKENS · 色彩 + 字体</div>
+      <h2>视觉 Token（沿用 VS Code 暗色）</h2>
+      <div class="cols">
+        <div class="col2">
+          <table>
+            <thead><tr><th>Token</th><th>hex</th><th>用途</th></tr></thead>
+            <tbody>
+              <tr><td>bg-page</td><td><code><span class="sw" style="background:#1e1e1e"></span>#1e1e1e</code></td><td>页面/面板</td></tr>
+              <tr><td>accent</td><td><code><span class="sw" style="background:#4fc1ff"></span>#4fc1ff</code></td><td>强调/有效值</td></tr>
+              <tr><td>in-bg / in-bd</td><td><code><span class="sw" style="background:#3c3c3c"></span>#3c3c3c</code> / <code>#6b6b6b</code></td><td>输入框</td></tr>
+              <tr><td>focus</td><td><code><span class="sw" style="background:#007fd4"></span>#007fd4</code></td><td>focus 边/outline</td></tr>
+              <tr><td>btn / hover</td><td><code><span class="sw" style="background:#0e639c"></span>#0e639c</code> / <code>#1177bb</code></td><td>主按钮</td></tr>
+              <tr><td>err/warn/ok</td><td><code><span class="sw" style="background:#f48771"></span>#f48771</code>/<code><span class="sw" style="background:#cca700"></span>#cca700</code>/<code><span class="sw" style="background:#4caf50"></span>#4caf50</code></td><td>错/警/成功</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col">
+          <h3>字体规格</h3>
+          <table>
+            <thead><tr><th>用途</th><th>px/重</th></tr></thead>
+            <tbody>
+              <tr><td>结果 hex</td><td>24/700 mono</td></tr>
+              <tr><td>结果 dec</td><td>15/500 mono</td></tr>
+              <tr><td>标题</td><td>18/600</td></tr>
+              <tr><td>控件/label</td><td>13–14/400</td></tr>
+              <tr><td>错误/注记</td><td>12/400</td></tr>
+              <tr><td>bits 标签</td><td>11/400</td></tr>
+            </tbody>
+          </table>
+          <div class="card mt6"><h4>可读性基线</h4><p>正文 #ccc/#1e1e1e ≈ 9:1；所有文案 ≥12px（落实 a11y A2）。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 COMPONENTS + bitbar -->
+    <section class="slide" id="components">
+      <div class="tag">COMPONENTS · 组件规格</div>
+      <h2>位布局条 + 关键控件</h2>
+      <div class="cols">
+        <div class="col2">
+          <h3>位布局条（按真实位宽 6:16:1:1:8，非半字节等分）</h3>
+          <div class="bitbar">
+            <div class="bseg seg-fn" style="flex:6"><b>功能码</b><small>6b · 31–26</small></div>
+            <div class="bseg seg-cmd" style="flex:16"><b>命令码</b><small>16b · 25–10</small></div>
+            <div class="bseg seg-ms" style="flex:1"><b>MS</b><small>9</small></div>
+            <div class="bseg seg-rw" style="flex:1"><b>RW</b><small>8</small></div>
+            <div class="bseg seg-pm" style="flex:8"><b>参数</b><small>8b · 7–0</small></div>
+          </div>
+          <p>字段 focus/hover → 对应段 <code>brightness(1.3)</code> + 2px 白 outline，双向联动。</p>
+          <div class="card mt6"><h4>控件清单</h4>
+            <ul class="list">
+              <li><strong>功能码</strong>：select，选项「0xNN · 中文标签」+ 区段注记</li>
+              <li><strong>命令码/参数</strong>：hexwrap，0x 前缀 + 大写 mono 输入</li>
+              <li><strong>MS/RW</strong>：分段二选一（aria-pressed），底层存 0/1</li>
+              <li><strong>复制</strong>：done 态「已复制 ✓」#4caf50 800ms</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <h3>形态预览（mockup）</h3>
+          <div class="mockup">
+            <div class="mock-res">0x30460000</div>
+            <div class="mock-row"><div class="mock-in">功能码：0x06 散热部件</div></div>
+            <div class="mock-row"><div class="mock-in">0x &nbsp;1180</div></div>
+            <div class="mock-row">
+              <div class="mock-seg"><span class="on">多读</span><span>单读</span></div>
+              <div class="mock-seg"><span>写</span><span class="on">读</span></div>
+            </div>
+          </div>
+          <p style="margin-top:8px">语义常驻（落实 D1）：功能码/MS/RW 不再藏 tooltip。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 STATE MATRIX -->
+    <section class="slide" id="states">
+      <div class="tag">STATE ENUM · 逐组件状态枚举</div>
+      <h2>状态矩阵（节选，完整见 design-structure §8.4）</h2>
+      <div class="cols">
+        <div class="col2">
+          <table>
+            <thead><tr><th>组件 \ 状态</th><th>default</th><th>focus</th><th>error</th><th>disabled</th><th>empty</th></tr></thead>
+            <tbody>
+              <tr><td>应用按钮</td><td>#0e639c/#fff</td><td>outline #007fd4</td><td>—</td><td>#2d2d2d 灰</td><td>—</td></tr>
+              <tr><td>Hex 输入</td><td>#3c3c3c/#6b6b6b</td><td>border #007fd4 + 位段亮</td><td>边 #f48771 + ⚠</td><td>—</td><td>占位 #8b8b8b</td></tr>
+              <tr><td>MS/RW 分段</td><td>#3c3c3c/#9d9d9d</td><td>outline #007fd4</td><td>—</td><td>—</td><td>—</td></tr>
+              <tr><td>功能码 select</td><td>#3c3c3c</td><td>border #007fd4</td><td>保留/空洞→#cca700 注记</td><td>—</td><td>—</td></tr>
+              <tr><td>复制按钮</td><td>#3a3d41</td><td>outline #007fd4</td><td>—</td><td>—</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col">
+          <h3>结果区三态（核心修复 D4）</h3>
+          <ul class="list">
+            <li><span class="chip chip-blue">合法/零值</span> <code>0x________</code> 强调蓝</li>
+            <li><span class="chip" style="color:#8b8b8b;border-color:#ccc">未输入</span> <code>0x--------</code> 占位灰</li>
+            <li><span class="chip chip-red">超范围</span> <code>0x--------</code> 红 + 点名字段</li>
+          </ul>
+          <div class="card mt6"><h4>不再混淆</h4><p>合法零值 0x00000000 用蓝、不再当错误红——数值工具通用陷阱已规避。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 INTERACTION SEQUENCES -->
+    <section class="slide" id="seq">
+      <div class="tag">INTERACTION · 交互序列</div>
+      <h2>三条关键序列</h2>
+      <div class="cols">
+        <div class="col">
+          <div class="card"><h4>① 正向编码</h4>
+            <div class="flowstep" style="margin-top:6px">
+              <span class="fstep"><b>改字段</b></span><span class="farrow">→</span>
+              <span class="fstep">250ms 防抖</span><span class="farrow">→</span>
+              <span class="fstep">encode</span><span class="farrow">→</span>
+              <span class="fstep"><b>结果+位条</b></span>
+            </div>
+            <p style="margin-top:6px">超范围 → 字段红边+⚠，结果区点名字段，应用禁用。</p></div>
+          <div class="card mt6"><h4>② 反向解码</h4>
+            <div class="flowstep" style="margin-top:6px">
+              <span class="fstep"><b>粘偏移量</b></span><span class="farrow">→</span>
+              <span class="fstep">parse(0x?)</span><span class="farrow">→</span>
+              <span class="fstep">decode</span><span class="farrow">→</span>
+              <span class="fstep"><b>回填字段</b></span>
+            </div>
+            <p style="margin-top:6px">&gt; 0xFFFFFFFF → 警告「取低 32 位」继续。</p></div>
+        </div>
+        <div class="col">
+          <div class="card"><h4>③ 应用 → 宿主</h4>
+            <div class="flowstep" style="margin-top:6px">
+              <span class="fstep"><b>点应用</b>(全合法)</span><span class="farrow">→</span>
+              <span class="fstep">CustomEvent<br>'smc-apply'</span><span class="farrow">→</span>
+              <span class="fstep"><b>宿主 postMessage</b></span>
+            </div>
+            <p style="margin-top:6px">非法字段 → error toast，不抛事件。</p></div>
+          <div class="card mt6"><h4>数据流</h4>
+            <div class="pre" style="font-size:9px">用户输入→字段(本地)→encode→结果+位条
+偏移量→parse→decode→回填→encode→结果
+应用→smc-apply→宿主→写回寄存器</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 ROUND-2 REVIEW -->
+    <section class="slide" id="review2">
+      <div class="tag">REVIEW R2 · 优化后 Demo 复审</div>
+      <h2>第一轮问题 → 复审结果</h2>
+      <div class="cols">
+        <div class="col2">
+          <table>
+            <thead><tr><th>R1 问题</th><th>修复</th><th>R2 状态</th></tr></thead>
+            <tbody>
+              <tr><td>D1 语义藏 tooltip 🔴</td><td>功能码下拉 + MS/RW 分段</td><td><span class="chip chip-green">已解决</span></td></tr>
+              <tr><td>D2 结果不可复制 🟡</td><td>hex/dec 复制 + 反馈</td><td><span class="chip chip-green">已解决</span></td></tr>
+              <tr><td>D3 无位布局可视化 🟡</td><td>按位宽位条 + 联动高亮</td><td><span class="chip chip-green">已解决</span></td></tr>
+              <tr><td>D4 三态混淆 🟡</td><td>空/零/错三态分色</td><td><span class="chip chip-green">已解决</span></td></tr>
+              <tr><td>D7 装饰符混用 🟢</td><td>统一 3px 竖条</td><td><span class="chip chip-green">已解决</span></td></tr>
+              <tr><td>a11y A1–A7</td><td>aria-live/分段/图标/≥12px/focus</td><td><span class="chip chip-green">已解决</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col">
+          <h3>残留 / 待确认</h3>
+          <ul class="list">
+            <li><span class="chip chip-yellow">🟡 需规格</span> 功能码空洞(0x0A–1F)拦截 vs 仅警告</li>
+            <li><span class="chip chip-red">🔴 需决策</span> 功能码×命令码联动有效范围</li>
+            <li><span class="chip chip-blue">待确认</span> 宿主 setOffset 入口 + 应用真实写回目标</li>
+            <li><span class="chip chip-blue">待确认</span> 功能码语义改宿主下发（i18n）</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 DELIVERABLES -->
+    <section class="slide" id="deliver">
+      <div class="tag">DELIVERABLES · 交付映射</div>
+      <h2>UX Spec 的两种形态 + 工程落地</h2>
+      <div class="cols">
+        <div class="col">
+          <div class="card"><h4>规格（双形态）</h4>
+            <ul class="list">
+              <li><code>design-structure.md</code> — 精确源（hex/px/状态枚举）</li>
+              <li><code>uxspec-report.html</code> — 本报告，评审沟通用</li>
+            </ul></div>
+          <div class="card mt6"><h4>审查</h4>
+            <ul class="list">
+              <li><code>design-review.md</code> · <code>accessibility-audit.md</code></li>
+            </ul></div>
+        </div>
+        <div class="col">
+          <div class="card"><h4>工程落地</h4>
+            <ul class="list">
+              <li><code>src/</code> — 原生 Web Component + ESM 纯函数</li>
+              <li><code>test/</code> — 9 用例 node --test 通过</li>
+              <li><code>INTEGRATION.md</code> · <code>README</code> · <code>CHANGELOG</code></li>
+            </ul></div>
+          <div class="card mt6"><h4>规格 ↔ 代码一致性</h4><p>状态枚举每一行都能在组件里找到对应实现；魔法值/枚举集中在 constants/utils。</p></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+<script>
+function resizeDeck(){const deck=document.getElementById('deck');const ww=window.innerWidth,wh=window.innerHeight;
+  const s=Math.min(ww/1280,wh/720);deck.style.transform=`scale(${s})`;
+  deck.style.left=((ww-1280*s)/2)+'px';deck.style.top=((wh-720*s)/2)+'px';}
+window.addEventListener('resize',resizeDeck);resizeDeck();
+const slides=document.querySelectorAll('.slide');let current=0;
+function goTo(n){slides[current].classList.remove('active');current=Math.max(0,Math.min(slides.length-1,n));
+  slides[current].classList.add('active');document.getElementById('counter').textContent=`${current+1} / ${slides.length}`;}
+const go=d=>goTo(current+d);
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowDown'){go(1);e.preventDefault();}
+  if(e.key==='ArrowLeft'||e.key==='ArrowUp'){go(-1);e.preventDefault();}});
+document.getElementById('deck').addEventListener('click',e=>{if(e.target.closest('.deck-header'))return;
+  const x=e.clientX,w=window.innerWidth;if(x<w*.25)go(-1);else if(x>w*.75)go(1);});
+</script>
+</body>
+</html>

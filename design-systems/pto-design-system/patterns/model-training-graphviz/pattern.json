@@ -1,0 +1,66 @@
+{
+  "id": "model-training-graphviz",
+  "name": "Model Training Graphviz",
+  "type": "hybrid",
+  "description": "Training-time overlay contract for model architecture graphs. The pattern renders the base architecture through model-graphviz, then adds training evidence hover panels, edge type tags, phase-driven node selection, related-node emphasis, and drag pan / Command-wheel zoom without viewport jumping.",
+  "source": {
+    "visualContract": [
+      "Profiling_Insight_and_Tool/AI_Profiling_Tool/graph-evidence-workbench.html",
+      "Profiling_Insight_and_Tool/AI_Profiling_Tool/js/graph-evidence/graph-stage.js",
+      "patterns/model-graphviz/pattern.js",
+      "patterns/model-training-graphviz/pattern.html",
+      "patterns/model-training-graphviz/pattern.css",
+      "patterns/model-training-graphviz/pattern.js"
+    ],
+    "patternHtml": "patterns/model-training-graphviz/pattern.html",
+    "patternCss": "patterns/model-training-graphviz/pattern.css",
+    "renderScript": "patterns/model-training-graphviz/pattern.js",
+    "basePattern": "patterns/model-graphviz/pattern.js",
+    "originalModule": "Profiling_Insight_and_Tool/AI_Profiling_Tool/graph-evidence-workbench.html"
+  },
+  "classification": "hybrid-pattern: DOM shell and hover panel with SVG renderer-driven graph geometry and interaction math.",
+  "requiredApis": [
+    "window.PtoModelGraphvizPattern.render(container, graph, options)",
+    "window.PtoModelTrainingGraphvizPattern.render(container, graph, options)"
+  ],
+  "dataContract": {
+    "graph": "Same node/edge/cluster graph object accepted by model-graphviz.",
+    "trainingEvidence": {
+      "<nodeId>": {
+        "priority": "P0|P1|P2",
+        "dimension": "training dimension label",
+        "metric": "metric or config field",
+        "what": "node explanation",
+        "evidence": ["source/config/profiling evidence lines"],
+        "action": "operator-facing next action",
+        "relatedNodeIds": ["node ids to keep highlighted with this node"]
+      }
+    },
+    "edgeTags": "Edges may define tag, edgeType, edgeTypeLabel to render compact evidence labels."
+  },
+  "useWhen": [
+    "showing how a training phase maps to architecture nodes without moving the graph viewport",
+    "overlaying source/config/profiling evidence in hover panels or side evidence while graph nodes stay tensor/module/operator based",
+    "connecting right-side run steps, loss/MFU curves, or hardware evidence to architecture nodes",
+    "teaching Dense, MoE, MLA, DSA, router, expert, and LM Head training bottlenecks"
+  ],
+  "allowedOverrides": [
+    "graph data, node labels, cluster labels, edge tags, training evidence copy, and selected node ids",
+    "model-specific phase maps from training workflow names to graph node ids",
+    "viewport padding and initial selected node",
+    "node fill colors through the base model-graphviz colormap only",
+    "source/config/profiling evidence as hover metadata or page-side evidence panels"
+  ],
+  "forbiddenOverrides": [
+    "reimplementing model node geometry outside model-graphviz",
+    "using an iframe page shell when the product needs direct phase-node linkage",
+    "moving the viewport when phase steps advance; selection should only change node and edge emphasis",
+    "dimming non-selected operators or tensor nodes with low opacity during phase changes",
+    "drawing tall source-evidence columns inside the architecture graph",
+    "using source files such as config.json or modeling.py as input/output tensor nodes",
+    "using saturated blue borders as the main selected state in light mode",
+    "creating native title tooltips in addition to the custom hover panel",
+    "drawing edge tags or evidence badges from static HTML rather than renderer output"
+  ],
+  "agentReuseRule": "Load model-graphviz/pattern.css and pattern.js first, then model-training-graphviz/pattern.css and pattern.js. Call PtoModelTrainingGraphvizPattern.render with a model-graphviz graph object plus trainingEvidence. Use controller.setPhase({nodeId, relatedNodeIds}) for training-step linkage; do not refit or pan the graph when phases change."
+}

@@ -53,7 +53,8 @@ description: |
 > 2. **标注「必出」的产物是强制交付项，不可省略：**  
 >    `design-review.md` / `accessibility-audit.md` / `design-structure.md` / 工程代码 / `INTEGRATION.md` / `README.md` / `CHANGELOG.md` ——缺少任意一项视为本次执行未完成。
 > 3. **唯一合法的中途暂停**：Step 1 的目标工程信息询问（目录结构、状态管理方案等），其余不得暂停。
-> 4. Step 4（tech-selection.md）是「可选」，可快速跳过；但 Step 5–7 是「必出」，不能因跳过 Step 4 而漏掉 Step 5–7。
+> 4. Step 4（tech-selection.md）是「可选」，可快速跳过；但 Step 3.5（uxspec-report.html）和 Step 5–7 是「必出」，不能省略。`uxspec-report.html` 标注「必出」，**不得以「推荐」为由跳过**。
+> 5. **案例隔离**：文中 cooling-web-config（`pid_control_mode`/`32768`/Canvas 曲线）、SMC 计算器（命令字/位布局）等具体值均为**示范素材**。执行时枚举映射、魔法值、组件命名、消息协议一律从**当前 Demo 与后端约定**重新推导，禁止照搬案例值；当前需求没有的概念（Canvas/位字段/表达式…）跳过对应示范条目。
 
 ---
 
@@ -98,7 +99,7 @@ description: |
 
 | 类型 | 说明 |
 |------|------|
-| **精调后的 Demo 产物**（必需） | 单文件 HTML 原型 / 一组页面 / 截图 + 代码。由阶段一 demo-prompt.md 驱动生成或精调 |
+| **优化后 Demo 产物**（必需） | 阶段一 Step 3.5 产出的 `optimized-demo/index.html`（或基于 demo-prompt.md 再迭代的版本）。单文件 HTML 原型 / 一组页面 / 截图 + 代码。**本阶段所有审查与 uxspec 都以这个优化后 Demo 为对象，而非原始 Demo** |
 | 阶段一产物（强烈建议带上） | `demo-prompt.md`、`product-doc.md`、`data-structure.md`、`interface-contract.md`、`business-logic.md`、可视化报告 |
 | 目标工程信息（建议先问） | 目标开发栈、目录结构约定、状态管理方案、CSS 方案、测试框架、TypeScript 严格度 |
 
@@ -112,10 +113,11 @@ description: |
 |---|------|------|------|
 | 1 | `design-review.md` | 必出 | /design-critique 设计审查报告（信息架构·一致性·层级·反馈） |
 | 2 | `accessibility-audit.md` | 必出 | /accessibility-review 可访问性审查报告（WCAG 2.1 AA + 工程侧建议） |
-| 3 | `design-structure.md` | 必出 | 精确视觉规格 · 布局算法 · 交互规格 · 状态枚举 · 交互序列 · 待确认清单 |
+| 3 | `design-structure.md` | 必出 | 精确视觉规格 · 布局算法 · 交互规格 · 状态枚举 · 交互序列 · 待确认清单（uxspec 的**精确源**） |
+| 3.5 | `uxspec-report.html` | **必出** | uxspec 的**可视化报告形态**（16:9 幻灯片，单文件）——把 design-structure 渲染成可评审的 deck |
 | 4 | `tech-selection.md` | 可选（看复杂度） | 技术选型，Demo 与工程各一套 + 迁移路径 |
 | 5 | `src/components/...` | 必出 | 工程级前端代码，符合后端数据结构，可直接接入 |
-| 6 | `src/services/[feature]Api.ts` | 必出 | API 集成层，Mock 字段映射真实接口 |
+| 6 | `src/services/[feature]Api.ts` | 有 HTTP 后端时必出 | API 集成层，Mock 字段映射真实接口；**纯本地功能/宿主桥**则改为事件或 IPC 适配层（如 `CustomEvent`/`postMessage`），不强造空 API 层 |
 | 7 | `src/utils/[feature]Logic.ts` | 视情况 | 业务规则纯函数，与 UI 解耦 |
 | 8 | `INTEGRATION.md` | 必出 | 接入说明：接口定义 · 业务逻辑 · 前后端边界 · 联调待确认 |
 | 9 | `README.md` | 必出 | 项目总览（覆盖两阶段） |
@@ -148,7 +150,13 @@ description: |
 
 #### 2.1 设计审查（/design-critique）→ `design-review.md`
 
-带上阶段一的产品上下文模板调用 `/design-critique`：
+> **设计审查与可访问性审查的方法都内置于本 skill（下方 2.1/2.2 的检查维度表 + WCAG 2.1 AA 清单），工具无关，不依赖外部 skill。**
+> `/design-critique`、`/accessibility-review` 是 Claude 自带的同名 skill：
+> - **环境有** → 可调用它们，并把产品上下文一起传入，结论按本节格式落盘。
+> - **环境没有**（换工具/换环境/裸 API）→ 直接用 2.1/2.2 的内置清单执行同一套审查。
+> 两条路径产出同构。这两份审查是**必出项**，外部 skill 只是其一种实现方式。
+
+带上阶段一的产品上下文，对照下方维度做设计审查（有 `/design-critique` 则一并调用）：
 
 ```
 请基于以下产品背景进行审查：
@@ -225,7 +233,7 @@ description: |
 > - ✅ 应写入：组件视觉规格、数据 Schema（字段+类型）、布局策略（算法+约束）、交互行为规格、状态枚举、交互序列
 > - ❌ 不写入：具体节点 x/y 坐标、hardcode 节点数组、写死的 Mock 实例（那是代码和接口契约的事）
 
-`design-structure.md` 必须覆盖以下八节（完整模板见文末 Artifact 模板）：
+`design-structure.md` 必须覆盖以下**九节**（完整模板见文末 Artifact 模板）：
 
 1. **页面整体布局** — ASCII 树描述分区、每区固定尺寸与背景色
 2. **间距系统** — 组件间/内边距/行高/图标文字间距
@@ -268,6 +276,23 @@ description: |
 
    文件末尾单列「⚠️ 待设计师确认」（动画时长与缓动、错误文案与时机、边缘状态视觉、多步骤回退规则）
 
+9. **机会点 → uxspec 落地对照（产品验收视角，闭合设计↔产品环）**  
+   > 前八节解决「设计↔工程」对齐；这一节解决「设计↔**产品**」对齐——回答产品/业务方最关心的一句话：**「我当初要的商业价值和机会点，设计到底落地了几条？」** 没有这节，uxspec 只是给开发的规格，产品侧无法验收。
+
+   逐条回填**阶段一 product-doc.md 的机会点（§E）与商业价值表（§H）**，对照本次 Demo/uxspec 的兑现情况：
+
+   ```markdown
+   | 机会点（来自阶段一 §E） | 商业权重/优先级（§H） | 本轮落地状态 | 在 uxspec 的落点 | 未落地原因 / 移交 |
+   |------------------------|---------------------|------------|-----------------|------------------|
+   | [如：逐位 32-bit 位图] | 高 / P0 | ✅ 已落地 | 组件清单 §3「位图」+ 状态枚举 | — |
+   | [如：多格式导出] | 中 / P1 | ◑ 部分 | 仅 HEX/DEC，C/JSON 待做 | 本轮范围外，移交下一迭代 |
+   | [如：协同编辑] | 低 / P2 | ⛔ 未做 | — | 需后端，进 INTEGRATION 待联调 |
+   ```
+
+   - **三态明确**：✅ 已落地 / ◑ 部分落地 / ⛔ 未落地，每条都要有「落点」或「原因」，不留空。
+   - **P0/P1 未落地必须显式解释**——这是产品验收的红线项，不能默默漏掉。
+   - 若阶段一产物缺失（用户直接拿 Demo 进来），先从 Demo + 用户口述补一份机会点清单再对照，并标注「机会点为反向补录」。
+
 **布局策略选型参考：**
 
 | 布局类型 | 推荐算法 | 约束说明 |
@@ -276,6 +301,17 @@ description: |
 | 拓扑网络 | ELK.js（layered 模式） | 边距 Xpx，端口对齐方式 |
 | 力导向图 | d3-force | 排斥力 X，中心引力 X |
 | 手动布局（可拖拽后持久化） | 无自动布局 | 初始位置从数据源读取 |
+
+---
+
+#### 3.9 uxspec 的可视化报告形态（**必出**）→ `uxspec-report.html`
+
+> `design-structure.md` 是给开发看的**精确源**（hex/px/状态枚举），信息密度高但不便评审汇报。再产出一份**可视化报告**，把同一套规格渲染成 16:9 幻灯片，供设计/产品/工程对齐。
+
+- **形态硬约束与阶段一可视化报告完全一致**：单文件、1280×720 固定画布 + 整体 `scale()` 自适应、一次一张 slide、内部固定 px、组件化而非裸标签（缩放/翻页/SVG 逻辑直接复用阶段一 Step 4 的实现）。
+- **建议 slide 清单**：封面（规格概览数字）→ 整体布局（ASCII 树 + 间距）→ 设计 Token（色板 + 字体表）→ 组件规格（含位布局条/mockup）→ **状态矩阵**（逐组件 × 状态网格）→ 交互序列（流程链 + 数据流）→ 复审结论（R1 问题→R2 状态 + 残留）→ **机会点落地对照**（承接阶段一 §E/§H，✅/◑/⛔ 三态 + P0/P1 未落地解释，给产品验收看）→ 交付映射（规格/审查/工程落地）。
+- **两者关系**：md 为准、report 为窗。report 里的每个数值都出自 design-structure.md，不另造规格；md 更新后 report 同步。
+- 生成后过阶段一 Step 4 的「交付前自检」（比例不变形、单页不溢出、翻页可用、用组件非裸标签）。
 
 ---
 
@@ -311,7 +347,14 @@ description: |
 
 #### 5.1 组件拆分与工程结构规划
 
-根据 Demo 和目标仓库约定规划组件树，**写代码前先把结构告诉用户确认**（这一步返工成本最高）：
+根据 Demo 和目标仓库约定规划组件树，**写代码前先把结构告诉用户确认**（这一步返工成本最高）。
+
+> **先按目标栈选结构，别默认 React/Vue。** 下面的 `.tsx`/`.vue` 树是「有框架」时的形态；若 Step 1/4 确认目标是**原生 HTML+CSS+JS（BMC/Webview 轻量约束）**，改用框架中立的等价结构：
+> - 组件 → **原生 Web Component（Custom Element + Shadow DOM）**，样式写在 shadow root 内（天然 scoped，不需要 CSS Modules）。
+> - 纯逻辑 → ES Module 纯函数（`utils/*.js`），用 JSDoc `@typedef` 替代 TS 类型；测试用 `node:test` 零依赖。
+> - 目录仍是 `components/ utils/ constants/`，只是文件是 `.js` 而非 `.tsx/.vue`。
+
+
 
 ```
 src/
@@ -342,6 +385,7 @@ src/
 - **CSS 不污染全局**：CSS Modules / scoped / styled-components，类名有命名空间
 - **错误边界**：关键数据加载失败有 fallback UI，不白屏
 - **魔法值在数据层统一转换**：组件层只处理业务语义
+- **视觉消费可插拔设计系统**：工程代码的视觉与阶段一 Demo 用**同一个可插拔设计系统**（见仓库 `design-systems/<激活>`，如 `pto-design-system`）。一律用它的 token/class，不自创、不硬编码颜色/间距/圆角；命中 IDE/图/泳道等场景走它的 pattern。**任何 standalone 交付物（演示页、Storybook 静态导出）必须内联或随包带上该设计系统的 CSS**——外链相对路径一旦文件被移动/单独打开就 404，而 token 化 CSS 无 fallback，整页塌成裸 HTML。
 
 #### 5.3 枚举值与魔法值处理规范（来自真实案例）
 
@@ -362,6 +406,8 @@ function formatTemperature(val){ return val >= 32768 ? '—' : val + ' ℃'; }
 #### 5.4 API 集成层 → `src/services/[feature]Api.ts`
 
 把 Demo 的 Mock 替换为真实 API 调用骨架，**保留 Mock 作为开发降级**：
+
+> 仅当功能有 HTTP 后端时才建本层。**纯本地功能**（离线计算/编解码）无需 API 层，把「结果输出」做成对宿主的事件/IPC（如 `dispatchEvent('feature-apply', {detail})` → Webview `postMessage`），并在 INTEGRATION.md 写清这个边界即可。
 
 ```typescript
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
@@ -400,6 +446,15 @@ describe('[ComponentName]', () => {
 ```
 
 测试桩标 `// TODO: implement` 而非空 it 块，让开发者知道要补什么。
+
+#### 5.6 交付前验证（必过，不通过不算完成）
+
+> **「代码写完 / 文件存在 / 没硬编码色」≠「能用」。** token 没加载时这些静态检查全过、页面却全黑或塌成裸 HTML；纯函数没跑过时类型对、结果可能错。声称完成前必须真跑：
+
+1. **真渲染**：用浏览器（headless 截图即可）实际挂载渲染关键组件/页面，确认配色/布局/组件到位、**控制台无报错**、设计系统 CSS 确实加载（不是裸 HTML）。
+2. **真运行逻辑**：跑单元测试 / 关键纯函数往返用例，确认编解码/校验/状态机结果正确，而不是只看类型通过。
+3. **状态覆盖眼检**：empty / loading / error / disabled 至少各看一眼，不是只验 happy path。
+4. 验证留痕（截图或测试输出），写进最终交付清单；没渲染/没跑过就不要说"达标"。
 
 > **⚠️ 完成 Step 5 工程代码后，立即进入 Step 6，不要询问用户是否继续。**
 
@@ -451,6 +506,8 @@ describe('[ComponentName]', () => {
 ### Step 7 — README + 新增/修改日志（CHANGELOG）
 
 **README.md** — 项目总览，覆盖两阶段：背景、产物清单、目录结构、如何打开 Demo、如何接入工程、文档索引（指向 design-structure / INTEGRATION / 审查报告 / 阶段一可视化报告）。
+
+> 「如何打开」要区分两类产物：**单文件 Demo** 可 `file://` 双击；**用 ES Modules 的工程版**不能双击（浏览器对 `file://` 的模块 CORS 限制），必须经 HTTP 打开，README 要给出 `python3 -m http.server` 之类的命令，别让接收方对着空白页排查。
 
 **CHANGELOG.md** — 新增/修改日志，区分 Demo 版与工程版：
 
@@ -680,6 +737,17 @@ interface [Entity] {
 3. [ ] 边缘状态视觉处理：空数据 / 超长文本 / 权限不足
 4. [ ] 多步骤流程的回退规则
 5. [ ] [从 Step 2 审查未决项中补充]
+
+## 十、机会点 → uxspec 落地对照（产品验收视角）
+> 回填阶段一 product-doc.md §E 机会点 + §H 商业价值，核对本轮兑现情况。
+
+| 机会点（阶段一 §E） | 商业权重/优先级（§H） | 落地状态 ✅/◑/⛔ | 在 uxspec 的落点 | 未落地原因 / 移交 |
+|--------------------|---------------------|-----------------|-----------------|------------------|
+| [机会点] | 高 / P0 | ✅ 已落地 | [§3 组件 / §八 状态枚举 …] | — |
+| [机会点] | 中 / P1 | ◑ 部分 | [落点] | [范围外，移交下一迭代] |
+| [机会点] | 低 / P2 | ⛔ 未做 | — | [需后端，进 INTEGRATION 待联调] |
+
+> P0/P1 未落地必须逐条解释（产品验收红线）。阶段一产物缺失时，先反向补录机会点再对照，并注明「反向补录」。
 ```
 
 ### tech-selection.md

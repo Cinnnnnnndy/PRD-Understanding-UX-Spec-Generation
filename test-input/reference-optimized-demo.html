@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>SMC 偏移量计算器 · openUBMC Studio</title>
+<link rel="stylesheet" href="studio-shell.css" />
+<style>
+  /* ======================================================
+     View 1 · SMC Offset Calculator (drawer-aware)
+     Layout target: 800–960px wide
+     Bit layout: func 6 [31:26] | cmd 16 [25:10] | ms [9] | rw [8] | param 8 [7:0]
+     ====================================================== */
+
+  .container { max-width: 960px; }
+
+  /* === Top: Offset bar (encode + decode merged) === */
+  .offset-bar {
+    background: var(--bg-elev-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .offset-bar .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 12px;
+    align-items: stretch;
+  }
+  @media (max-width: 720px) {
+    .offset-bar .row { grid-template-columns: 1fr; }
+  }
+  .offset-input-wrap {
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: border-color .12s, box-shadow .12s;
+  }
+  .offset-input-wrap.focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .offset-input-wrap.invalid {
+    border-color: var(--err);
+    box-shadow: 0 0 0 3px rgba(240,101,112,0.12);
+  }
+  .offset-input-wrap .tag {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 10.5px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .offset-input-wrap .tag .sync {
+    color: var(--text-dim);
+    font-size: 10px;
+  }
+  .offset-input-wrap.synced .tag .sync { color: var(--accent); }
+  .offset-input-wrap input {
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 19px;
+    font-weight: 600;
+    padding: 0;
+    outline: none;
+    width: 100%;
+    letter-spacing: 0.02em;
+  }
+  .offset-input-wrap input::placeholder { color: var(--placeholder); font-weight: 500; }
+
+  .offset-actions {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .offset-actions .btn { height: auto; }
+
+  /* split copy button */
+  .split-btn { position: relative; display: flex; }
+  .split-btn .btn-copy {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .split-btn .btn-fmt {
+    border-left: 1px solid rgba(255,255,255,0.18);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 0 9px;
+  }
+  .fmt-menu {
+    position: absolute;
+    top: calc(100% + 4px); right: 0;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 4px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+    min-width: 220px;
+    z-index: 10;
+    display: none;
+  }
+  .fmt-menu.open { display: block; }
+  .fmt-item {
+    padding: 7px 10px;
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    cursor: pointer;
+  }
+  .fmt-item:hover { background: var(--bg-elev-3); }
+  .fmt-item .preview {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .fmt-item.active::after {
+    content: "✓"; color: var(--accent); margin-left: 6px;
+  }
+
+  .offset-err {
+    margin-top: 8px;
+    min-height: 14px;
+    font-size: 11.5px;
+    color: var(--err);
+    font-family: var(--font-mono);
+  }
+
+  /* === 32-bit grid card === */
+  .bitmap-card {
+    background: var(--bg-elev-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    margin-bottom: 14px;
+    overflow-x: auto;
+  }
+
+  .bit-grid {
+    display: grid;
+    grid-template-columns: repeat(32, minmax(20px, 1fr));
+    grid-template-rows: auto auto auto;
+    gap: 0;
+    min-width: 680px;
+  }
+  /* Field band (row 1) */
+  .field-band {
+    padding: 4px 0;
+    text-align: center;
+    font-size: 10.5px;
+    color: #07120c;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background: var(--hue-func);
+    border-radius: 4px 4px 0 0;
+    margin-right: 2px;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .field-band:last-of-type { margin-right: 0; }
+  .field-band.hue-func   { background: var(--hue-func); }
+  .field-band.hue-cmd    { background: var(--hue-cmd); color: #fff; }
+  .field-band.hue-ms     { background: var(--hue-ms);  color: #fff; font-size: 9px; padding: 4px 0; }
+  .field-band.hue-rw     { background: var(--hue-rw);  color: #07120c; font-size: 9px; padding: 4px 0; }
+  .field-band.hue-param  { background: var(--hue-param); }
+  .field-band .seg-info {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    opacity: 0.7;
+    margin-left: 6px;
+  }
+
+  /* Bit cells (row 2) */
+  .bit-cell {
+    height: 28px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    border-right: 0;
+    transition: background .15s, color .15s, border-color .15s;
+    position: relative;
+  }
+  .bit-cell.boundary { border-right: 1px solid var(--border-strong); }
+  .bit-cell:last-child { border-right: 1px solid var(--border); }
+
+  .bit-cell.on { color: var(--text); font-weight: 700; }
+  .bit-cell[data-hue="func"].on   { background: rgba(245,158,107,0.22); border-color: rgba(245,158,107,0.5); color: #ffd0ad; }
+  .bit-cell[data-hue="cmd"].on    { background: rgba(79,110,247,0.22);  border-color: rgba(79,110,247,0.5);  color: #b9c8ff; }
+  .bit-cell[data-hue="ms"].on     { background: rgba(167,139,250,0.22); border-color: rgba(167,139,250,0.5); color: #d8caff; }
+  .bit-cell[data-hue="rw"].on     { background: rgba(52,211,153,0.22);  border-color: rgba(52,211,153,0.5);  color: #9bf0c8; }
+  .bit-cell[data-hue="param"].on  { background: rgba(245,180,84,0.22);  border-color: rgba(245,180,84,0.5);  color: #ffd99e; }
+
+  /* Bit position labels (row 3) */
+  .bit-pos {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--text-dim);
+    padding-top: 5px;
+  }
+  .bit-pos.boundary { color: var(--text-mute); font-weight: 700; }
+
+  /* Result summary line under bitmap */
+  .bitmap-summary {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-mute);
+  }
+  .bitmap-summary .lbl { color: var(--text-dim); margin-right: 4px; }
+  .bitmap-summary .val { color: var(--text); }
+
+  /* === Field cards === */
+  .fields-card {
+    background: var(--bg-elev-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+  }
+  .fields-row {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .fields-row:last-child { margin-bottom: 0; }
+  .fields-row.r1 { grid-template-columns: 6fr 16fr; }
+  .fields-row.r2 { grid-template-columns: 1fr 1fr 2fr; }
+  @media (max-width: 720px) {
+    .fields-row.r1, .fields-row.r2 { grid-template-columns: 1fr; }
+  }
+
+  .field-card {
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 12px 10px;
+    transition: border-color .12s, background .12s;
+    position: relative;
+    min-width: 0;
+  }
+  .field-card[data-hue="func"]  { border-top: 2px solid var(--hue-func); }
+  .field-card[data-hue="cmd"]   { border-top: 2px solid var(--hue-cmd); }
+  .field-card[data-hue="ms"]    { border-top: 2px solid var(--hue-ms); }
+  .field-card[data-hue="rw"]    { border-top: 2px solid var(--hue-rw); }
+  .field-card[data-hue="param"] { border-top: 2px solid var(--hue-param); }
+  .field-card:focus-within { background: var(--bg-elev-3); }
+
+  .field-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 8px;
+  }
+  .field-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .field-label .swatch {
+    width: 8px; height: 8px; border-radius: 2px;
+  }
+  .field-card[data-hue="func"]  .swatch { background: var(--hue-func); }
+  .field-card[data-hue="cmd"]   .swatch { background: var(--hue-cmd); }
+  .field-card[data-hue="ms"]    .swatch { background: var(--hue-ms); }
+  .field-card[data-hue="rw"]    .swatch { background: var(--hue-rw); }
+  .field-card[data-hue="param"] .swatch { background: var(--hue-param); }
+  .field-meta {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+  .field-input-wrap { display: flex; gap: 6px; }
+  .field-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 7px 10px;
+    outline: none;
+    transition: border-color .12s, box-shadow .12s;
+    min-width: 0;
+  }
+  .field-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .field-input.invalid {
+    border-color: var(--err);
+    box-shadow: 0 0 0 3px rgba(240,101,112,0.12);
+  }
+  .field-input::placeholder { color: var(--placeholder); }
+  .field-copy {
+    width: 30px; height: 32px;
+    padding: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all .12s;
+    font-family: inherit;
+  }
+  .field-copy:hover { color: var(--text); border-color: var(--accent); background: var(--bg-elev-3); }
+  .field-copy:disabled { opacity: 0.4; cursor: not-allowed; }
+  .field-copy.copied { color: var(--ok); border-color: var(--ok); }
+
+  .field-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 6px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-dim);
+    min-height: 14px;
+  }
+  .field-foot .pair { display: inline-flex; gap: 8px; }
+  .field-foot .pair span .k { color: var(--text-dim); margin-right: 2px; }
+  .field-foot .pair span .v { color: var(--text); }
+  .field-foot .pair span.muted .v { color: var(--placeholder); }
+  .field-foot .semantic {
+    color: var(--text-mute);
+    font-style: italic;
+  }
+  .field-foot .err {
+    color: var(--err);
+  }
+
+  /* === History (compact, side-by-side under main) === */
+  .history-card {
+    background: var(--bg-elev-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 18px;
+    margin-top: 14px;
+  }
+  .history-list {
+    list-style: none; padding: 0; margin: 8px 0 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 6px;
+  }
+  .history-item {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all .1s;
+  }
+  .history-item:hover {
+    border-color: var(--accent);
+    background: var(--bg-elev-2);
+  }
+  .history-item .idx {
+    font-family: var(--font-mono);
+    font-size: 10px; color: var(--text-dim);
+    text-align: right;
+  }
+  .history-item .val {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .history-item .ts {
+    font-size: 10px; color: var(--text-dim);
+    font-family: var(--font-mono);
+  }
+  .history-empty {
+    padding: 16px 12px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  /* === Legend === */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--text-mute);
+    font-family: var(--font-mono);
+  }
+  .legend .chip { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .sw-func  { background: var(--hue-func); }
+  .sw-cmd   { background: var(--hue-cmd); }
+  .sw-ms    { background: var(--hue-ms); }
+  .sw-rw    { background: var(--hue-rw); }
+  .sw-param { background: var(--hue-param); }
+
+  /* hover hint */
+  .with-hint { position: relative; cursor: help; border-bottom: 1px dotted var(--text-dim); }
+  .with-hint:hover .hint-pop {
+    opacity: 1;
+    transform: translate(0,0);
+    pointer-events: auto;
+  }
+  .hint-pop {
+    position: absolute;
+    top: calc(100% + 8px); left: 0;
+    background: #0a0c12;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 10px 12px;
+    min-width: 220px;
+    z-index: 12;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    opacity: 0;
+    transform: translate(0,-4px);
+    pointer-events: none;
+    transition: opacity .15s, transform .15s;
+    font-weight: normal;
+  }
+  .hint-pop .h {
+    font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);
+    margin-bottom: 6px;
+  }
+  .hint-pop ul {
+    list-style: none; padding: 0; margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11.5px; line-height: 1.7;
+    color: var(--text);
+  }
+  .hint-pop ul li .k { color: var(--hue-func); display: inline-block; min-width: 36px; }
+  .hint-pop ul li .d { color: var(--text-mute); margin-left: 6px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="tabbar" aria-label="Studio tabs">
+    <div class="brand"><span class="dot"></span><span>openUBMC Studio</span></div>
+    <div class="tabs">
+      <span class="tab"><a href="index.html">Home</a></span>
+      <span class="tab active"><a href="SMC Offset Calculator.html">SMC Offset</a> <span class="badge">0x</span></span>
+      <span class="tab"><a href="Expression Calculator.html">Expression</a> <span class="badge">|</span></span>
+      <span class="tab"><a href="Power Fan Template.html">Power &amp; Fan</a> <span class="badge">YAML</span></span>
+      <span class="tab">Console</span>
+      <span class="tab">Logs</span>
+    </div>
+  </nav>
+
+  <main class="page">
+    <div class="container">
+
+      <header class="page-head">
+        <div>
+          <h1>SMC 偏移量计算器</h1>
+          <div class="sub">
+            32-bit 命令字 ↔ <b style="color:var(--text)">功能码 · 命令码 · MS · RW · 参数</b> 双向同步。
+            上方任一输入框、下方任一字段，编辑后整体即时联动。
+          </div>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-ghost" id="btn-reset">重置</button>
+          <button class="btn btn-secondary" id="btn-load-sample">载入示例</button>
+        </div>
+      </header>
+
+      <!-- ============ 1) Top: dual offset input (HEX ↔ DEC) ============ -->
+      <div class="offset-bar">
+        <div class="section-h" style="margin-bottom: 10px;">
+          <span class="title">偏移量 · 32-bit Offset</span>
+          <span class="hint">输入十六进制或十进制，两边自动联动；下方字段同时刷新</span>
+        </div>
+        <div class="row">
+          <div class="offset-input-wrap" id="off-hex-wrap">
+            <div class="tag">
+              <span>HEX · 0x...</span>
+              <span class="sync" id="hex-sync">●</span>
+            </div>
+            <input id="off-hex" placeholder="0x00000000" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="offset-input-wrap" id="off-dec-wrap">
+            <div class="tag">
+              <span>DEC · 0 – 4 294 967 295</span>
+              <span class="sync" id="dec-sync">●</span>
+            </div>
+            <input id="off-dec" placeholder="0" autocomplete="off" spellcheck="false" inputmode="numeric" />
+          </div>
+          <div class="offset-actions">
+            <div class="split-btn">
+              <button class="btn btn-primary btn-copy" id="btn-copy-all">复制偏移量</button>
+              <button class="btn btn-primary btn-fmt" id="btn-fmt" aria-label="选择复制格式">▾</button>
+              <div class="fmt-menu" id="fmt-menu">
+                <div class="fmt-item active" data-fmt="hex">
+                  <span>仅 HEX</span><span class="preview" id="prev-hex">0x00000000</span>
+                </div>
+                <div class="fmt-item" data-fmt="dec">
+                  <span>仅 DEC</span><span class="preview" id="prev-dec">0</span>
+                </div>
+                <div class="fmt-item" data-fmt="both">
+                  <span>HEX + DEC</span><span class="preview" id="prev-both">0x00000000 (0)</span>
+                </div>
+                <div class="fmt-item" data-fmt="c">
+                  <span>C 字面量</span><span class="preview" id="prev-c">0x00000000u</span>
+                </div>
+                <div class="fmt-item" data-fmt="json">
+                  <span>JSON 字段</span><span class="preview" id="prev-json">{ "func": …}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="offset-err" id="offset-err"></div>
+      </div>
+
+      <!-- ============ 2) 32-bit visual map ============ -->
+      <div class="bitmap-card">
+        <div class="section-h" style="margin-bottom: 12px;">
+          <span class="title">32-bit 位图</span>
+          <span class="hint">MSB → LSB · 每格 1 bit · 颜色与下方字段对应</span>
+        </div>
+        <div class="bit-grid" id="bit-grid"></div>
+        <div class="legend">
+          <span class="chip"><span class="sw sw-func"></span>Function · [31:26] · 6b</span>
+          <span class="chip"><span class="sw sw-cmd"></span>Command · [25:10] · 16b</span>
+          <span class="chip"><span class="sw sw-ms"></span>MS · [9] · 1b</span>
+          <span class="chip"><span class="sw sw-rw"></span>RW · [8] · 1b</span>
+          <span class="chip"><span class="sw sw-param"></span>Param · [7:0] · 8b</span>
+        </div>
+      </div>
+
+      <!-- ============ 3) Field cards (2-way) ============ -->
+      <div class="fields-card">
+        <div class="section-h" style="margin-bottom: 12px;">
+          <span class="title">字段拆解 · 双向编辑</span>
+          <span class="hint">输入 0x 开头即十六进制，否则按十进制解析</span>
+        </div>
+
+        <div class="fields-row r1">
+          <!-- Function -->
+          <div class="field-card" data-hue="func" data-field="func">
+            <div class="field-head">
+              <span class="field-label">
+                <span class="swatch"></span>
+                <span class="with-hint">Function · 功能码
+                  <span class="hint-pop">
+                    <div class="h">速查表（部分） · 6-bit</div>
+                    <ul>
+                      <li><span class="k">0x01</span><span class="d">系统管理 System</span></li>
+                      <li><span class="k">0x02</span><span class="d">电源管理 Power</span></li>
+                      <li><span class="k">0x03</span><span class="d">风扇控制 Fan</span></li>
+                      <li><span class="k">0x0C</span><span class="d">温度管理 Thermal</span></li>
+                      <li><span class="k">0x10</span><span class="d">存储 Storage</span></li>
+                      <li><span class="k">0x20</span><span class="d">网络 Network</span></li>
+                    </ul>
+                  </span>
+                </span>
+              </span>
+              <span class="field-meta">[31:26] · 6b</span>
+            </div>
+            <div class="field-input-wrap">
+              <input class="field-input" data-input="func" placeholder="0x00 / 0–63" autocomplete="off" spellcheck="false" />
+              <button class="field-copy" data-copy-field="func" title="复制此字段" disabled>⧉</button>
+            </div>
+            <div class="field-foot" data-foot="func">
+              <span class="pair">
+                <span class="muted"><span class="k">DEC</span><span class="v">—</span></span>
+                <span class="muted"><span class="k">HEX</span><span class="v">—</span></span>
+              </span>
+              <span class="semantic" data-sem="func"></span>
+            </div>
+          </div>
+
+          <!-- Command -->
+          <div class="field-card" data-hue="cmd" data-field="cmd">
+            <div class="field-head">
+              <span class="field-label"><span class="swatch"></span>Command · 命令码</span>
+              <span class="field-meta">[25:10] · 16b · 0–0xFFFF</span>
+            </div>
+            <div class="field-input-wrap">
+              <input class="field-input" data-input="cmd" placeholder="0x0000 / 0–65535" autocomplete="off" spellcheck="false" />
+              <button class="field-copy" data-copy-field="cmd" title="复制此字段" disabled>⧉</button>
+            </div>
+            <div class="field-foot" data-foot="cmd">
+              <span class="pair">
+                <span class="muted"><span class="k">DEC</span><span class="v">—</span></span>
+                <span class="muted"><span class="k">HEX</span><span class="v">—</span></span>
+              </span>
+              <span class="semantic"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="fields-row r2">
+          <!-- MS -->
+          <div class="field-card" data-hue="ms" data-field="ms">
+            <div class="field-head">
+              <span class="field-label">
+                <span class="swatch"></span>
+                <span class="with-hint">MS · 读取方式
+                  <span class="hint-pop">
+                    <div class="h">1-bit</div>
+                    <ul>
+                      <li><span class="k">0</span><span class="d">Multi-read · 多读（高效）</span></li>
+                      <li><span class="k">1</span><span class="d">Single-read · 单读（精确）</span></li>
+                    </ul>
+                  </span>
+                </span>
+              </span>
+              <span class="field-meta">[9] · 1b</span>
+            </div>
+            <div class="field-input-wrap">
+              <input class="field-input" data-input="ms" placeholder="0 / 1" autocomplete="off" spellcheck="false" />
+              <button class="field-copy" data-copy-field="ms" title="复制此字段" disabled>⧉</button>
+            </div>
+            <div class="field-foot" data-foot="ms">
+              <span class="pair">
+                <span class="muted"><span class="k">DEC</span><span class="v">—</span></span>
+              </span>
+              <span class="semantic" data-sem="ms"></span>
+            </div>
+          </div>
+
+          <!-- RW -->
+          <div class="field-card" data-hue="rw" data-field="rw">
+            <div class="field-head">
+              <span class="field-label">
+                <span class="swatch"></span>
+                <span class="with-hint">RW · 读写方向
+                  <span class="hint-pop">
+                    <div class="h">1-bit</div>
+                    <ul>
+                      <li><span class="k">0</span><span class="d">Write · 写入</span></li>
+                      <li><span class="k">1</span><span class="d">Read · 读取</span></li>
+                    </ul>
+                  </span>
+                </span>
+              </span>
+              <span class="field-meta">[8] · 1b</span>
+            </div>
+            <div class="field-input-wrap">
+              <input class="field-input" data-input="rw" placeholder="0 / 1" autocomplete="off" spellcheck="false" />
+              <button class="field-copy" data-copy-field="rw" title="复制此字段" disabled>⧉</button>
+            </div>
+            <div class="field-foot" data-foot="rw">
+              <span class="pair">
+                <span class="muted"><span class="k">DEC</span><span class="v">—</span></span>
+              </span>
+              <span class="semantic" data-sem="rw"></span>
+            </div>
+          </div>
+
+          <!-- Param -->
+          <div class="field-card" data-hue="param" data-field="param">
+            <div class="field-head">
+              <span class="field-label"><span class="swatch"></span>Param · 参数</span>
+              <span class="field-meta">[7:0] · 8b · 0–0xFF</span>
+            </div>
+            <div class="field-input-wrap">
+              <input class="field-input" data-input="param" placeholder="0x00 / 0–255" autocomplete="off" spellcheck="false" />
+              <button class="field-copy" data-copy-field="param" title="复制此字段" disabled>⧉</button>
+            </div>
+            <div class="field-foot" data-foot="param">
+              <span class="pair">
+                <span class="muted"><span class="k">DEC</span><span class="v">—</span></span>
+                <span class="muted"><span class="k">HEX</span><span class="v">—</span></span>
+              </span>
+              <span class="semantic"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 4) History ============ -->
+      <div class="history-card">
+        <div class="section-h" style="margin: 0;">
+          <span class="title">最近 10 次计算</span>
+          <span style="display: flex; gap: 6px;">
+            <span class="hint">Ctrl+S 收集 · 点击回填</span>
+            <button class="btn btn-ghost" id="btn-clear-history" style="height: 22px; padding: 0 8px; font-size: 11px;">清空</button>
+          </span>
+        </div>
+        <ul class="history-list" id="history-list">
+          <li class="history-empty" style="grid-column: 1/-1;">尚无历史记录</li>
+        </ul>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast">已复制</div>
+
+<script>
+/* ====================================================================
+   View 1 · SMC Offset Calculator (rewritten)
+   Single source of truth: state.fields { func, cmd, ms, rw, param }.
+   Both the top dual-input and the per-field inputs read/write fields.
+   ==================================================================== */
+
+const FIELDS = {
+  func:  { hi: 31, lo: 26, width: 6,  hexDigits: 2, label: 'Function' },
+  cmd:   { hi: 25, lo: 10, width: 16, hexDigits: 4, label: 'Command' },
+  ms:    { hi: 9,  lo: 9,  width: 1,  hexDigits: 1, label: 'MS' },
+  rw:    { hi: 8,  lo: 8,  width: 1,  hexDigits: 1, label: 'RW' },
+  param: { hi: 7,  lo: 0,  width: 8,  hexDigits: 2, label: 'Param' },
+};
+const FIELD_ORDER = ['func','cmd','ms','rw','param'];
+
+const FUNC_LOOKUP = {
+  0x01: '系统管理 System', 0x02: '电源管理 Power', 0x03: '风扇控制 Fan',
+  0x0C: '温度管理 Thermal', 0x10: '存储 Storage', 0x20: '网络 Network',
+};
+const MS_LABEL = { 0: 'Multi-read', 1: 'Single-read' };
+const RW_LABEL = { 0: 'Write', 1: 'Read' };
+
+const state = {
+  fields: { func: null, cmd: null, ms: null, rw: null, param: null },
+  history: [],
+  copyFormat: 'hex',
+};
+const STORAGE_KEY = 'ubmc.smc.history.v2';
+
+/* ---------- math ---------- */
+function pad(s, n, ch='0') { return s.length >= n ? s : ch.repeat(n - s.length) + s; }
+
+function composeWord() {
+  let w = 0;
+  for (const k of FIELD_ORDER) {
+    const v = state.fields[k];
+    if (v !== null && v !== undefined) {
+      w = (w | ((v << FIELDS[k].lo) >>> 0)) >>> 0;
+    }
+  }
+  return w >>> 0;
+}
+
+function decomposeWord(w) {
+  const out = {};
+  for (const k of FIELD_ORDER) {
+    const cfg = FIELDS[k];
+    const mask = ((1 << cfg.width) - 1);
+    out[k] = (w >>> cfg.lo) & mask;
+  }
+  return out;
+}
+
+function anySet() {
+  return FIELD_ORDER.some(k => state.fields[k] !== null && state.fields[k] !== undefined);
+}
+
+function fmtHex(w) { return '0x' + pad(w.toString(16).toUpperCase(), 8); }
+function fmtBin(w) { return pad(w.toString(2), 32); }
+
+/* ---------- parsing ---------- */
+function parseLoose(raw, maxBits) {
+  // returns { ok, value, err? }
+  const s = String(raw || '').trim();
+  if (!s) return { ok: true, value: null };
+  let n;
+  if (/^0x/i.test(s)) {
+    if (!/^0x[0-9a-f]+$/i.test(s)) return { ok: false, err: '不是合法的十六进制' };
+    n = parseInt(s.slice(2), 16);
+  } else if (/^[0-9a-f]+$/i.test(s) && /[a-f]/i.test(s)) {
+    n = parseInt(s, 16);
+  } else if (/^-?[0-9]+$/.test(s)) {
+    n = parseInt(s, 10);
+  } else {
+    return { ok: false, err: '只接受 dec 或 0x hex' };
+  }
+  if (!Number.isFinite(n)) return { ok: false, err: '非法数字' };
+  if (n < 0) return { ok: false, err: '不可为负' };
+  const max = maxBits === 32 ? 0xFFFFFFFF : ((1 << maxBits) - 1);
+  if (n > max) return { ok: false, err: `超出 ${maxBits}-bit 范围` };
+  return { ok: true, value: n >>> 0 };
+}
+
+/* ---------- bit grid ---------- */
+const bitGridEl = document.getElementById('bit-grid');
+function buildBitGrid() {
+  const html = [];
+  // Row 1: field bands (5 cells, span'd via style)
+  html.push(`<div class="field-band hue-func"  style="grid-column: 1 / 7">Function<span class="seg-info">[31:26]</span></div>`);
+  html.push(`<div class="field-band hue-cmd"   style="grid-column: 7 / 23">Command<span class="seg-info">[25:10]</span></div>`);
+  html.push(`<div class="field-band hue-ms"    style="grid-column: 23 / 24">MS</div>`);
+  html.push(`<div class="field-band hue-rw"    style="grid-column: 24 / 25">RW</div>`);
+  html.push(`<div class="field-band hue-param" style="grid-column: 25 / 33">Param<span class="seg-info">[7:0]</span></div>`);
+  // Row 2: 32 bit cells
+  for (let col = 0; col < 32; col++) {
+    const bitIdx = 31 - col;
+    const hue = bitToHue(bitIdx);
+    // boundary right of: bit 26 (col 5), bit 10 (col 21), bit 9 (col 22), bit 8 (col 23)
+    const boundary = [5, 21, 22, 23].includes(col) ? 'boundary' : '';
+    html.push(`<div class="bit-cell ${boundary}" data-hue="${hue}" data-bit="${bitIdx}">0</div>`);
+  }
+  // Row 3: 32 position labels
+  for (let col = 0; col < 32; col++) {
+    const bitIdx = 31 - col;
+    const boundary = [31, 26, 25, 10, 9, 8, 7, 0].includes(bitIdx) ? 'boundary' : '';
+    html.push(`<div class="bit-pos ${boundary}">${bitIdx}</div>`);
+  }
+  bitGridEl.innerHTML = html.join('');
+}
+function bitToHue(bit) {
+  if (bit >= 26) return 'func';
+  if (bit >= 10) return 'cmd';
+  if (bit === 9) return 'ms';
+  if (bit === 8) return 'rw';
+  return 'param';
+}
+function paintBitGrid() {
+  const w = composeWord();
+  const set = anySet();
+  bitGridEl.querySelectorAll('.bit-cell').forEach(c => {
+    const b = parseInt(c.dataset.bit, 10);
+    const on = ((w >>> b) & 1) === 1;
+    c.textContent = (set ? (on ? '1' : '0') : '0');
+    c.classList.toggle('on', set && on);
+  });
+}
+
+/* ---------- field render ---------- */
+function setField(k, v) {
+  state.fields[k] = v;
+}
+
+function renderFieldFoot(k) {
+  const v = state.fields[k];
+  const foot = document.querySelector(`[data-foot="${k}"]`);
+  if (!foot) return;
+  const pair = foot.querySelector('.pair');
+  const sem  = foot.querySelector('.semantic');
+  // pair: dec/hex (mw cases)
+  const cfg = FIELDS[k];
+  if (v === null || v === undefined) {
+    if (cfg.width === 1) {
+      pair.innerHTML = `<span class="muted"><span class="k">DEC</span><span class="v">—</span></span>`;
+    } else {
+      pair.innerHTML = `
+        <span class="muted"><span class="k">DEC</span><span class="v">—</span></span>
+        <span class="muted"><span class="k">HEX</span><span class="v">—</span></span>`;
+    }
+    if (sem) sem.textContent = '';
+  } else {
+    if (cfg.width === 1) {
+      pair.innerHTML = `<span><span class="k">DEC</span><span class="v">${v}</span></span>`;
+    } else {
+      pair.innerHTML = `
+        <span><span class="k">DEC</span><span class="v">${v}</span></span>
+        <span><span class="k">HEX</span><span class="v">0x${pad(v.toString(16).toUpperCase(), cfg.hexDigits)}</span></span>`;
+    }
+    if (sem) {
+      if (k === 'func' && FUNC_LOOKUP[v]) sem.textContent = '· ' + FUNC_LOOKUP[v];
+      else if (k === 'ms')  sem.textContent = '· ' + (MS_LABEL[v] || '');
+      else if (k === 'rw')  sem.textContent = '· ' + (RW_LABEL[v] || '');
+      else sem.textContent = '';
+    }
+  }
+  // copy button enable
+  const cp = document.querySelector(`[data-copy-field="${k}"]`);
+  if (cp) cp.disabled = (v === null || v === undefined);
+}
+
+function renderAllFieldFeet() {
+  FIELD_ORDER.forEach(renderFieldFoot);
+}
+
+function renderFieldInputs(source) {
+  // re-fill text into per-field inputs (skip the one user is typing in)
+  FIELD_ORDER.forEach(k => {
+    if (source === 'field:' + k) return;
+    const inp = document.querySelector(`[data-input="${k}"]`);
+    if (!inp) return;
+    const v = state.fields[k];
+    if (v === null || v === undefined) {
+      if (source !== 'field-only') inp.value = '';
+    } else {
+      inp.value = '0x' + pad(v.toString(16).toUpperCase(), FIELDS[k].hexDigits);
+    }
+    inp.classList.remove('invalid');
+  });
+}
+
+/* ---------- offset top inputs ---------- */
+const $offHex = document.getElementById('off-hex');
+const $offDec = document.getElementById('off-dec');
+const $offErr = document.getElementById('offset-err');
+const $hexSync = document.getElementById('hex-sync');
+const $decSync = document.getElementById('dec-sync');
+const $offHexWrap = document.getElementById('off-hex-wrap');
+const $offDecWrap = document.getElementById('off-dec-wrap');
+
+function renderOffsetInputs(source) {
+  const w = composeWord();
+  const set = anySet();
+  if (source !== 'top-hex') {
+    $offHex.value = set ? fmtHex(w) : '';
+    $offHex.classList.remove('invalid');
+  }
+  if (source !== 'top-dec') {
+    $offDec.value = set ? String(w) : '';
+    $offDec.classList.remove('invalid');
+  }
+  // mark "synced" state (both reflect the word)
+  $offHexWrap.classList.toggle('synced', set);
+  $offDecWrap.classList.toggle('synced', set);
+}
+
+$offHex.addEventListener('focus', () => $offHexWrap.classList.add('focus'));
+$offHex.addEventListener('blur',  () => $offHexWrap.classList.remove('focus'));
+$offDec.addEventListener('focus', () => $offDecWrap.classList.add('focus'));
+$offDec.addEventListener('blur',  () => $offDecWrap.classList.remove('focus'));
+
+function onTopInput(source) {
+  const raw = source === 'top-hex' ? $offHex.value : $offDec.value;
+  $offErr.textContent = '';
+  $offHex.classList.remove('invalid'); $offDec.classList.remove('invalid');
+  $offHexWrap.classList.remove('invalid'); $offDecWrap.classList.remove('invalid');
+
+  if (raw.trim() === '') {
+    // empty: clear all fields
+    FIELD_ORDER.forEach(k => state.fields[k] = null);
+    renderAllFieldFeet();
+    renderFieldInputs(source);
+    renderOffsetInputs(source);
+    paintBitGrid();
+    updateFmtPreviews();
+    updateCopyEnable();
+    return;
+  }
+  const r = parseLoose(raw, 32);
+  if (!r.ok) {
+    if (source === 'top-hex') $offHexWrap.classList.add('invalid');
+    else                       $offDecWrap.classList.add('invalid');
+    $offErr.textContent = r.err;
+    return;
+  }
+  const w = r.value;
+  const parts = decomposeWord(w);
+  FIELD_ORDER.forEach(k => state.fields[k] = parts[k]);
+  renderAllFieldFeet();
+  renderFieldInputs(source);
+  renderOffsetInputs(source);
+  paintBitGrid();
+  updateFmtPreviews();
+  updateCopyEnable();
+}
+$offHex.addEventListener('input', () => onTopInput('top-hex'));
+$offDec.addEventListener('input', () => onTopInput('top-dec'));
+
+/* ---------- per-field inputs ---------- */
+function wireFieldInput(k) {
+  const inp = document.querySelector(`[data-input="${k}"]`);
+  inp.addEventListener('input', () => {
+    const r = parseLoose(inp.value, FIELDS[k].width);
+    if (!r.ok) {
+      inp.classList.add('invalid');
+      const foot = document.querySelector(`[data-foot="${k}"] .semantic`);
+      if (foot) { foot.textContent = '· ' + r.err; foot.classList.add('err'); }
+      return;
+    }
+    inp.classList.remove('invalid');
+    const semFoot = document.querySelector(`[data-foot="${k}"] .semantic`);
+    if (semFoot) semFoot.classList.remove('err');
+    state.fields[k] = r.value;
+    renderFieldFoot(k);
+    renderOffsetInputs('field:' + k);
+    paintBitGrid();
+    updateFmtPreviews();
+    updateCopyEnable();
+  });
+  inp.addEventListener('blur', () => {
+    if (state.fields[k] === null || state.fields[k] === undefined) return;
+    inp.value = '0x' + pad(state.fields[k].toString(16).toUpperCase(), FIELDS[k].hexDigits);
+  });
+}
+FIELD_ORDER.forEach(wireFieldInput);
+
+/* ---------- per-field copy ---------- */
+document.querySelectorAll('[data-copy-field]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const k = btn.dataset.copyField;
+    const v = state.fields[k]; if (v === null || v === undefined) return;
+    const txt = '0x' + pad(v.toString(16).toUpperCase(), FIELDS[k].hexDigits);
+    navigator.clipboard?.writeText(txt);
+    btn.classList.add('copied');
+    setTimeout(() => btn.classList.remove('copied'), 800);
+    showToast(`已复制 ${FIELDS[k].label}: ${txt}`);
+  });
+});
+
+/* ---------- copy all + format menu ---------- */
+function formattedCopy(fmt) {
+  const w = composeWord();
+  const hex = fmtHex(w), dec = String(w);
+  switch (fmt) {
+    case 'dec':  return dec;
+    case 'both': return `${hex} (${dec})`;
+    case 'c':    return hex + 'u';
+    case 'json': {
+      const p = decomposeWord(w);
+      return JSON.stringify({
+        offset: hex,
+        func: '0x' + pad(p.func.toString(16).toUpperCase(),2),
+        cmd:  '0x' + pad(p.cmd.toString(16).toUpperCase(),4),
+        ms: p.ms, rw: p.rw,
+        param: '0x' + pad(p.param.toString(16).toUpperCase(),2),
+      });
+    }
+    case 'hex':
+    default: return hex;
+  }
+}
+function updateFmtPreviews() {
+  document.getElementById('prev-hex').textContent  = formattedCopy('hex');
+  document.getElementById('prev-dec').textContent  = formattedCopy('dec');
+  document.getElementById('prev-both').textContent = formattedCopy('both');
+  document.getElementById('prev-c').textContent    = formattedCopy('c');
+  const j = formattedCopy('json');
+  document.getElementById('prev-json').textContent = j.length > 24 ? j.slice(0, 22) + '…' : j;
+}
+function updateCopyEnable() {
+  document.getElementById('btn-copy-all').disabled = !anySet();
+  document.getElementById('btn-fmt').disabled     = !anySet();
+}
+
+document.getElementById('btn-copy-all').addEventListener('click', () => {
+  if (!anySet()) return;
+  const txt = formattedCopy(state.copyFormat);
+  navigator.clipboard?.writeText(txt);
+  showToast('已复制 ' + (txt.length > 36 ? txt.slice(0,34) + '…' : txt));
+  saveToHistory();
+});
+document.getElementById('btn-fmt').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('fmt-menu').classList.toggle('open');
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('.split-btn')) document.getElementById('fmt-menu').classList.remove('open');
+});
+document.querySelectorAll('.fmt-item').forEach(el => {
+  el.addEventListener('click', () => {
+    state.copyFormat = el.dataset.fmt;
+    document.querySelectorAll('.fmt-item').forEach(x => x.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('fmt-menu').classList.remove('open');
+    document.getElementById('btn-copy-all').click();
+  });
+});
+
+/* ---------- reset / sample ---------- */
+document.getElementById('btn-reset').addEventListener('click', () => {
+  FIELD_ORDER.forEach(k => state.fields[k] = null);
+  FIELD_ORDER.forEach(k => {
+    const inp = document.querySelector(`[data-input="${k}"]`);
+    inp.value = ''; inp.classList.remove('invalid');
+  });
+  renderAllFieldFeet();
+  renderOffsetInputs();
+  paintBitGrid();
+  updateFmtPreviews();
+  updateCopyEnable();
+  $offErr.textContent = '';
+});
+document.getElementById('btn-load-sample').addEventListener('click', () => {
+  // 整齐示例：func=0x0C (Thermal) · cmd=0x0011 · ms=0 (multi) · rw=1 (read) · param=0x00
+  // → 0x0C<<26 | 0x0011<<10 | 0<<9 | 1<<8 | 0 = 0x30004500
+  const word = 0x30004500;
+  $offHex.value = fmtHex(word);
+  onTopInput('top-hex');
+});
+
+/* ---------- history ---------- */
+function saveToHistory() {
+  if (!anySet()) return;
+  const snap = { word: composeWord(), parts: { ...state.fields }, ts: Date.now() };
+  if (state.history[0] && state.history[0].word === snap.word) return;
+  state.history.unshift(snap);
+  if (state.history.length > 10) state.history.length = 10;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.history)); } catch(e){}
+  renderHistory();
+}
+function restoreHistory() {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (s) state.history = JSON.parse(s) || [];
+  } catch (e) {}
+}
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  if (state.history.length === 0) {
+    list.innerHTML = `<li class="history-empty" style="grid-column: 1/-1;">尚无历史记录 · 复制即自动收藏</li>`;
+    return;
+  }
+  list.innerHTML = state.history.map((it, i) => {
+    const t = new Date(it.ts);
+    const ts = `${pad(String(t.getHours()),2)}:${pad(String(t.getMinutes()),2)}`;
+    return `<li class="history-item" data-h="${i}">
+      <span class="idx">${pad(String(i+1),2,' ')}</span>
+      <span class="val">${fmtHex(it.word)}</span>
+      <span class="ts">${ts}</span>
+    </li>`;
+  }).join('');
+  list.querySelectorAll('.history-item').forEach(el => {
+    el.addEventListener('click', () => loadFromHistory(parseInt(el.dataset.h, 10)));
+  });
+}
+function loadFromHistory(i) {
+  const it = state.history[i]; if (!it) return;
+  FIELD_ORDER.forEach(k => state.fields[k] = it.parts[k]);
+  renderAllFieldFeet();
+  renderFieldInputs();
+  renderOffsetInputs();
+  paintBitGrid();
+  updateFmtPreviews();
+  updateCopyEnable();
+  showToast('已回填 ' + fmtHex(it.word));
+}
+document.getElementById('btn-clear-history').addEventListener('click', () => {
+  state.history = []; try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+  renderHistory();
+});
+
+/* ---------- toast ---------- */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+/* ---------- keyboard ---------- */
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault(); saveToHistory(); showToast('已保存当前结果');
+  }
+});
+
+/* ---------- init ---------- */
+buildBitGrid();
+paintBitGrid();
+renderAllFieldFeet();
+renderOffsetInputs();
+updateFmtPreviews();
+updateCopyEnable();
+restoreHistory();
+renderHistory();
+</script>
+</body>
+</html>

@@ -1,0 +1,2014 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管道表达式批量评估器 · PTO Design System</title>
+
+<!-- ── PTO Design System tokens (foundation → semantic → components) ───────────
+     注意：以下三层 token 已内联，确保单文件自包含、任意预览方式均能正常渲染。
+     原始三层 CSS 快照仍保留在同级 design-system/ 目录，供工程接入参考。 -->
+<style>
+/* ===== PTO Design System · foundation.css ===== */
+:root {
+  /* Neutral Gray Ramp — pure neutral, no blue tint */
+  --ark-neutral-0: #0b0b0b;
+  --ark-neutral-1: #101010;
+  --ark-neutral-2: #141414;
+  --ark-neutral-3: #1a1a1a;
+  --ark-neutral-4: #343434;
+
+  /* Accent Palette */
+  --ark-blue-500: #4369efff;
+  --ark-blue-600: #5a92e6;
+  --ark-domain-aux: #7c8db8;
+  --ark-green-500: #04d793ff;
+  --ark-orange-500: #ffaa3bff;
+  --ark-red-500: #ff4b7bff;
+  --highlight-l0a-violet-source: #A855F7;
+
+  /* Typography Scale */
+  --font-size-display-lg: 28px;
+  --font-size-title-md:   20px;
+  --font-size-title-sm:   16px;
+  --font-size-body-md:    14px;
+  --font-size-body-sm:    12px;
+  --font-size-label-xs:   11px;
+
+  --font-weight-bold:     700;
+  --font-weight-semibold: 600;
+  --font-weight-medium:   500;
+
+  --line-height-display:  1.25;
+  --line-height-body:     1.5;
+  --line-height-label:    1.2;
+
+  --letter-spacing-body:  0;
+  --letter-spacing-label: 0.5px;
+
+  /* Font Family */
+  --font-sans: 'Inter', 'Source Han Sans SC', 'PingFang SC', 'Noto Sans SC', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* Spacing Scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Radius Scale */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* Shadow Scale */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.42);
+
+  /* Z-index Scale */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+
+  /* Motion */
+  --duration-fast: 100ms;
+  --duration-base: 200ms;
+  --duration-slow: 350ms;
+  --easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-out: cubic-bezier(0, 0, 0.2, 1);
+}
+
+:root[data-theme='light'] {
+  --ark-neutral-0: #FFFFFF;
+  --ark-neutral-1: #F5F5F5;
+  --ark-neutral-2: #FFFFFF;
+  --ark-neutral-3: #F2F2F2;
+  --ark-neutral-4: #E6E6E6;
+}
+
+/* ===== PTO Design System · semantic.css ===== */
+:root[data-theme='dark'],
+:root {
+  --background: var(--ark-neutral-1);
+  --background-elevated: var(--ark-neutral-2);
+  --surface-1: #161616;
+  --surface-2: #1c1c1c;
+  --surface-3: #262626;
+  --surface-4: #313131;
+
+  --foreground:           rgba(255, 255, 255, 0.90);
+  --foreground-secondary: rgba(255, 255, 255, 0.60);
+  --foreground-muted:     rgba(255, 255, 255, 0.40);
+  --foreground-disabled:  rgba(255, 255, 255, 0.25);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --primary: var(--ark-blue-500);
+  --primary-hover: var(--ark-blue-600);
+  --primary-foreground: #ffffff;
+
+  --accent: var(--ark-domain-aux);
+  --success: var(--ark-green-500);
+  --warning: var(--ark-orange-500);
+  --danger: var(--ark-red-500);
+
+  --tone-critical-bg: color-mix(in srgb, var(--danger) 14%, transparent);
+  --tone-warning-bg: color-mix(in srgb, var(--warning) 16%, transparent);
+  --tone-info-bg: color-mix(in srgb, var(--primary) 16%, transparent);
+  --tone-blue-strong: color-mix(in srgb, var(--primary) 28%, transparent);
+  --tone-green-strong: color-mix(in srgb, var(--success) 22%, transparent);
+  --tone-warning-strong: color-mix(in srgb, var(--warning) 22%, transparent);
+
+  --focus-ring: rgba(67, 105, 239, 0.42);
+
+  --state-hover:    rgba(255, 255, 255, 0.06);
+  --state-press:    rgba(255, 255, 255, 0.10);
+  --state-muted:    rgba(255, 255, 255, 0.06);
+  --state-selected: rgba(67, 105, 239, 0.14);
+  --state-focus:    rgba(67, 105, 239, 0.20);
+
+  --surface-disabled: rgba(255, 255, 255, 0.04);
+  --border-disabled:  rgba(255, 255, 255, 0.06);
+
+  --app-background: var(--background);
+  --surface-backdrop-filter: none;
+  --surface-backdrop-filter-soft: none;
+  --surface-backdrop-filter-strong: none;
+  --glass-surface-bg: var(--surface-1);
+  --glass-surface-bg-soft: var(--surface-2);
+  --glass-surface-bg-strong: var(--background-elevated);
+  --glass-surface-border: var(--border-default);
+  --glass-surface-highlight: none;
+  --glass-surface-shadow: none;
+}
+
+:root[data-theme='glass'] {
+  --background: #080a0f;
+  --background-elevated: rgba(18, 25, 38, 0.62);
+  --surface-1: rgba(255, 255, 255, 0.075);
+  --surface-2: rgba(255, 255, 255, 0.095);
+  --surface-3: rgba(255, 255, 255, 0.13);
+  --surface-4: rgba(255, 255, 255, 0.18);
+
+  --foreground:           rgba(255, 255, 255, 0.92);
+  --foreground-secondary: rgba(255, 255, 255, 0.66);
+  --foreground-muted:     rgba(255, 255, 255, 0.46);
+  --foreground-disabled:  rgba(255, 255, 255, 0.28);
+
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-default: rgba(255, 255, 255, 0.16);
+  --border-strong: rgba(255, 255, 255, 0.24);
+
+  --primary: #6fa1ff;
+  --primary-hover: #8bb5ff;
+  --primary-foreground: #08111f;
+  --accent: #90a4d4;
+
+  --focus-ring: rgba(111, 161, 255, 0.44);
+
+  --state-hover:    rgba(255, 255, 255, 0.09);
+  --state-press:    rgba(255, 255, 255, 0.14);
+  --state-muted:    rgba(255, 255, 255, 0.07);
+  --state-selected: rgba(111, 161, 255, 0.18);
+  --state-focus:    rgba(111, 161, 255, 0.24);
+
+  --surface-disabled: rgba(255, 255, 255, 0.055);
+  --border-disabled:  rgba(255, 255, 255, 0.08);
+
+  --app-background:
+    radial-gradient(circle at 0% 0%, rgba(91, 140, 255, 0.20) 0%, rgba(91, 140, 255, 0.10) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.14) 0%, rgba(20, 184, 166, 0.07) 16%, transparent 34%),
+    radial-gradient(circle at 100% 100%, rgba(234, 179, 8, 0.10) 0%, transparent 30%),
+    linear-gradient(180deg, #080a0f 0%, #0f1623 48%, #080a0f 100%);
+  --surface-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
+  --surface-backdrop-filter-soft: blur(16px) saturate(150%) brightness(1.03);
+  --surface-backdrop-filter-strong: blur(32px) saturate(180%) brightness(1.06);
+  --glass-surface-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.052) 48%, rgba(255, 255, 255, 0.09));
+  --glass-surface-bg-soft: linear-gradient(145deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.038) 48%, rgba(255, 255, 255, 0.065));
+  --glass-surface-bg-strong: linear-gradient(145deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.064) 46%, rgba(255, 255, 255, 0.115));
+  --glass-surface-border: rgba(255, 255, 255, 0.13);
+  --glass-surface-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 1px 0 0 rgba(139, 181, 255, 0.10), inset -1px 0 0 rgba(255, 255, 255, 0.08), inset 0 -14px 30px rgba(0, 0, 0, 0.16);
+  --glass-surface-shadow: 0 18px 56px rgba(0, 0, 0, 0.30), 0 3px 18px rgba(0, 0, 0, 0.20);
+}
+
+:root[data-theme='light'] {
+  --background: var(--ark-neutral-1);
+  --background-elevated: var(--ark-neutral-2);
+  --surface-1: #FFFFFF;
+  --surface-2: #F2F2F2;
+  --surface-3: #E6E6E6;
+  --surface-4: #CCCCCC;
+
+  --foreground:           rgba(0, 0, 0, 0.90);
+  --foreground-secondary: rgba(0, 0, 0, 0.55);
+  --foreground-muted:     rgba(0, 0, 0, 0.42);
+  --foreground-disabled:  rgba(0, 0, 0, 0.25);
+
+  --border-subtle: rgba(0, 0, 0, 0.07);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.18);
+
+  --focus-ring: rgba(67, 105, 239, 0.36);
+
+  --state-hover:    rgba(0, 0, 0, 0.05);
+  --state-press:    rgba(0, 0, 0, 0.09);
+  --state-muted:    rgba(0, 0, 0, 0.05);
+  --state-selected: rgba(67, 105, 239, 0.10);
+  --state-focus:    rgba(67, 105, 239, 0.16);
+
+  --surface-disabled: rgba(0, 0, 0, 0.04);
+  --border-disabled:  rgba(0, 0, 0, 0.07);
+}
+
+/* ===== PTO Design System · components.css ===== */
+:root {
+  /* Toolbar */
+  --comp-toolbar-height: 44px;
+  --comp-toolbar-bg: color-mix(in srgb, var(--background) 92%, black);
+  --comp-toolbar-border: var(--border-subtle);
+
+  /* Button */
+  --button-height-sm: 30px;
+  --button-height-md: 36px;
+  --button-height-lg: 42px;
+  --button-radius: var(--radius-lg);
+  --button-padding-x-sm: var(--space-2);
+  --button-padding-x-md: var(--space-3);
+  --button-padding-x-lg: var(--space-4);
+  --button-gap: 6px;
+  --button-font: 500 12px / 1 var(--font-sans);
+  --button-solid-bg:       var(--foreground);
+  --button-solid-bg-hover: color-mix(in srgb, var(--foreground) 88%, transparent);
+  --button-solid-bg-press: color-mix(in srgb, var(--foreground) 80%, transparent);
+  --button-solid-fg:       var(--background);
+  --button-solid-shadow:   none;
+  --button-secondary-bg: color-mix(in srgb, var(--surface-2) 92%, white 3%);
+  --button-secondary-bg-hover: var(--surface-3);
+  --button-secondary-bg-press: color-mix(in srgb, var(--surface-3) 84%, black);
+  --button-secondary-border: var(--border-subtle);
+  --button-secondary-fg: var(--foreground);
+  --button-secondary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 8px rgba(0, 0, 0, 0.16);
+  --button-ghost-bg-hover: var(--state-hover);
+  --button-ghost-bg-press: var(--state-press);
+  --button-ghost-fg: var(--foreground-secondary);
+  --button-ghost-fg-hover: var(--foreground);
+  --button-focus-ring: var(--focus-ring);
+  --button-disabled-opacity: 0.42;
+
+  /* Input */
+  --input-height-md: 34px;
+  --input-radius: var(--radius-md);
+  --input-border: var(--border-default);
+  --input-bg: var(--surface-1);
+
+  /* Panel */
+  --panel-radius: var(--radius-lg);
+  --panel-padding: var(--space-4);
+  --panel-padding-lg: var(--space-5);
+  --panel-bg: var(--surface-2);
+  --panel-border: var(--border-subtle);
+
+  /* Card */
+  --card-radius: var(--radius-lg);
+  --card-padding: var(--space-4);
+  --card-bg: var(--surface-1);
+  --card-border: var(--border-default);
+  --card-shadow: none;
+  --card-hover-border: var(--border-strong);
+  --card-hover-bg: var(--state-hover);
+  --card-selected-border: var(--primary);
+  --card-selected-bg: var(--state-selected);
+
+  /* Table */
+  --table-row-height: 36px;
+  --table-header-height: 36px;
+  --table-border: var(--border-subtle);
+
+  /* Typography Composites */
+  --text-display:  700 28px / 1.25 var(--font-sans);
+  --text-title-1:  600 20px / 1.30 var(--font-sans);
+  --text-title-2:  600 16px / 1.30 var(--font-sans);
+  --text-body:     400 14px / 1.50 var(--font-sans);
+  --text-body-sm:  400 12px / 1.50 var(--font-sans);
+  --text-label:    500 11px / 1.20 var(--font-sans);
+  --text-mono:     500 12px / 1.40 var(--font-mono);
+
+  /* Badge / Tag */
+  --tag-radius: var(--radius-pill);
+  --tag-padding-x: var(--space-2);
+  --tag-height: 20px;
+  --comp-tag-bg: var(--state-muted);
+  --comp-tag-border: var(--border-default);
+  --comp-tag-fg: var(--foreground-muted);
+
+  /* Stat Chip */
+  --stat-chip-height: 22px;
+  --stat-chip-padding-x: 8px;
+  --stat-chip-radius: var(--radius-pill);
+  --stat-chip-bg: var(--surface-2);
+  --stat-chip-border: var(--border-subtle);
+  --stat-chip-fg: color-mix(in srgb, var(--foreground) 88%, var(--background));
+
+  /* Segmented Control */
+  --segmented-control-gap: 3px;
+  --segmented-control-padding: 3px;
+  --segmented-control-radius: 10px;
+  --segmented-control-bg: var(--surface-disabled);
+  --segmented-control-border: var(--border-subtle);
+
+  /* Inspector Rail soft card */
+  --inspector-soft-card-bg: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  --inspector-soft-card-bg-hover: color-mix(in srgb, var(--surface-3) 62%, transparent);
+  --inspector-soft-card-radius: var(--radius-md);
+}
+
+:root[data-theme='light'] {
+  --button-secondary-bg: color-mix(in srgb, var(--surface-1) 92%, var(--surface-2));
+  --button-secondary-bg-hover: color-mix(in srgb, var(--surface-1) 28%, var(--surface-2));
+  --button-secondary-bg-press: color-mix(in srgb, var(--surface-2) 84%, var(--surface-3));
+  --button-secondary-border: var(--border-default);
+  --button-secondary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme='glass'] {
+  --comp-toolbar-bg: var(--glass-surface-bg-strong);
+  --comp-toolbar-border: var(--glass-surface-border);
+  --button-solid-bg: rgba(255, 255, 255, 0.88);
+  --button-solid-bg-hover: rgba(255, 255, 255, 0.96);
+  --button-solid-bg-press: rgba(255, 255, 255, 0.78);
+  --button-solid-fg: #08111f;
+  --button-solid-shadow: var(--glass-surface-highlight), 0 8px 20px rgba(0, 0, 0, 0.18);
+  --button-secondary-bg: rgba(255, 255, 255, 0.105);
+  --button-secondary-bg-hover: rgba(255, 255, 255, 0.16);
+  --button-secondary-bg-press: rgba(255, 255, 255, 0.08);
+  --button-secondary-border: rgba(255, 255, 255, 0.12);
+  --button-secondary-shadow: var(--glass-surface-highlight), 0 8px 24px rgba(0, 0, 0, 0.14);
+  --button-ghost-bg-hover: rgba(255, 255, 255, 0.10);
+  --button-ghost-bg-press: rgba(255, 255, 255, 0.15);
+  --input-bg: rgba(255, 255, 255, 0.08);
+  --input-border: rgba(255, 255, 255, 0.12);
+  --panel-bg: color-mix(in srgb, var(--background-elevated) 88%, black 12%);
+  --panel-border: var(--border-subtle);
+  --card-bg: color-mix(in srgb, var(--background-elevated) 84%, black 16%);
+  --card-border: var(--border-subtle);
+  --card-hover-border: var(--border-strong);
+  --card-hover-bg: rgba(255, 255, 255, 0.08);
+  --card-selected-bg: rgba(111, 161, 255, 0.18);
+  --comp-tag-bg: rgba(255, 255, 255, 0.075);
+  --comp-tag-border: rgba(255, 255, 255, 0.16);
+  --comp-tag-fg: var(--foreground-secondary);
+  --stat-chip-bg: rgba(255, 255, 255, 0.09);
+  --stat-chip-border: rgba(255, 255, 255, 0.14);
+  --segmented-control-bg: rgba(255, 255, 255, 0.065);
+  --segmented-control-border: rgba(255, 255, 255, 0.14);
+  --inspector-soft-card-bg: rgba(255, 255, 255, 0.075);
+  --inspector-soft-card-bg-hover: rgba(255, 255, 255, 0.115);
+}
+</style>
+
+<style>
+/* ════════════════════════════════════════════════════════════════════════════
+   App styles — 全部基于 PTO Design System 语义 token，零硬编码颜色
+   仅图标 SVG 的 currentColor 跟随 foreground
+═══════════════════════════════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font: var(--text-body);
+  color: var(--foreground);
+  background: var(--app-background);
+  padding: var(--space-4);
+  -webkit-font-smoothing: antialiased;
+}
+code, .mono { font: var(--text-mono); }
+
+/* ── App shell ────────────────────────────────────────────────────────────── */
+.app-shell {
+  max-width: 1440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── 双栏骨架（B13：左=操作，右=反馈）─────────────────────────────────────── */
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.main-col { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+@media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
+
+/* 步骤编号 chip（①②③④ 空间叙事） */
+.num-chip {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1.5px solid var(--primary); color: var(--primary);
+  font: var(--text-label);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+
+/* ── 操作符 Chip 面板（B12：分类分组 + hover 签名 + 点击插入）──────────────── */
+.op-panel { margin-top: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-1); }
+.op-head {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer; user-select: none;
+  color: var(--foreground-muted); font: var(--text-body-sm);
+}
+.op-head .caret { display: flex; }
+.op-head .caret svg { transition: transform var(--duration-fast) var(--easing-default); }
+.op-panel.open .op-head .caret svg { transform: rotate(90deg); }
+.op-body { display: none; padding: 0 var(--space-3) var(--space-3); flex-direction: column; gap: var(--space-2); }
+.op-panel.open .op-body { display: flex; }
+.op-group { display: flex; align-items: flex-start; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px dashed var(--border-subtle); }
+.op-group:first-child { border-top: none; padding-top: 0; }
+.op-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 8px; flex: none; }
+.op-gname { font: var(--text-label); letter-spacing: var(--letter-spacing-label); color: var(--foreground-secondary); width: 44px; flex: none; margin-top: 5px; }
+.op-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.op-chip {
+  font: var(--text-mono); font-size: 11px;
+  color: var(--foreground-secondary);
+  background: var(--comp-tag-bg); border: 1px solid var(--comp-tag-border);
+  border-radius: var(--radius-sm); padding: 3px 8px; cursor: pointer;
+  transition: all var(--duration-fast) var(--easing-default);
+}
+.op-chip:hover { color: var(--foreground); border-color: var(--border-strong); background: var(--state-hover); transform: translateY(-1px); }
+.op-chip .hint { color: var(--foreground-muted); font-family: var(--font-sans); }
+
+/* ── 空态示例卡片（B11：可操作的引导，一键填入演示）────────────────────────── */
+.ex-cards { display: flex; flex-direction: column; gap: var(--space-2); }
+.ex-card {
+  text-align: left; width: 100%;
+  background: var(--card-bg); border: 1px solid var(--card-border);
+  border-radius: var(--card-radius); padding: var(--space-3);
+  cursor: pointer; display: flex; flex-direction: column; gap: 6px;
+  transition: all var(--duration-fast) var(--easing-default);
+  font-family: var(--font-sans);
+}
+.ex-card:hover { border-color: var(--card-hover-border); background: var(--state-hover); transform: translateY(-1px); }
+.ex-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.ex-title { font: var(--text-body-sm); font-weight: 600; color: var(--foreground); }
+.ex-expr { font: var(--text-mono); font-size: 11px; color: var(--primary); word-break: break-all; }
+.ex-io { font: var(--text-body-sm); color: var(--foreground-muted); }
+.ex-io b { color: var(--success); font-weight: 600; }
+
+/* ── 数据流轨迹（B14：阶段间箭头 + 入→出 + 类型标注）──────────────────────── */
+.flow-input {
+  font: var(--text-mono); font-size: 12px;
+  color: var(--foreground-secondary);
+  background: var(--surface-1);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  word-break: break-all;
+}
+.flow-arrow { display: flex; flex-direction: column; align-items: center; margin: 2px 0; color: var(--foreground-muted); }
+.flow-arrow .bar { width: 2px; height: 10px; background: var(--border-strong); }
+.flow-arrow .tip { font-size: 9px; line-height: 1; margin-top: -1px; }
+.stage-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: 6px; min-width: 0; }
+.stage-idx {
+  font: var(--text-label); color: var(--foreground-muted);
+  background: var(--comp-tag-bg); border: 1px solid var(--comp-tag-border);
+  border-radius: var(--tag-radius); padding: 1px 8px; flex: none;
+}
+.stage-io { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font: var(--text-body); }
+.io-in { color: var(--foreground-secondary); font: var(--text-mono); font-size: 12px; word-break: break-all; }
+.io-arr { color: var(--foreground-muted); flex: none; }
+.io-out { font: var(--text-mono); font-size: 12px; font-weight: 600; word-break: break-all; }
+.io-out.waiting { color: var(--foreground-muted); font-style: italic; font-weight: 400; }
+.type-chip { font: var(--text-label); border-radius: var(--tag-radius); padding: 1px 7px; flex: none; background: var(--comp-tag-bg); color: var(--foreground-muted); }
+.type-num { background: var(--tone-info-bg); color: var(--primary); }
+.type-str { background: var(--tone-green-strong); color: var(--success); }
+.type-bool { background: var(--tone-warning-bg); color: var(--warning); }
+.stage.skipped { opacity: .45; }
+.stage.errored { border-color: var(--danger); }
+
+/* ── 通过率摘要 badge（B15）────────────────────────────────────────────────── */
+.pass-badge {
+  font: var(--text-label); letter-spacing: .3px;
+  border-radius: var(--tag-radius); padding: 3px 10px;
+  cursor: pointer; border: none; margin-left: auto; flex: none;
+  font-weight: 700;
+}
+.pass-badge.ok  { background: var(--success); color: #08111f; }
+.pass-badge.bad { background: var(--danger);  color: #ffffff; }
+
+/* ── Top bar（替换原 56px 蓝色横幅 → 紧凑 toolbar）──────────────────────────── */
+.topbar {
+  height: var(--comp-toolbar-height);
+  background: var(--comp-toolbar-bg);
+  border: 1px solid var(--comp-toolbar-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+}
+.topbar .tb-icon { color: var(--primary); display: flex; }
+.topbar .tb-title { font: var(--text-title-2); }
+.topbar .tb-beta {
+  font: var(--text-label);
+  letter-spacing: var(--letter-spacing-label);
+  color: var(--foreground-muted);
+  background: var(--comp-tag-bg);
+  border: 1px solid var(--comp-tag-border);
+  padding: 2px var(--space-2);
+  border-radius: var(--tag-radius);
+  text-transform: uppercase;
+}
+.topbar .tb-spacer { flex: 1; }
+
+/* Theme switcher (segmented control) */
+.theme-seg {
+  display: flex;
+  gap: var(--segmented-control-gap);
+  padding: var(--segmented-control-padding);
+  background: var(--segmented-control-bg);
+  border: 1px solid var(--segmented-control-border);
+  border-radius: var(--segmented-control-radius);
+}
+.theme-seg button {
+  border: none; background: transparent;
+  color: var(--foreground-secondary);
+  font: var(--text-label);
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--easing-default), color var(--duration-fast) var(--easing-default);
+}
+.theme-seg button:hover { color: var(--foreground); background: var(--state-hover); }
+.theme-seg button.active { color: var(--primary-foreground); background: var(--primary); }
+
+/* ── Mode toggle（segmented control）──────────────────────────────────────── */
+.mode-toggle {
+  display: flex;
+  gap: var(--segmented-control-gap);
+  padding: var(--segmented-control-padding);
+  background: var(--segmented-control-bg);
+  border: 1px solid var(--segmented-control-border);
+  border-radius: var(--segmented-control-radius);
+}
+.mode-btn {
+  flex: 1; border: none; background: transparent;
+  color: var(--foreground-secondary);
+  font: var(--text-body-sm);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all var(--duration-fast) var(--easing-default);
+}
+.mode-btn:hover:not(.active) { background: var(--state-hover); color: var(--foreground); }
+.mode-btn.active { background: var(--primary); color: var(--primary-foreground); }
+.mode-btn svg { width: 14px; height: 14px; }
+
+/* ── Panel / Section ──────────────────────────────────────────────────────── */
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  padding: var(--panel-padding);
+}
+.panel-title {
+  font: var(--text-title-2);
+  margin-bottom: var(--space-3);
+  display: flex; align-items: center; gap: var(--space-2);
+}
+.panel-title svg { width: 15px; height: 15px; color: var(--foreground-secondary); }
+.panel-title .pt-hint { font: var(--text-body-sm); color: var(--foreground-muted); font-weight: 400; margin-left: auto; }
+
+/* ── Expression editor ────────────────────────────────────────────────────── */
+.expr-textarea {
+  width: 100%; min-height: 52px;
+  padding: var(--space-3);
+  font: var(--text-mono);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--foreground);
+  border-radius: var(--input-radius);
+  resize: vertical;
+}
+.expr-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.expr-textarea.invalid { border-color: var(--danger); box-shadow: 0 0 0 3px var(--tone-critical-bg); }
+
+/* inline validation 区（替换 alert）*/
+.inline-msg {
+  margin-top: var(--space-2);
+  font: var(--text-body-sm);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-sm);
+  display: none;
+  align-items: flex-start; gap: 6px;
+}
+.inline-msg.show { display: flex; }
+.inline-msg.err { color: var(--danger); background: var(--tone-critical-bg); }
+.inline-msg.ok  { color: var(--success); background: var(--tone-green-strong); }
+.inline-msg svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; }
+
+.expr-actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-3); align-items: center; }
+.kbd-hint { font: var(--text-label); color: var(--foreground-muted); margin-right: auto; display: flex; align-items: center; gap: 4px; }
+kbd {
+  font: var(--text-label); font-family: var(--font-mono);
+  background: var(--surface-3); border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm); padding: 1px 5px; color: var(--foreground-secondary);
+}
+
+/* ── Buttons (PTO btn) ────────────────────────────────────────────────────── */
+.btn {
+  height: var(--button-height-sm);
+  padding: 0 var(--button-padding-x-md);
+  font: var(--button-font);
+  border-radius: var(--button-radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: var(--button-gap);
+  transition: background var(--duration-fast) var(--easing-default);
+}
+.btn svg { width: 13px; height: 13px; }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--button-focus-ring); }
+.btn:disabled { opacity: var(--button-disabled-opacity); cursor: not-allowed; }
+.btn-solid { background: var(--button-solid-bg); color: var(--button-solid-fg); box-shadow: var(--button-solid-shadow); }
+.btn-solid:hover:not(:disabled) { background: var(--button-solid-bg-hover); }
+.btn-solid:active:not(:disabled) { background: var(--button-solid-bg-press); }
+.btn-secondary { background: var(--button-secondary-bg); color: var(--button-secondary-fg); border-color: var(--button-secondary-border); box-shadow: var(--button-secondary-shadow); }
+.btn-secondary:hover:not(:disabled) { background: var(--button-secondary-bg-hover); }
+.btn-ghost { background: transparent; color: var(--button-ghost-fg); }
+.btn-ghost:hover:not(:disabled) { background: var(--button-ghost-bg-hover); color: var(--button-ghost-fg-hover); }
+.btn-primary { background: var(--primary); color: var(--primary-foreground); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+/* ── Input parameter rows ─────────────────────────────────────────────────── */
+.input-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) 0;
+  flex-wrap: wrap;
+}
+.input-row.warn .input-field { border-color: var(--warning); }
+.input-label { min-width: 220px; display: flex; align-items: center; gap: var(--space-2); font: var(--text-body-sm); }
+.input-label .pname { font: var(--text-mono); color: var(--foreground); }
+.input-label .phint { color: var(--foreground-muted); }
+
+/* 动态徽章（替换硬编码 SYNC）*/
+.badge {
+  display: inline-flex; align-items: center; height: var(--tag-height);
+  padding: 0 var(--tag-padding-x);
+  border-radius: var(--tag-radius);
+  font: var(--text-label); letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase; flex-shrink: 0;
+  border: 1px solid transparent;
+}
+.badge-sync     { background: var(--tone-info-bg);     color: var(--primary);  border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+.badge-ref      { background: color-mix(in srgb, var(--highlight-l0a-violet-source) 16%, transparent); color: var(--highlight-l0a-violet-source); border-color: color-mix(in srgb, var(--highlight-l0a-violet-source) 40%, transparent); }
+.badge-const    { background: var(--tone-green-strong); color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, transparent); }
+.badge-literal  { background: var(--state-muted);      color: var(--foreground-secondary); border-color: var(--border-default); }
+.badge-template { background: var(--tone-warning-bg);  color: var(--warning);  border-color: color-mix(in srgb, var(--warning) 40%, transparent); }
+
+.badge-select {
+  appearance: none;
+  background: transparent; border: 1px solid var(--border-default);
+  color: var(--foreground-secondary); font: var(--text-label);
+  border-radius: var(--radius-sm); padding: 2px 4px; cursor: pointer;
+}
+.badge-select:focus { outline: none; border-color: var(--primary); }
+
+.input-field {
+  flex: 1; min-width: 200px;
+  height: var(--input-height-md);
+  padding: 0 var(--space-3);
+  font: var(--text-mono);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--foreground);
+  border-radius: var(--input-radius);
+}
+.input-field:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.param-msg { flex-basis: 100%; font: var(--text-label); color: var(--warning); padding-left: 232px; display: none; }
+.param-msg.show { display: block; }
+
+/* ── Pipeline stages ──────────────────────────────────────────────────────── */
+.stage {
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
+}
+.stage:last-child { margin-bottom: 0; }
+.stage-expr { font: var(--text-mono); color: var(--foreground-secondary); margin-bottom: 4px; word-break: break-all; }
+.stage-out { font: var(--text-body); font-weight: 500; }
+.stage-out.waiting { color: var(--foreground-muted); font-style: italic; font-weight: 400; }
+
+/* ── Final result ─────────────────────────────────────────────────────────── */
+.final-result {
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+  font: var(--text-title-1); text-align: center;
+  word-break: break-all;
+}
+.final-result.waiting { color: var(--foreground-muted); font: var(--text-body); font-style: italic; }
+.final-result.error { border-color: var(--danger); color: var(--danger); font: var(--text-body); }
+.result-actions { text-align: center; margin-top: var(--space-3); }
+
+/* ── Template variable panel（新增 — 打开隐藏功能）─────────────────────────── */
+.tpl-panel .tpl-head {
+  display: flex; align-items: center; gap: var(--space-2); cursor: pointer; user-select: none;
+}
+.tpl-head .caret { transition: transform var(--duration-fast) var(--easing-default); color: var(--foreground-muted); display: flex; }
+.tpl-panel.open .tpl-head .caret { transform: rotate(90deg); }
+.tpl-body { display: none; margin-top: var(--space-3); flex-direction: column; gap: var(--space-2); }
+.tpl-panel.open .tpl-body { display: flex; }
+.tpl-row { display: flex; align-items: center; gap: var(--space-2); }
+.tpl-row .tpl-key, .tpl-row .tpl-val {
+  height: var(--input-height-md); padding: 0 var(--space-3);
+  font: var(--text-mono); background: var(--input-bg);
+  border: 1px solid var(--input-border); color: var(--foreground);
+  border-radius: var(--input-radius);
+}
+.tpl-row .tpl-key { width: 200px; }
+.tpl-row .tpl-val { flex: 1; }
+.tpl-row .tpl-key:focus, .tpl-row .tpl-val:focus { outline: none; border-color: var(--primary); }
+.icon-btn {
+  width: 28px; height: 28px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm); color: var(--foreground-muted); cursor: pointer;
+}
+.icon-btn:hover { background: var(--state-hover); color: var(--foreground); }
+.icon-btn svg { width: 13px; height: 13px; }
+
+/* ── History panel（新增 P1 — localStorage 持久化）────────────────────────── */
+.history-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.history-empty { font: var(--text-body-sm); color: var(--foreground-muted); }
+.history-item {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--inspector-soft-card-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--inspector-soft-card-radius);
+  cursor: pointer;
+}
+.history-item:hover { background: var(--inspector-soft-card-bg-hover); border-color: var(--border-default); }
+.history-item .hi-expr { font: var(--text-mono); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--foreground-secondary); }
+.history-item .hi-time { font: var(--text-label); color: var(--foreground-muted); flex-shrink: 0; }
+
+/* ── Test-case loading ────────────────────────────────────────────────────── */
+.load-textarea {
+  width: 100%; min-height: 130px;
+  padding: var(--space-3);
+  font: var(--text-mono);
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  color: var(--foreground); border-radius: var(--input-radius); resize: vertical;
+}
+.load-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.load-textarea::placeholder { color: var(--foreground-disabled); }
+.action-bar { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+
+/* ── Stats ────────────────────────────────────────────────────────────────── */
+.stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--space-2); margin-bottom: var(--space-3);
+}
+.stat {
+  text-align: center; padding: var(--space-3) var(--space-2);
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.stat-v { font: var(--text-title-1); }
+.stat-v.s-ok { color: var(--success); }
+.stat-v.s-fail { color: var(--danger); }
+.stat-v.s-warn { color: var(--warning); }
+.stat-l { font: var(--text-label); color: var(--foreground-muted); text-transform: uppercase; letter-spacing: var(--letter-spacing-label); margin-top: 2px; }
+
+/* ── Filter chips（新增 P1 — 结果筛选）────────────────────────────────────── */
+.filter-bar { display: flex; gap: var(--space-2); margin-bottom: var(--space-2); flex-wrap: wrap; }
+.filter-chip {
+  height: var(--stat-chip-height); padding: 0 var(--stat-chip-padding-x);
+  background: var(--stat-chip-bg); border: 1px solid var(--stat-chip-border);
+  border-radius: var(--stat-chip-radius); color: var(--foreground-secondary);
+  font: var(--text-label); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+}
+.filter-chip.active { background: var(--state-selected); border-color: var(--primary); color: var(--foreground); }
+.filter-chip .fc-count { color: var(--foreground-muted); }
+
+/* ── Virtual scroll table ─────────────────────────────────────────────────── */
+.vtable-header {
+  display: flex;
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  border: 1px solid var(--table-border); border-radius: var(--radius-md) var(--radius-md) 0 0;
+  min-width: fit-content;
+  height: var(--table-header-height);
+}
+.vtable-header .vcell { font: var(--text-label); text-transform: uppercase; letter-spacing: var(--letter-spacing-label); color: var(--foreground-muted); display: flex; align-items: center; }
+.virtual-container {
+  max-height: calc(100vh - 420px); min-height: 160px;
+  overflow: auto; position: relative;
+  border: 1px solid var(--table-border); border-top: none;
+}
+.virtual-spacer { position: relative; }
+.virtual-content { position: absolute; top: 0; left: 0; right: 0; }
+.vrow {
+  display: flex; min-width: fit-content;
+  height: var(--table-row-height); align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.vrow:hover { background: var(--state-hover); }
+.vrow.mismatch { background: var(--tone-critical-bg); }
+.vrow.errored { background: var(--tone-warning-bg); }
+.vcell { padding: 0 var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--text-mono); }
+.vcell.ci { width: 52px; flex-shrink: 0; justify-content: center; color: var(--foreground-muted); }
+.vcell.inp, .vcell.exp, .vcell.act { flex: 1; min-width: 120px; display: block; }
+.vcell.st { width: 64px; flex-shrink: 0; display: flex; justify-content: center; }
+.mic { width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; }
+.mic-ok { background: var(--success); color: var(--background); }
+.mic-fail { background: var(--danger); color: var(--primary-foreground); }
+.mic-err { background: var(--warning); color: var(--background); }
+.scroll-foot {
+  display: flex; justify-content: space-between;
+  font: var(--text-label); color: var(--foreground-muted);
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  border: 1px solid var(--table-border); border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+/* ── Error box / toast ────────────────────────────────────────────────────── */
+.errbox {
+  padding: var(--space-3);
+  background: var(--tone-critical-bg);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm); color: var(--foreground);
+  display: none;
+}
+.errbox.show { display: block; }
+.errbox strong { color: var(--danger); }
+.errbox .err-detail { margin-top: 4px; color: var(--foreground-secondary); white-space: pre-wrap; }
+
+#toast {
+  position: fixed; bottom: var(--space-5); right: var(--space-5);
+  background: var(--surface-4); color: var(--foreground);
+  border: 1px solid var(--border-strong);
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius-md);
+  font: var(--text-body-sm); box-shadow: var(--shadow-md);
+  z-index: var(--z-toast); opacity: 0; transform: translateY(8px);
+  transition: opacity var(--duration-base) var(--easing-default), transform var(--duration-base) var(--easing-default);
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+
+.hidden { display: none !important; }
+.muted-note { font: var(--text-body-sm); color: var(--foreground-muted); }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ── Top bar ──────────────────────────────────────────────────────────── -->
+  <div class="topbar">
+    <span class="tb-icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" width="18" height="18">
+        <path d="M2 4h12M2 8h8M2 12h5"/><circle cx="13" cy="11" r="2"/>
+      </svg>
+    </span>
+    <span class="tb-title">管道表达式批量评估器</span>
+    <span class="tb-beta">Beta</span>
+    <span class="tb-spacer"></span>
+    <div class="theme-seg" role="group" aria-label="主题切换">
+      <button data-theme-val="dark" class="active" onclick="setTheme('dark')">暗色</button>
+      <button data-theme-val="light" onclick="setTheme('light')">亮色</button>
+      <button data-theme-val="glass" onclick="setTheme('glass')">玻璃</button>
+    </div>
+  </div>
+
+  <!-- ── 双栏骨架：左=操作（表达式/参数），右=反馈（管道轨迹/结果）─────────── -->
+  <div class="main-grid">
+  <div class="main-col" id="col-left">
+
+  <!-- ── Expression editor ────────────────────────────────────────────────── -->
+  <div class="panel">
+    <div class="panel-title">
+      <span class="num-chip">1</span>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M4 2v12M12 2v12M2 5h2M2 11h2M12 5h2M12 11h2"/></svg>
+      管道表达式
+    </div>
+    <textarea id="expr-input" class="expr-textarea" spellcheck="false">$1;$2 |> expr($1 + $2) |> expr($1 * 2)</textarea>
+    <div id="expr-msg" class="inline-msg"></div>
+
+    <!-- 操作符 Chip 面板（B12：分类分组 · hover 签名 · 点击插入光标处）-->
+    <div class="op-panel open" id="op-panel">
+      <div class="op-head" onclick="toggleOpPanel()">
+        <span class="caret"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" width="12" height="12"><path d="M6 4l4 4-4 4"/></svg></span>
+        操作符面板 · 悬停看签名说明 · 点击插入到光标处
+      </div>
+      <div class="op-body">
+        <div class="op-group">
+          <span class="op-dot" style="background:var(--primary);"></span><span class="op-gname">输入</span>
+          <div class="op-chips">
+            <button class="op-chip" onclick="insertOp('$1')" title="$N · 引用第 N 个输入参数；首段用 ; 分隔多个输入">$1 <span class="hint">· 引用第 1 个输入参数</span></button>
+            <button class="op-chip" onclick="insertOp(';$2')" title="; · 在首段追加声明一个输入参数">;$2</button>
+            <button class="op-chip" onclick="insertOp(' |> ')" title="|> · 管道连接符，左侧输出作为右侧 $1（两侧必须有空格）">|&gt;</button>
+          </div>
+        </div>
+        <div class="op-group">
+          <span class="op-dot" style="background:var(--success);"></span><span class="op-gname">字符串</span>
+          <div class="op-chips">
+            <button class="op-chip" onclick="insertOp('string.format(&quot;%.2f&quot;, $1)')" title="string.format(fmt, …) · Lua 风格格式化：%d %f %s %x %b 等">string.format <span class="hint">"F"</span></button>
+            <button class="op-chip" onclick="insertOp('string.upper($1)')" title="string.upper(s) · 转大写">string.upper</button>
+            <button class="op-chip" onclick="insertOp('string.lower($1)')" title="string.lower(s) · 转小写">string.lower</button>
+            <button class="op-chip" onclick="insertOp('string.sub($1, 1, 3)')" title="string.sub(s, start, end) · 1 基截取，支持负索引">string.sub <span class="hint">S [L]</span></button>
+            <button class="op-chip" onclick="insertOp('string.gsub($1, &quot;a&quot;, &quot;b&quot;)')" title="string.gsub(s, pat, repl) · Lua pattern 全局替换（%d %a %s 等字符类）">string.gsub <span class="hint">"F" "T"</span></button>
+            <button class="op-chip" onclick="insertOp('string.cmp($1, &quot;expected&quot;)')" title="string.cmp(a, b) · 字符串相等比较，返回 true/false">string.cmp <span class="hint">"S"</span></button>
+          </div>
+        </div>
+        <div class="op-group">
+          <span class="op-dot" style="background:var(--warning);"></span><span class="op-gname">自定义</span>
+          <div class="op-chips">
+            <button class="op-chip" onclick="insertOp('expr($1 + $2)')" title="expr(<表达式>) · 算术/逻辑/位运算；? : 为 Lua 风格条件（0 和 &quot;&quot; 为真值）">expr <span class="hint">( &lt;JS&gt; )</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="expr-actions">
+      <span class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> 应用</span>
+      <button class="btn btn-secondary" onclick="resetExpr()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M13 8a5 5 0 1 1-1.5-3.5M13 2v3h-3"/></svg>
+        重置
+      </button>
+      <button class="btn btn-primary" onclick="applyExpr()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8.5l3 3 7-7"/></svg>
+        应用表达式
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Mode toggle ──────────────────────────────────────────────────────── -->
+  <div class="mode-toggle" role="tablist">
+    <button class="mode-btn active" id="btn-debug" role="tab" onclick="switchMode('debug')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="9" r="4"/><path d="M8 5V2M5 3l1.5 2M11 3L9.5 5M2 9h2M12 9h2M4 13l1.5-1.5M12 13l-1.5-1.5"/></svg>
+      调试模式
+    </button>
+    <button class="mode-btn" id="btn-testcase" role="tab" onclick="switchMode('testcase')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M5 6h6M5 9h6M5 12h3"/></svg>
+      用例模式
+    </button>
+  </div>
+
+  <!-- ── Debug mode ───────────────────────────────────────────────────────── -->
+  <div id="dbg-inputs" class="panel">
+    <div class="panel-title">
+      <span class="num-chip">2</span>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
+      输入参数
+    </div>
+    <div id="inputs-container"></div>
+  </div>
+
+  <!-- ── Template variables panel ─────────────────────────────────────────── -->
+  <div id="dbg-tpl" class="panel tpl-panel">
+    <div class="tpl-head" onclick="toggleTplPanel()">
+      <span class="caret" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" width="13" height="13"><path d="M6 4l4 4-4 4"/></svg></span>
+      <span class="panel-title" style="margin:0;">模板变量</span>
+      <span class="pt-hint" style="margin-left:auto;">&dollar;{VarName} 注入</span>
+    </div>
+    <div class="tpl-body">
+      <div class="muted-note">为表达式中的 <code>&dollar;{VarName}</code> 占位符提供值；亦可由宿主通过 postMessage 注入。</div>
+      <div id="tpl-rows"></div>
+      <div>
+        <button class="btn btn-secondary" onclick="addTplRow()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 3v10M3 8h10"/></svg>
+          添加变量
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── History panel（左栏：操作侧）────────────────────────────────────── -->
+  <div id="dbg-history" class="panel">
+    <div class="panel-title">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>
+      历史表达式
+      <span class="pt-hint">本地保存，点击恢复</span>
+    </div>
+    <div id="history-list" class="history-list"></div>
+  </div>
+
+  <!-- ── Test-case mode · 左栏（加载用例）──────────────────────────────────── -->
+  <div id="tc-left" class="hidden">
+    <div class="panel">
+      <div class="panel-title">
+        <span class="num-chip">2</span>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
+        加载测试用例
+      </div>
+      <textarea class="load-textarea" id="tc-input" spellcheck="false"
+        placeholder="粘贴测试用例（空格 / 逗号 / Tab 分隔，最后一列为预期输出）&#10;&#10;示例（单输入）:&#10;5  10&#10;10 20&#10;&#10;示例（多输入）:&#10;3 4 14&#10;10 5 30&#10;&#10;# 井号开头为注释行"></textarea>
+      <div class="action-bar" style="margin-top:var(--space-3);">
+        <button class="btn btn-primary" onclick="loadTestCases()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
+          加载用例
+        </button>
+        <button class="btn btn-ghost" onclick="clearTestCases()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 4h10M6 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5 4l.5 9a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1L11 4"/></svg>
+          清空
+        </button>
+      </div>
+      <div id="tc-load-err" class="errbox" style="margin-top:var(--space-3);"></div>
+    </div>
+  </div>
+
+  </div><!-- /col-left -->
+  <div class="main-col" id="col-right">
+
+  <!-- ── 空态示例卡片（B11：右栏空白变成可操作引导）──────────────────────────── -->
+  <div id="dbg-empty" class="panel">
+    <div class="panel-title">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 1.5l2 4 4.5.5-3.3 3.1.9 4.4L8 11.3l-4.1 2.2.9-4.4L1.5 6l4.5-.5z"/></svg>
+      还没有数据？点一张示例立即看运行轨迹
+    </div>
+    <div class="ex-cards" id="ex-cards"></div>
+  </div>
+
+  <!-- ── Pipeline（B14：数据流轨迹）──────────────────────────────────────────── -->
+  <div id="dbg-pipeline" class="panel">
+    <div class="panel-title">
+      <span class="num-chip">3</span>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 5h5l2 6h5M2 11h3"/><circle cx="14" cy="5" r="1.5"/></svg>
+      管道处理
+      <span class="pt-hint">每阶段：入 → 操作 → 出</span>
+    </div>
+    <div id="pipeline-container"></div>
+  </div>
+
+  <!-- ── Final result ─────────────────────────────────────────────────────── -->
+  <div id="dbg-result" class="panel">
+    <div class="panel-title">
+      <span class="num-chip">4</span>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2l1.8 3.8L14 6.4l-3 2.9.7 4.2L8 11.5 4.3 13.5 5 9.3 2 6.4l4.2-.6z"/></svg>
+      最终结果
+    </div>
+    <div class="final-result waiting" id="final-result">等待输入…</div>
+    <div class="result-actions">
+      <button class="btn btn-secondary hidden" id="copy-btn" onclick="copyResult()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h7"/></svg>
+        复制结果
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Test-case mode · 右栏（执行 + 结果）───────────────────────────────── -->
+  <div id="tc-right" class="hidden">
+
+    <div class="panel hidden" id="tc-exec-section" style="margin-bottom:var(--space-4);">
+      <div class="panel-title">
+        <span class="num-chip">3</span>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 2L3 9h4l-1 5 6-7H8z"/></svg>
+        批量执行
+        <span class="pt-hint"><kbd>F5</kbd> 执行</span>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary" id="tc-exec-btn" onclick="executeBatch()">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 3l9 5-9 5z"/></svg>
+          执行全部
+        </button>
+        <button class="btn btn-secondary hidden" id="tc-export-btn" onclick="exportResults()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 10V2M5 5l3-3 3 3M3 11v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-2"/></svg>
+          导出结果
+        </button>
+        <span id="tc-exec-info" class="muted-note"></span>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="tc-results-section">
+      <div class="panel-title">
+        <span class="num-chip">4</span>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 14V9M6 14V4M10 14V7M14 14V2"/></svg>
+        执行结果
+        <button class="pass-badge hidden" id="pass-badge" onclick="setFilter('mismatch')" title="点击筛选不匹配项"></button>
+      </div>
+      <div class="stats" id="tc-stats"></div>
+      <div class="filter-bar" id="tc-filter"></div>
+      <div class="vtable-header">
+        <div class="vcell ci">#</div>
+        <div class="vcell inp">输入</div>
+        <div class="vcell exp">期望输出</div>
+        <div class="vcell act">实际输出</div>
+        <div class="vcell st">状态</div>
+      </div>
+      <div class="virtual-container" id="vc">
+        <div class="virtual-spacer" id="vs">
+          <div class="virtual-content" id="vcon"></div>
+        </div>
+      </div>
+      <div class="scroll-foot">
+        <span id="vrange">–</span>
+        <span id="vhint"></span>
+      </div>
+    </div>
+
+  </div><!-- /tc-right -->
+
+  </div><!-- /col-right -->
+  </div><!-- /main-grid -->
+
+</div><!-- /app-shell -->
+
+<div id="toast"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     JavaScript — 求值核心逐字移植自原 Demo（逻辑零改动），仅 UI/UX 层增强
+════════════════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1.  SafeExpressionParser  (逐字移植，未改动求值逻辑)
+═══════════════════════════════════════════════════════════════════════════ */
+class SafeExpressionParser {
+  constructor(input) { this.input = input; this.tokens = []; this.pos = 0; this._tokenize(); }
+  _tokenize() {
+    const patterns = [
+      { re: /\s+/, skip: true },
+      { re: /\/\/[ \t]*(?=[0-9(a-zA-Z_$+\-*&|^~!<>?:%])/ },
+      { re: /\/\/.*$/, skip: true },
+      { re: /\d+(\.\d+)?/ },
+      { re: /"[^"]*"|'[^']*'/ },
+      { re: /true|false/ },
+      { re: /null|undefined/ },
+      { re: /\?/, sub: 'and' },
+      { re: /:(?![a-zA-Z_$])/, sub: 'or' },
+      { re: /\band\b/ }, { re: /\bor\b/ },
+      { re: /&&/ }, { re: /\|\|/ },
+      { re: />>>|<<|>>/ },
+      { re: /~=|==|!=|<=|>=/ },
+      { re: /[+\-*/%&|^~!<>]/ },
+      { re: /[\(\)\[\]\{\}]/ },
+      { re: /[^"'\s+\-*/%&|^~!<>?:\[\]\(\)\{\}=,]+/ },
+    ];
+    let rem = this.input;
+    while (rem.length > 0) {
+      let matched = false;
+      for (const p of patterns) {
+        const m = rem.match(p.re);
+        if (m && m.index === 0) {
+          if (!p.skip) { let tok = p.sub || m[0]; if (tok.startsWith('//')) tok = tok.replace(/[ \t]+$/, ''); this.tokens.push(tok); }
+          rem = rem.slice(m[0].length); matched = true; break;
+        }
+      }
+      if (!matched) rem = rem.slice(1);
+    }
+  }
+  parse() { return this._parseLogicalOr(); }
+  _peek(off = 0) { return this.tokens[this.pos + off] ?? null; }
+  _consume() { return this.tokens[this.pos++] ?? ''; }
+  _match(t) { if (this._peek() === t) { this._consume(); return true; } return false; }
+  _expect(t) { if (this._peek() !== t) throw new Error(`期望 '${t}'，但得到 '${this._peek()}'`); this._consume(); }
+  _truthy(v) { return v !== null && v !== undefined && v !== false; }
+  _luaAnd(l, r) { return this._truthy(l) ? r : l; }
+  _luaOr(l, r) { return this._truthy(l) ? l : r; }
+  _parseLogicalOr() {
+    let l = this._parseLogicalAnd();
+    while (true) { const op = this._peek(); if (op === '||' || op === 'or') { this._consume(); l = this._luaOr(l, this._parseLogicalAnd()); } else break; }
+    return l;
+  }
+  _parseLogicalAnd() {
+    let l = this._parseRelational();
+    while (true) { const op = this._peek(); if (op === '&&' || op === 'and') { this._consume(); l = this._luaAnd(l, this._parseRelational()); } else break; }
+    return l;
+  }
+  _parseRelational() {
+    let l = this._parseBitwiseOr();
+    while (true) {
+      if (this._match('==')) l = l === this._parseBitwiseOr();
+      else if (this._match('!=')) l = l !== this._parseBitwiseOr();
+      else if (this._match('~=')) l = l !== this._parseBitwiseOr();
+      else if (this._match('<=')) l = l <= this._parseBitwiseOr();
+      else if (this._match('>=')) l = l >= this._parseBitwiseOr();
+      else if (this._peek() === '<' && this._peek(1) !== '<') { this._consume(); l = l < this._parseBitwiseOr(); }
+      else if (this._peek() === '>' && this._peek(1) !== '>') { this._consume(); l = l > this._parseBitwiseOr(); }
+      else break;
+    }
+    return l;
+  }
+  _parseBitwiseOr() { let l = this._parseBitwiseXor(); while (this._peek() === '|' && this._peek(1) !== '|') { this._consume(); l = l | this._parseBitwiseXor(); } return l; }
+  _parseBitwiseXor() { let l = this._parseBitwiseAnd(); while (this._peek() === '^') { this._consume(); l = l ^ this._parseBitwiseAnd(); } return l; }
+  _parseBitwiseAnd() { let l = this._parseShift(); while (this._peek() === '&' && this._peek(1) !== '&') { this._consume(); l = l & this._parseShift(); } return l; }
+  _parseShift() {
+    let l = this._parseAdditive();
+    while (true) {
+      if (this._match('<<<')) l = l << this._parseAdditive();
+      else if (this._match('>>>')) l = (l >>> 0) >>> this._parseAdditive();
+      else if (this._match('<<')) l = l << this._parseAdditive();
+      else if (this._match('>>')) l = l >> this._parseAdditive();
+      else break;
+    }
+    return l;
+  }
+  _parseAdditive() {
+    let l = this._parseMultiplicative();
+    while (true) {
+      if (this._peek() === '+' && this.pos > 0) { this._consume(); l = l + this._parseMultiplicative(); }
+      else if (this._peek() === '-' && this.pos > 0) { this._consume(); l = l - this._parseMultiplicative(); }
+      else break;
+    }
+    return l;
+  }
+  _parseMultiplicative() {
+    let l = this._parseUnary();
+    while (true) {
+      if (this._peek() === '*' && this._peek(1) !== '*') { this._consume(); l = l * this._parseUnary(); }
+      else if (this._match('//')) l = Math.trunc(l / this._parseUnary());
+      else if (this._peek() === '/') { this._consume(); l = l / this._parseUnary(); }
+      else if (this._peek() === '%') { this._consume(); l = l % this._parseUnary(); }
+      else break;
+    }
+    return l;
+  }
+  _parseUnary() {
+    if (this._match('!')) return !this._parseUnary();
+    if (this._match('~')) return ~this._parseUnary();
+    if (this._match('-')) return -this._parseUnary();
+    if (this._match('+')) return +this._parseUnary();
+    return this._parsePrimary();
+  }
+  _parsePrimary() {
+    if (this._match('(')) { const v = this._parseLogicalOr(); this._expect(')'); return v; }
+    const t = this._peek();
+    if (t === null) throw new Error('意外的表达式结束');
+    if (t === '__EMPTY_STRING__') { this._consume(); return ''; }
+    if (t === '__NULL__') { this._consume(); return null; }
+    if (t === '__UNDEFINED__') { this._consume(); return undefined; }
+    if (t.startsWith('"') || t.startsWith("'")) { this._consume(); return t.slice(1, -1); }
+    if (/^-?\d+(\.\d+)?$/.test(t)) { this._consume(); return parseFloat(t); }
+    if (t === 'true') { this._consume(); return true; }
+    if (t === 'false') { this._consume(); return false; }
+    if (t === 'null') { this._consume(); return null; }
+    if (t === 'undefined') { this._consume(); return undefined; }
+    this._consume();
+    if (t === 'NaN') return NaN;
+    if (t === 'Infinity') return Infinity;
+    const n = parseFloat(t);
+    return isNaN(n) ? t : n;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2.  PipeEvaluator  (逐字移植)
+═══════════════════════════════════════════════════════════════════════════ */
+class PipeEvaluator {
+  constructor() { this.templateVars = new Map(); }
+  _parseVal(v) {
+    if (typeof v !== 'string') return v;
+    if (/^-?\d+(\.\d+)?$/.test(v)) { const n = parseFloat(v); if (!isNaN(n)) return n; }
+    if (v.toLowerCase() === 'true') return true;
+    if (v.toLowerCase() === 'false') return false;
+    if (v.toLowerCase() === 'null') return null;
+    return v;
+  }
+  _rmQuotes(s) {
+    s = String(s);
+    if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) return s.slice(1, -1);
+    return s;
+  }
+  _replTplVars(s) {
+    return s.replace(/\$\{([^}]+)\}/g, (m, name) => { const v = this.templateVars.get(name); return v !== undefined ? String(v) : m; });
+  }
+  _replParams(arg, params) {
+    let r = arg;
+    for (let i = 0; i < params.length; i++) {
+      let pv = params[i];
+      if (typeof pv === 'string' && ((pv.startsWith('"') && pv.endsWith('"')) || (pv.startsWith("'") && pv.endsWith("'")))) pv = pv.slice(1, -1);
+      const sub = pv === '' ? '__EMPTY_STRING__' : pv === null ? '__NULL__' : pv === undefined ? '__UNDEFINED__' : String(pv);
+      r = r.replace(new RegExp('\\$' + (i + 1), 'g'), sub);
+    }
+    return this._replTplVars(r);
+  }
+  _strFormat(fmt, params) {
+    let pi = 0;
+    return fmt.replace(/%(-)?(\+)?( )?(0)?(\d+)?(?:\.(\d+))?([sdfoxXeEubBgGi])/g, (_, la, ps, sp, zp, wS, prS, type) => {
+      if (pi >= params.length) return _;
+      const raw = params[pi++];
+      const width = wS ? parseInt(wS) : 0;
+      const prec = prS !== undefined ? parseInt(prS) : (['f','e','E','g','G'].includes(type) ? 6 : 0);
+      const num = Number(raw);
+      let fmt2 = '';
+      switch (type) {
+        case 's': fmt2 = String(raw ?? ''); if (prec > 0) fmt2 = fmt2.slice(0, prec); break;
+        case 'd': case 'i': fmt2 = Math.trunc(num).toString(); break;
+        case 'f': fmt2 = num.toFixed(prec); break;
+        case 'e': fmt2 = num.toExponential(prec); break;
+        case 'E': fmt2 = num.toExponential(prec).replace('e','E'); break;
+        case 'g': case 'G':
+          fmt2 = (Math.abs(num) >= 1e-4 && Math.abs(num) < 1e4) ? num.toFixed(prec) : num.toExponential(prec);
+          if (type === 'G') fmt2 = fmt2.replace('e','E'); break;
+        case 'x': fmt2 = Math.round(num).toString(16); break;
+        case 'X': fmt2 = Math.round(num).toString(16).toUpperCase(); break;
+        case 'o': fmt2 = Math.round(num).toString(8); break;
+        case 'b': case 'B': fmt2 = Math.round(num).toString(2); break;
+        case 'u': fmt2 = Math.abs(Math.trunc(num)).toString(); break;
+        default: fmt2 = String(raw ?? '');
+      }
+      if (ps && !isNaN(num) && type !== 's') { if (num > 0) fmt2 = '+' + fmt2; }
+      else if (sp && !isNaN(num) && !ps && type !== 's') { if (num >= 0) fmt2 = ' ' + fmt2; }
+      if (fmt2.length < width) {
+        const pad = width - fmt2.length;
+        if (zp && !la && type !== 's') {
+          if (/^[+\- ]/.test(fmt2)) fmt2 = fmt2[0] + '0'.repeat(pad) + fmt2.slice(1);
+          else fmt2 = '0'.repeat(pad) + fmt2;
+        } else if (la) fmt2 = fmt2 + ' '.repeat(pad);
+        else fmt2 = ' '.repeat(pad) + fmt2;
+      }
+      return fmt2;
+    });
+  }
+  _strSub(s, start, end) {
+    const len = s.length;
+    let a = start < 0 ? len + start + 1 : start;
+    let b = end < 0 ? len + end + 1 : end;
+    const js = Math.max(0, a - 1);
+    const je = Math.min(len, b);
+    return js >= len || js > je ? '' : s.substring(js, je);
+  }
+  _luaPatToRegex(pat) {
+    const magic = '^$()%.[]*+-?';
+    const cls = { a:'[A-Za-z]', d:'[0-9]', s:'\\s', l:'[a-z]', u:'[A-Z]', w:'[A-Za-z0-9_]', x:'[0-9A-Fa-f]', c:'[\\x00-\\x1F]', z:'\\x00' };
+    let r = ''; let i = 0;
+    while (i < pat.length) {
+      const c = pat[i];
+      if (c === '%' && i + 1 < pat.length) { const nx = pat[++i]; r += cls[nx] || nx; i++; }
+      else if (c === '[') { const cb = pat.indexOf(']', i); if (cb === -1) { r += '\\['; i++; } else { r += '[' + pat.slice(i+1, cb) + ']'; i = cb + 1; } }
+      else if (magic.includes(c)) { r += '\\' + c; i++; }
+      else { r += c; i++; }
+    }
+    return new RegExp(r, 'g');
+  }
+  _evalStage(stage, params) {
+    const pArr = Array.isArray(params) ? params : [params];
+    const args = stage.args.map(a => this._replParams(a, pArr));
+    switch (stage.fn) {
+      case 'expr': return new SafeExpressionParser(args[0]).parse();
+      case 'string.format': { let fmt = args[0]; if ((fmt.startsWith('"') && fmt.endsWith('"')) || (fmt.startsWith("'") && fmt.endsWith("'"))) fmt = fmt.slice(1, -1); return this._strFormat(fmt, args.slice(1)); }
+      case 'string.cmp': return this._rmQuotes(args[0]) === this._rmQuotes(args[1]);
+      case 'string.sub': { const s = this._rmQuotes(args[0]); return this._strSub(s, parseInt(args[1], 10), parseInt(args[2], 10)); }
+      case 'string.gsub': { const s = this._rmQuotes(args[0]); const rgx = this._luaPatToRegex(this._rmQuotes(args[1])); const rep = this._rmQuotes(args[2]).replace(/%(\d)/g, '$$$1'); return s.replace(rgx, rep); }
+      case 'string.upper': return this._rmQuotes(args[0]).toUpperCase();
+      case 'string.lower': return this._rmQuotes(args[0]).toLowerCase();
+      default: throw new Error(`未知函数: ${stage.fn}`);
+    }
+  }
+  evaluate(parsed, inputVals, tplVars) {
+    this.templateVars = tplVars || new Map();
+    try {
+      const inputs = inputVals.map((v, i) => { if (v === '' || v === undefined) throw new Error(`参数 $${i+1} 未提供`); return this._parseVal(v); });
+      const intermediates = [];
+      let cur = inputs;
+      for (const stage of parsed.stages) { cur = this._evalStage(stage, cur); intermediates.push(cur); }
+      return { success: true, result: cur, intermediates };
+    } catch (e) { return { success: false, error: e.message, intermediates: [] }; }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3.  Pipe expression parser  (逐字移植)
+═══════════════════════════════════════════════════════════════════════════ */
+function parsePipeExpr(raw) {
+  try {
+    const firstPipe = raw.indexOf(' |> ');
+    let inputPart, pipeStr;
+    if (firstPipe === -1) { inputPart = raw.trim(); pipeStr = ''; }
+    else { inputPart = raw.slice(0, firstPipe).trim(); pipeStr = raw.slice(firstPipe + 4).trim(); }
+    const inputTokens = inputPart.split(';').map(t => t.trim()).filter(Boolean);
+    const inputs = inputTokens.map((t, i) => ({ idx: i, placeholder: t, desc: `参数 ${t}` }));
+    const stageStrs = pipeStr ? pipeStr.split(' |> ').filter(Boolean) : [];
+    const stages = stageStrs.map(s => {
+      s = s.trim();
+      const m = s.match(/^([A-Za-z_][A-Za-z0-9_.]*)\((.*)\)$/s);
+      if (!m) return { fn: 'expr', args: [s], raw: s };
+      const fn = m[1]; const argsStr = m[2];
+      const args = splitArgs(argsStr);
+      return { fn, args, raw: s };
+    });
+    return { ok: true, inputs, stages };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+function splitArgs(s) {
+  const args = []; let cur = ''; let depth = 0; let inQ = false; let qc = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (!inQ && (c === '"' || c === "'")) { inQ = true; qc = c; cur += c; continue; }
+    if (inQ && c === qc && s[i-1] !== '\\') { inQ = false; qc = ''; cur += c; continue; }
+    if (inQ) { cur += c; continue; }
+    if (c === '(') { depth++; cur += c; continue; }
+    if (c === ')') { depth--; cur += c; continue; }
+    if (c === ',' && depth === 0) { args.push(cur.trim()); cur = ''; continue; }
+    cur += c;
+  }
+  if (cur.trim()) args.push(cur.trim());
+  return args;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4.  Test case parser  (逐字移植)
+═══════════════════════════════════════════════════════════════════════════ */
+function parseTestCaseLine(line, lineNum) {
+  const tokens = tokenizeLine(line, lineNum);
+  if (tokens.length < 2) throw new Error(`至少需要 2 列（输入 + 预期输出），得到 ${tokens.length} 列`);
+  const inputs = tokens.slice(0, -1).map(t => { const n = Number(t); return (isNaN(n) || t === '') ? t : n; });
+  return { id: Math.random().toString(36).slice(2), inputs, expectedOutput: tokens[tokens.length - 1], actualOutput: null, executionStatus: 'pending', lineNumber: lineNum, createdAt: Date.now() };
+}
+function tokenizeLine(line, lineNum) {
+  const tokens = []; let cur = ''; let inQ = false; let qc = ''; let i = 0;
+  while (i < line.length) {
+    const c = line[i];
+    if (!inQ && (c === '"' || c === "'")) { inQ = true; qc = c; i++; continue; }
+    if (inQ && c === qc) { if (i + 1 < line.length && line[i+1] === qc) { cur += qc; i += 2; continue; } inQ = false; qc = ''; i++; continue; }
+    if (inQ && c === '\\' && i + 1 < line.length) { const nx = line[i+1]; const esc = { n:'\n', t:'\t', r:'\r', '\\':'\\', '"':'"', "'":"'", '0':'\0' }; cur += esc[nx] ?? nx; i += 2; continue; }
+    if (!inQ && (c === ' ' || c === ',' || c === '\t')) { if (cur.trim()) tokens.push(cur.trim()); cur = ''; i++; continue; }
+    cur += c; i++;
+  }
+  if (cur.trim()) tokens.push(cur.trim());
+  if (inQ) throw new Error(`第 ${lineNum} 行引号未闭合`);
+  return tokens;
+}
+function parseTestCaseText(text) {
+  const lines = text.split('\n'); const cases = [], errors = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    try { cases.push(parseTestCaseLine(line, i + 1)); } catch (e) { errors.push({ line: i + 1, message: e.message, context: line }); }
+  }
+  return { cases, errors };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5.  Application state
+═══════════════════════════════════════════════════════════════════════════ */
+const evaluator = new PipeEvaluator();
+const DEFAULT_EXPR = '$1;$2 |> expr($1 + $2) |> expr($1 * 2)';
+let originalExprText = DEFAULT_EXPR;
+let parsedExpr = parsePipeExpr(originalExprText);
+let inputValues = [];
+let badgeTypes = [];          // 每个参数的徽章类型（P1：动态徽章）
+let templateVars = [];        // {key, val}（P0：模板变量面板）
+let testCases = [];
+let execResults = null;
+let currentMode = 'debug';
+let resultFilter = 'all';     // P1：结果筛选
+const ROW_H = 36; const BUF = 10;
+let vsReady = false;
+const HIST_KEY = 'pipe-eval-history';
+const TPL_OPEN_KEY = 'pipe-eval-tpl-open';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6.  Render helpers
+═══════════════════════════════════════════════════════════════════════════ */
+function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+function fmtVal(v) { if (v === null) return 'null'; if (v === undefined) return 'undefined'; if (typeof v === 'string') return '"' + v + '"'; return String(v); }
+
+/* P1：根据参数特征推断徽章类型（替换硬编码 SYNC）*/
+function inferBadge(placeholder, idx) {
+  // 默认 literal；可由用户在下拉中改写，或宿主 postMessage 覆盖
+  return badgeTypes[idx] || 'literal';
+}
+const BADGE_LABEL = { sync:'SYNC', ref:'REF', const:'CONST', literal:'LITERAL', template:'TEMPLATE' };
+
+function renderInputFields() {
+  const c = document.getElementById('inputs-container');
+  if (!parsedExpr.ok || !parsedExpr.inputs.length) {
+    c.innerHTML = '<p class="muted-note">此表达式无需输入参数</p>';
+    inputValues = []; return;
+  }
+  inputValues = new Array(parsedExpr.inputs.length).fill('');
+  if (badgeTypes.length !== parsedExpr.inputs.length) badgeTypes = new Array(parsedExpr.inputs.length).fill('literal');
+  c.innerHTML = parsedExpr.inputs.map((inp, i) => {
+    const bt = inferBadge(inp.placeholder, i);
+    const opts = Object.keys(BADGE_LABEL).map(k => `<option value="${k}" ${k===bt?'selected':''}>${BADGE_LABEL[k]}</option>`).join('');
+    return `
+    <div class="input-row" id="irow-${i}">
+      <div class="input-label">
+        <span class="badge badge-${bt}" id="badge-${i}">${BADGE_LABEL[bt]}</span>
+        <select class="badge-select" onchange="onBadgeChange(${i}, this.value)" title="参数类型">${opts}</select>
+        <span class="pname">$${i+1}</span>
+        <span class="phint">(${esc(inp.desc)})</span>
+      </div>
+      <input type="text" class="input-field" inputmode="text"
+        placeholder="输入 $${i+1} 的值" data-idx="${i}"
+        oninput="onInput(${i}, this.value)" ${i === 0 ? 'autofocus' : ''}>
+      <div class="param-msg" id="pmsg-${i}"></div>
+    </div>`;
+  }).join('');
+}
+
+function onBadgeChange(idx, val) {
+  badgeTypes[idx] = val;
+  const b = document.getElementById('badge-' + idx);
+  b.className = 'badge badge-' + val;
+  b.textContent = BADGE_LABEL[val];
+}
+
+/* B14：数据流轨迹 —— 输入行 + 阶段间箭头 + 每阶段「入 → 操作 → 出」 */
+function renderPipelineSlots() {
+  const c = document.getElementById('pipeline-container');
+  if (!parsedExpr.ok || !parsedExpr.stages.length) { c.innerHTML = '<p class="muted-note">无管道处理阶段</p>'; return; }
+  const arrow = '<div class="flow-arrow" aria-hidden="true"><span class="bar"></span><span class="tip">▼</span></div>';
+  c.innerHTML = '<div class="flow-input" id="flow-input">输入：等待参数…</div>' +
+    parsedExpr.stages.map((s, i) => arrow + `
+    <div class="stage" id="stage-${i}">
+      <div class="stage-head"><span class="stage-idx">阶段 ${i+1}</span><div class="stage-expr" style="margin-bottom:0;">${esc(s.raw)}</div></div>
+      <div class="stage-io" id="sio-${i}"><span class="io-out waiting">等待输入…</span></div>
+    </div>`).join('');
+}
+
+/* 数据类型标注 chip */
+function typeChip(v) {
+  const t = v === null ? 'null' : typeof v;
+  const cls = t === 'number' ? 'type-num' : t === 'string' ? 'type-str' : t === 'boolean' ? 'type-bool' : '';
+  return `<span class="type-chip ${cls}">${t}</span>`;
+}
+
+function collectTplVars() {
+  const map = new Map();
+  templateVars.forEach(({ key, val }) => { if (key) map.set(key, val); });
+  return map;
+}
+
+function updateDebugResults() {
+  const fr = document.getElementById('final-result');
+  const cb = document.getElementById('copy-btn');
+  const all = inputValues.length > 0 && inputValues.every(v => v !== '' && v !== undefined);
+
+  // 标记空参数行（inline，替换 alert）
+  inputValues.forEach((v, i) => {
+    const row = document.getElementById('irow-' + i);
+    const msg = document.getElementById('pmsg-' + i);
+    if (row && msg) {
+      const empty = (v === '' || v === undefined);
+      row.classList.toggle('warn', empty && _touched);
+      msg.classList.toggle('show', empty && _touched);
+      if (empty && _touched) msg.textContent = `参数 $${i+1} 未提供`;
+    }
+  });
+
+  // B11：空态示例卡片 —— 参数未填齐时显示，填齐后隐藏
+  const emp = document.getElementById('dbg-empty');
+  if (emp && currentMode === 'debug') emp.classList.toggle('hidden', all && parsedExpr.ok);
+
+  const fin = document.getElementById('flow-input');
+
+  if (!all || !parsedExpr.ok) {
+    fr.className = 'final-result waiting'; fr.textContent = '等待输入…';
+    cb.classList.add('hidden');
+    if (fin) fin.textContent = '输入：等待参数…';
+    parsedExpr.stages && parsedExpr.stages.forEach((_, i) => {
+      const sio = document.getElementById('sio-' + i);
+      if (sio) sio.innerHTML = '<span class="io-out waiting">等待输入…</span>';
+      const st = document.getElementById('stage-' + i);
+      if (st) st.classList.remove('skipped', 'errored');
+    });
+    return;
+  }
+  const res = evaluator.evaluate(parsedExpr, inputValues, collectTplVars());
+  const parsedIn = inputValues.map(v => evaluator._parseVal(v));
+  if (fin) fin.textContent = '输入：' + parsedIn.map((v, i) => `$${i+1} = ${fmtVal(v)}`).join('   ');
+
+  if (!res.success) {
+    // 逐段重放定位出错阶段（只读复用 _evalStage，不改求值核心）
+    let failIdx = -1;
+    try {
+      evaluator.templateVars = collectTplVars();
+      let cur = parsedIn;
+      for (let i = 0; i < parsedExpr.stages.length; i++) {
+        try { cur = evaluator._evalStage(parsedExpr.stages[i], cur); }
+        catch (e) { failIdx = i; break; }
+      }
+    } catch (e) { failIdx = -1; }
+    parsedExpr.stages.forEach((_, i) => {
+      const st = document.getElementById('stage-' + i);
+      const sio = document.getElementById('sio-' + i);
+      if (!st || !sio) return;
+      st.classList.toggle('errored', i === failIdx);
+      st.classList.toggle('skipped', failIdx >= 0 && i > failIdx);
+      sio.innerHTML = i === failIdx
+        ? `<span class="io-out" style="color:var(--danger);">✗ ${esc(res.error)}</span>`
+        : (failIdx >= 0 && i > failIdx
+            ? '<span class="io-out waiting">未执行</span>'
+            : '<span class="io-out waiting">—</span>');
+    });
+    fr.className = 'final-result error'; fr.textContent = res.error;
+    cb.classList.add('hidden');
+  } else {
+    res.intermediates.forEach((v, i) => {
+      const sio = document.getElementById('sio-' + i);
+      const st = document.getElementById('stage-' + i);
+      if (st) st.classList.remove('skipped', 'errored');
+      if (!sio) return;
+      const inV = i === 0 ? parsedIn.map(fmtVal).join(', ') : fmtVal(res.intermediates[i - 1]);
+      sio.innerHTML = `<span class="io-in">入 ${esc(inV)}</span><span class="io-arr">→</span><span class="io-out">出 ${esc(fmtVal(v))}</span>${typeChip(v)}`;
+    });
+    fr.className = 'final-result'; fr.textContent = fmtVal(res.result);
+    cb.classList.remove('hidden');
+  }
+}
+let _touched = false;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7.  Event handlers
+═══════════════════════════════════════════════════════════════════════════ */
+function onInput(idx, val) { _touched = true; inputValues[idx] = val; updateDebugResults(); }
+
+/* P0：inline 表达式校验（替换 alert）*/
+function validateExpr(raw) {
+  if (!raw.trim()) return { ok: false, msg: '表达式不能为空' };
+  const parsed = parsePipeExpr(raw);
+  if (!parsed.ok) return { ok: false, msg: '解析失败：' + parsed.error };
+  if (!parsed.inputs.length) return { ok: false, msg: '至少需要声明一个输入参数（如 $1）' };
+  // 试求值结构：检查未知函数
+  for (const st of parsed.stages) {
+    const known = ['expr','string.format','string.cmp','string.sub','string.gsub','string.upper','string.lower'];
+    if (!known.includes(st.fn)) return { ok: false, msg: `未知函数: ${st.fn}` };
+  }
+  return { ok: true, msg: `✓ 解析成功 · ${parsed.inputs.length} 个输入 · ${parsed.stages.length} 个阶段`, parsed };
+}
+
+function showExprMsg(kind, text) {
+  const el = document.getElementById('expr-msg');
+  const ta = document.getElementById('expr-input');
+  el.className = 'inline-msg show ' + (kind === 'ok' ? 'ok' : 'err');
+  const icon = kind === 'ok'
+    ? '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8.5l3 3 7-7"/></svg>'
+    : '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v4M8 11h.01"/></svg>';
+  el.innerHTML = icon + '<span>' + esc(text) + '</span>';
+  ta.classList.toggle('invalid', kind !== 'ok');
+}
+function clearExprMsg() { const el = document.getElementById('expr-msg'); el.className = 'inline-msg'; document.getElementById('expr-input').classList.remove('invalid'); }
+
+let _exprDebounce = null;
+function onExprInput() {
+  clearTimeout(_exprDebounce);
+  _exprDebounce = setTimeout(() => {
+    const raw = document.getElementById('expr-input').value;
+    if (!raw.trim()) { clearExprMsg(); return; }
+    const v = validateExpr(raw);
+    showExprMsg(v.ok ? 'ok' : 'err', v.msg);
+  }, 300);
+}
+
+function applyExpr() {
+  const raw = document.getElementById('expr-input').value.trim();
+  const v = validateExpr(raw);
+  if (!v.ok) { showExprMsg('err', v.msg); return; }
+  showExprMsg('ok', v.msg);
+  originalExprText = raw;
+  parsedExpr = v.parsed;
+  inputValues = []; badgeTypes = []; _touched = false;
+  renderInputFields();
+  renderPipelineSlots();
+  updateDebugResults();
+  pushHistory(raw);
+  // reset testcase mode
+  testCases = []; execResults = null;
+  document.getElementById('tc-exec-section').classList.add('hidden');
+  document.getElementById('tc-results-section').classList.add('hidden');
+  document.getElementById('tc-load-err').classList.remove('show');
+}
+function resetExpr() { document.getElementById('expr-input').value = originalExprText; clearExprMsg(); applyExpr(); }
+
+function copyResult() {
+  const text = document.getElementById('final-result').textContent;
+  navigator.clipboard?.writeText(text).then(() => showToast('已复制到剪贴板')).catch(() => showToast('复制失败'));
+}
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.getElementById('btn-debug').classList.toggle('active', mode === 'debug');
+  document.getElementById('btn-testcase').classList.toggle('active', mode === 'testcase');
+  ['dbg-inputs','dbg-tpl','dbg-pipeline','dbg-result','dbg-history'].forEach(id => document.getElementById(id).classList.toggle('hidden', mode !== 'debug'));
+  ['tc-left','tc-right'].forEach(id => document.getElementById(id).classList.toggle('hidden', mode !== 'testcase'));
+  if (mode === 'debug') updateDebugResults();
+  else document.getElementById('dbg-empty').classList.add('hidden');
+}
+
+/* ── B11：空态示例卡片（一键填入演示）────────────────────────────────────── */
+const EXAMPLES = [
+  { title: '两数求和并格式化',
+    expr: '$1;$2 |> expr($1 + $2) |> string.format("%.2f", $1)',
+    vals: ['3', '4'], out: '"7.00"' },
+  { title: '去空格并转大写',
+    expr: '$1 |> string.gsub($1, " ", "") |> string.upper($1)',
+    vals: ['bmc studio'], out: '"BMCSTUDIO"' },
+  { title: '条件判断（Lua 风格 ?:）',
+    expr: '$1 |> expr($1 > 0 ? "正数" : "非正数")',
+    vals: ['5'], out: '"正数"' },
+];
+function renderExamples() {
+  document.getElementById('ex-cards').innerHTML = EXAMPLES.map((ex, i) => `
+    <button class="ex-card" onclick="useExample(${i})">
+      <span class="ex-title">${esc(ex.title)}</span>
+      <span class="ex-expr">${esc(ex.expr)}</span>
+      <span class="ex-io">预填 ${ex.vals.map(esc).join(' , ')} → 预期 <b>${esc(ex.out)}</b></span>
+    </button>`).join('');
+}
+function useExample(i) {
+  const ex = EXAMPLES[i];
+  document.getElementById('expr-input').value = ex.expr;
+  applyExpr();
+  ex.vals.forEach((v, idx) => {
+    inputValues[idx] = v;
+    const f = document.querySelector(`#irow-${idx} .input-field`);
+    if (f) f.value = v;
+  });
+  _touched = true;
+  updateDebugResults();
+  showToast('示例已填入，轨迹见右侧');
+}
+
+/* ── B12：操作符 Chip 面板 ───────────────────────────────────────────────── */
+const OP_OPEN_KEY = 'pipe-eval-op-open';
+function insertOp(text) {
+  const ta = document.getElementById('expr-input');
+  const s = ta.selectionStart ?? ta.value.length;
+  const e = ta.selectionEnd ?? s;
+  ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
+  ta.focus();
+  const pos = s + text.length;
+  ta.setSelectionRange(pos, pos);
+  onExprInput();
+}
+function toggleOpPanel() {
+  const p = document.getElementById('op-panel');
+  p.classList.toggle('open');
+  try { localStorage.setItem(OP_OPEN_KEY, p.classList.contains('open') ? '1' : '0'); } catch(e){}
+}
+
+/* ── Template variable panel ──────────────────────────────────────────────── */
+function toggleTplPanel() {
+  const p = document.getElementById('dbg-tpl');
+  p.classList.toggle('open');
+  try { localStorage.setItem(TPL_OPEN_KEY, p.classList.contains('open') ? '1' : '0'); } catch(e){}
+}
+function renderTplRows() {
+  const c = document.getElementById('tpl-rows');
+  c.innerHTML = templateVars.map((tv, i) => `
+    <div class="tpl-row">
+      <input class="tpl-key" placeholder="变量名" value="${esc(tv.key)}" oninput="onTplKey(${i}, this.value)">
+      <input class="tpl-val" placeholder="值" value="${esc(tv.val)}" oninput="onTplVal(${i}, this.value)">
+      <button class="icon-btn" onclick="removeTplRow(${i})" title="删除">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>`).join('');
+}
+function addTplRow() { templateVars.push({ key:'', val:'' }); renderTplRows(); }
+function removeTplRow(i) { templateVars.splice(i, 1); renderTplRows(); updateDebugResults(); }
+function onTplKey(i, v) { templateVars[i].key = v; updateDebugResults(); }
+function onTplVal(i, v) { templateVars[i].val = v; updateDebugResults(); }
+
+/* ── History (localStorage) ───────────────────────────────────────────────── */
+function loadHistory() { try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch(e) { return []; } }
+function pushHistory(expr) {
+  let h = loadHistory();
+  h = h.filter(x => x.expr !== expr);
+  h.unshift({ expr, ts: Date.now() });
+  h = h.slice(0, 8);
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(h)); } catch(e){}
+  renderHistory();
+}
+function renderHistory() {
+  const h = loadHistory();
+  const c = document.getElementById('history-list');
+  if (!h.length) { c.innerHTML = '<div class="history-empty">暂无历史记录，应用表达式后自动保存</div>'; return; }
+  c.innerHTML = h.map(x => `
+    <div class="history-item" onclick="restoreHistory('${esc(x.expr).replace(/'/g,"\\'")}')">
+      <span class="hi-expr">${esc(x.expr)}</span>
+      <span class="hi-time">${relTime(x.ts)}</span>
+    </div>`).join('');
+}
+function restoreHistory(expr) { document.getElementById('expr-input').value = expr; applyExpr(); switchMode('debug'); }
+function relTime(ts) {
+  const d = Math.floor((Date.now() - ts) / 1000);
+  if (d < 60) return '刚刚';
+  if (d < 3600) return Math.floor(d/60) + ' 分钟前';
+  if (d < 86400) return Math.floor(d/3600) + ' 小时前';
+  return Math.floor(d/86400) + ' 天前';
+}
+
+/* ── Test-case handlers ───────────────────────────────────────────────────── */
+function loadTestCases() {
+  const text = document.getElementById('tc-input').value.trim();
+  const errEl = document.getElementById('tc-load-err');
+  errEl.classList.remove('show');
+  if (!text) { showErr('请输入测试用例', null); return; }
+  const { cases, errors } = parseTestCaseText(text);
+  if (!cases.length) { showErr('未能解析到有效的测试用例', errors[0]?.message); return; }
+  if (errors.length) { const detail = errors.slice(0, 3).map(e => `第 ${e.line} 行: ${e.message}`).join('\n'); showErr(`加载了 ${cases.length} 条，${errors.length} 条解析失败`, detail); }
+  testCases = cases;
+  document.getElementById('tc-exec-section').classList.remove('hidden');
+  document.getElementById('tc-exec-btn').disabled = false;
+  document.getElementById('tc-exec-info').textContent = `已加载 ${cases.length} 条测试用例`;
+}
+function clearTestCases() {
+  testCases = []; execResults = null;
+  document.getElementById('tc-input').value = '';
+  document.getElementById('tc-exec-section').classList.add('hidden');
+  document.getElementById('tc-results-section').classList.add('hidden');
+  document.getElementById('tc-load-err').classList.remove('show');
+  document.getElementById('tc-exec-info').textContent = '';
+  document.getElementById('pass-badge').classList.add('hidden');
+}
+async function executeBatch() {
+  if (!testCases.length) return;
+  const btn = document.getElementById('tc-exec-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="mono">⏳</span> 执行中…';
+  await new Promise(r => setTimeout(r, 0));
+  const tpl = collectTplVars();
+  const results = testCases.map(tc => {
+    const u = { ...tc, executedAt: Date.now() };
+    const res = evaluator.evaluate(parsedExpr, tc.inputs.map(String), tpl);
+    if (!res.success) { u.executionStatus = 'error'; u.errorMessage = res.error; u.actualOutput = null; u.matchStatus = null; }
+    else { u.executionStatus = 'success'; u.actualOutput = String(res.result); u.matchStatus = normOut(u.actualOutput) === normOut(tc.expectedOutput) ? 'match' : 'mismatch'; }
+    return u;
+  });
+  testCases = results;
+  const s = { total: 0, success: 0, failed: 0, matched: 0, mismatched: 0 };
+  results.forEach(tc => { s.total++; if (tc.executionStatus === 'success') { s.success++; if (tc.matchStatus === 'match') s.matched++; if (tc.matchStatus === 'mismatch') s.mismatched++; } else s.failed++; });
+  execResults = { testCases: results, summary: s };
+  resultFilter = 'all';
+  renderBatchResults();
+  btn.disabled = false;
+  btn.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 3l9 5-9 5z"/></svg> 执行全部';
+}
+function normOut(s) { return String(s).trim().replace(/^["']|["']$/g,'').replace(/\s+/g,' '); }
+function exportResults() {
+  if (!testCases.length) return;
+  const lines = testCases.map(tc => [...tc.inputs.map(String), tc.expectedOutput, tc.actualOutput ?? tc.errorMessage ?? ''].join('\t'));
+  const text = '#\t输入\t期望输出\t实际输出\n' + lines.join('\n');
+  navigator.clipboard?.writeText(text).then(() => showToast('结果已复制到剪贴板')).catch(() => showToast('复制失败'));
+}
+
+/* ── Result filter (P1) ───────────────────────────────────────────────────── */
+function filteredCases() {
+  if (!execResults) return [];
+  const all = execResults.testCases;
+  switch (resultFilter) {
+    case 'match': return all.filter(t => t.matchStatus === 'match');
+    case 'mismatch': return all.filter(t => t.matchStatus === 'mismatch');
+    case 'error': return all.filter(t => t.executionStatus === 'error');
+    default: return all;
+  }
+}
+function setFilter(f) { resultFilter = f; renderFilterBar(); document.getElementById('vc').scrollTop = 0; rerenderRows(); }
+function renderFilterBar() {
+  const s = execResults.summary;
+  const chips = [
+    ['all', '全部', s.total],
+    ['match', '匹配', s.matched],
+    ['mismatch', '不匹配', s.mismatched],
+    ['error', '错误', s.failed],
+  ];
+  document.getElementById('tc-filter').innerHTML = chips.map(([f,l,n]) =>
+    `<button class="filter-chip ${resultFilter===f?'active':''}" onclick="setFilter('${f}')">${l}<span class="fc-count">${n}</span></button>`
+  ).join('');
+}
+
+/* ── Virtual scroll ───────────────────────────────────────────────────────── */
+function renderBatchResults() {
+  const s = execResults.summary;
+  document.getElementById('tc-results-section').classList.remove('hidden');
+  document.getElementById('tc-export-btn').classList.remove('hidden');
+  // B15：通过率摘要 badge（全过=绿，有失败/不匹配=红；点击筛选不匹配）
+  const pb = document.getElementById('pass-badge');
+  const allPass = s.matched === s.total;
+  pb.classList.remove('hidden');
+  pb.className = 'pass-badge ' + (allPass ? 'ok' : 'bad');
+  pb.textContent = (allPass ? '✓' : '✗') + ' 通过 ' + s.matched + '/' + s.total;
+  document.getElementById('tc-stats').innerHTML = [
+    ['合计', s.total, ''], ['成功', s.success, 's-ok'], ['失败', s.failed, 's-fail'],
+    ['匹配', s.matched, 's-ok'], ['不匹配', s.mismatched, 's-warn']
+  ].map(([l,v,cls]) => `<div class="stat"><div class="stat-v ${cls}">${v}</div><div class="stat-l">${l}</div></div>`).join('');
+  renderFilterBar();
+  if (!vsReady) { document.getElementById('vc').addEventListener('scroll', handleVScroll); vsReady = true; }
+  document.getElementById('vc').scrollTop = 0;
+  rerenderRows();
+}
+function rerenderRows() {
+  const cases = filteredCases();
+  const end = Math.min(50, cases.length);
+  renderRows(0, end, cases);
+  updateVFoot(0, end, cases.length);
+}
+function handleVScroll() {
+  if (!execResults) return;
+  const cases = filteredCases();
+  const c = document.getElementById('vc');
+  const start = Math.max(0, Math.floor(c.scrollTop / ROW_H) - BUF);
+  const end = Math.min(cases.length, Math.ceil((c.scrollTop + c.clientHeight) / ROW_H) + BUF);
+  renderRows(start, end, cases);
+  updateVFoot(start, end, cases.length);
+}
+function renderRows(start, end, cases) {
+  const spacer = document.getElementById('vs');
+  const content = document.getElementById('vcon');
+  spacer.style.height = (cases.length * ROW_H) + 'px';
+  content.style.top = (start * ROW_H) + 'px';
+  let html = '';
+  for (let i = start; i < end && i < cases.length; i++) {
+    const tc = cases[i];
+    const icon = tc.matchStatus === 'match' ? '✓' : tc.matchStatus === 'mismatch' ? '✗' : tc.executionStatus === 'error' ? '!' : '…';
+    const cls = tc.matchStatus === 'match' ? 'mic-ok' : tc.matchStatus === 'mismatch' ? 'mic-fail' : 'mic-err';
+    const rowCls = tc.matchStatus === 'mismatch' ? 'mismatch' : tc.executionStatus === 'error' ? 'errored' : '';
+    const inp = Array.isArray(tc.inputs) ? tc.inputs.join(' ') : String(tc.inputs);
+    const exp = tc.expectedOutput ?? '–';
+    const act = tc.actualOutput ?? tc.errorMessage ?? 'pending';
+    html += `<div class="vrow ${rowCls}">
+      <div class="vcell ci">${i+1}</div>
+      <div class="vcell inp" title="${esc(inp)}">${esc(inp)}</div>
+      <div class="vcell exp" title="${esc(exp)}">${esc(exp)}</div>
+      <div class="vcell act" title="${esc(act)}">${esc(act)}</div>
+      <div class="vcell st"><span class="mic ${cls}">${icon}</span></div>
+    </div>`;
+  }
+  content.innerHTML = html;
+}
+function updateVFoot(start, end, total) {
+  document.getElementById('vrange').textContent = total ? `显示 ${start+1}–${Math.min(end, total)} / 共 ${total}` : '无匹配结果';
+  document.getElementById('vhint').textContent = total > 50 ? '滚动加载更多' : '';
+}
+
+/* ── Misc ─────────────────────────────────────────────────────────────────── */
+function showErr(msg, detail) {
+  const el = document.getElementById('tc-load-err');
+  el.innerHTML = `<strong>⚠ ${esc(msg)}</strong>${detail ? '<div class="err-detail">' + esc(detail) + '</div>' : ''}`;
+  el.classList.add('show');
+}
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ── Theme switch (P1 — dark/light/glass) ─────────────────────────────────── */
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.querySelectorAll('.theme-seg button').forEach(b => b.classList.toggle('active', b.dataset.themeVal === t));
+  try { localStorage.setItem('pipe-eval-theme', t); } catch(e){}
+}
+
+/* ── Keyboard shortcuts (P0) ──────────────────────────────────────────────── */
+document.addEventListener('keydown', (e) => {
+  // Ctrl/Cmd+Enter → 应用表达式
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (currentMode === 'debug') applyExpr(); }
+  // F5 → 执行批量（用例模式）
+  if (e.key === 'F5' && currentMode === 'testcase' && testCases.length) { e.preventDefault(); executeBatch(); }
+});
+
+/* ── postMessage 宿主桥（打开 setTemplateVars / setExpression 通道）────────── */
+window.addEventListener('message', (event) => {
+  const msg = event.data || {};
+  if (msg.type === 'setTemplateVars' && msg.payload) {
+    templateVars = Object.entries(msg.payload).map(([key, val]) => ({ key, val: String(val) }));
+    if (!document.getElementById('dbg-tpl').classList.contains('open')) toggleTplPanel();
+    renderTplRows(); updateDebugResults();
+  }
+  if (msg.type === 'setExpression' && typeof msg.payload === 'string') {
+    document.getElementById('expr-input').value = msg.payload; applyExpr();
+  }
+  if (msg.type === 'setBadgeTypes' && Array.isArray(msg.payload)) {
+    badgeTypes = msg.payload.slice(); renderInputFields(); updateDebugResults();
+  }
+});
+
+/* ── Init ─────────────────────────────────────────────────────────────────── */
+(function init() {
+  try { const t = localStorage.getItem('pipe-eval-theme'); if (t) setTheme(t); } catch(e){}
+  try { if (localStorage.getItem(TPL_OPEN_KEY) === '1') document.getElementById('dbg-tpl').classList.add('open'); } catch(e){}
+  try { if (localStorage.getItem(OP_OPEN_KEY) === '0') document.getElementById('op-panel').classList.remove('open'); } catch(e){}
+  parsedExpr = parsePipeExpr(originalExprText);
+  renderInputFields();
+  renderTplRows();
+  renderPipelineSlots();
+  renderHistory();
+  renderExamples();
+  updateDebugResults();
+  document.getElementById('expr-input').addEventListener('input', onExprInput);
+})();
+</script>
+</body>
+</html>
